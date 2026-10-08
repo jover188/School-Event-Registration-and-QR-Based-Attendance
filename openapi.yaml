@@ -1,0 +1,608 @@
+openapi: 3.0.3
+info:
+  title: School Event Registration and QR-Based Attendance Management System API
+  description: REST API specification for Laravel backend and Flutter mobile application.
+  version: 1.0.0
+servers:
+  - url: https://api.school-events.edu/api/v1
+    description: Production API Server
+  - url: http://localhost:8000/api/v1
+    description: Local Development Server
+
+components:
+  securitySchemes:
+    SanctumBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum Token
+      description: Enter the Sanctum Bearer token received upon login.
+
+  schemas:
+    StandardResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation completed successfully.
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error_code:
+          type: string
+          example: ERR_VALIDATION_FAILED
+        message:
+          type: string
+          example: The given data was invalid.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    LoginRequest:
+      type: object
+      required:
+        - login
+        - password
+      properties:
+        login:
+          type: string
+          description: Numeric Student ID (e.g., 20260001) or School Email
+          example: "20260001"
+        password:
+          type: string
+          format: password
+          example: "Password@123"
+
+    LoginResponseData:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "14|vB9lKmK2sX8j8H9Z3Qh0u0yD7Eeq0xZk0H1up8Z1F1M"
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 142
+            email:
+              type: string
+              example: "student@school.edu"
+            role:
+              type: string
+              example: "student"
+        student_profile:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 88
+            student_id_number:
+              type: string
+              example: "20260001"
+            full_name:
+              type: string
+              example: "Juan Dela Cruz"
+            course:
+              type: string
+              example: "BS Computer Science"
+            year_level:
+              type: string
+              example: "3rd Year"
+            section:
+              type: string
+              example: "CS-3A"
+            department:
+              type: string
+              example: "College of Computer Studies"
+            profile_photo_url:
+              type: string
+              example: "https://api.school-events.edu/storage/profiles/photo_142.jpg"
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12
+        title:
+          type: string
+          example: "Annual Tech Symposium 2026"
+        description:
+          type: string
+          example: "Exploration of emerging computing technologies."
+        venue:
+          type: string
+          example: "University Auditorium"
+        event_date:
+          type: string
+          format: date
+          example: "2026-10-25"
+        start_time:
+          type: string
+          example: "09:00:00"
+        end_time:
+          type: string
+          example: "16:00:00"
+        registration_start:
+          type: string
+          format: date-time
+          example: "2026-10-10T00:00:00Z"
+        registration_end:
+          type: string
+          format: date-time
+          example: "2026-10-23T23:59:59Z"
+        max_participants:
+          type: integer
+          nullable: true
+          example: 200
+        current_registered_count:
+          type: integer
+          example: 145
+        remaining_slots:
+          type: integer
+          nullable: true
+          example: 55
+        late_grace_period_minutes:
+          type: integer
+          example: 15
+        walk_in_allowed:
+          type: boolean
+          example: true
+        status:
+          type: string
+          enum: [draft, pending_approval, published, ongoing, completed, cancelled]
+          example: "published"
+
+    ScanRequest:
+      type: object
+      required:
+        - qr_token
+        - mode
+      properties:
+        qr_token:
+          type: string
+          minLength: 64
+          maxLength: 64
+          description: Cryptographic 64-character hexadecimal permanent student token
+          example: "a1f8c3d9e2b4056789abcdef0123456789abcdef0123456789abcdef01234567"
+        mode:
+          type: string
+          enum: [check_in, check_out]
+          example: "check_in"
+
+    ScanResponseData:
+      type: object
+      properties:
+        attendance_id:
+          type: integer
+          example: 905
+        status:
+          type: string
+          enum: [present, late, walk_in]
+          example: "present"
+        check_in_time:
+          type: string
+          format: date-time
+          example: "2026-10-25T09:05:22Z"
+        check_out_time:
+          type: string
+          format: date-time
+          nullable: true
+        student:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 88
+            student_id_number:
+              type: string
+              example: "20260001"
+            full_name:
+              type: string
+              example: "Juan Dela Cruz"
+            course:
+              type: string
+              example: "BS Computer Science"
+            year_level:
+              type: string
+              example: "3rd Year"
+            section:
+              type: string
+              example: "CS-3A"
+            department:
+              type: string
+              example: "College of Computer Studies"
+            profile_photo_url:
+              type: string
+              example: "https://api.school-events.edu/storage/profiles/photo_142.jpg"
+
+paths:
+  /auth/register:
+    post:
+      summary: Student Self-Registration
+      description: Allows a student to register with profile photo and numeric student ID. Dispatches email verification.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+                - student_id_number
+                - email
+                - password
+                - password_confirmation
+                - course
+                - year_level
+                - section
+                - department
+                - contact_number
+                - profile_photo
+              properties:
+                first_name:
+                  type: string
+                middle_name:
+                  type: string
+                last_name:
+                  type: string
+                student_id_number:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                password_confirmation:
+                  type: string
+                course:
+                  type: string
+                year_level:
+                  type: string
+                section:
+                  type: string
+                department:
+                  type: string
+                contact_number:
+                  type: string
+                profile_photo:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Registration successful, verification pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      summary: User Authentication
+      description: Authenticates user by school email OR student ID number. Invalidates prior sessions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/LoginResponseData'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Logout
+      description: Revokes the current device Sanctum token.
+      responses:
+        '200':
+          description: Successfully logged out
+
+  /student/qr:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Get Student Permanent QR
+      description: Retrieves the student's active 64-char hexadecimal QR token.
+      responses:
+        '200':
+          description: Permanent QR details returned
+
+  /student/qr/reissue:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Self-Service QR Reissue
+      description: Revokes current permanent QR code immediately and generates a fresh token.
+      responses:
+        '200':
+          description: QR token successfully reissued
+
+  /events:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: List Events
+      description: Search, filter, and paginate available events.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated events returned
+
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Create Event (Draft)
+      description: Creates a new event in draft status (Organizer/Admin).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+      responses:
+        '201':
+          description: Event created in draft status
+
+  /events/{id}/submit-approval:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Submit Event for Approval
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Status changed to pending_approval
+
+  /admin/events/{id}/review:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Admin Review Event Publishing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  enum: [approved, rejected]
+                remarks:
+                  type: string
+      responses:
+        '200':
+          description: Event approved or rejected
+
+  /events/{id}/register:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Event Registration / Join Waiting List
+      description: Registers authenticated student for an event. Placed on waiting list if cap reached.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Registered or placed on waiting list
+        '409':
+          description: Duplicate registration or registration closed
+
+  /events/{id}/cancel-registration:
+    delete:
+      security:
+        - SanctumBearerAuth: []
+      summary: Cancel Registration (Student)
+      description: Cancels student registration and auto-promotes the next student on the waiting list.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Cancelled and waiting list updated
+
+  /events/{id}/attendance/scan:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Scan QR Code (Attendance Check-In / Check-Out)
+      description: Evaluates QR token, checks start time against grace period for late detection, returns student verification photo and name.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+      responses:
+        '200':
+          description: Attendance recorded; photo & status returned for visual check
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ScanResponseData'
+        '403':
+          description: Student not registered and walk-in attendance disallowed
+        '409':
+          description: Duplicate scan for check-in
+        '422':
+          description: Invalid or revoked QR token
+
+  /attendance/{id}/correct:
+    put:
+      security:
+        - SanctumBearerAuth: []
+      summary: Correct Attendance Record
+      description: Admin or organizer modifies attendance status with mandatory justification reason.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - new_status
+                - reason
+              properties:
+                new_status:
+                  type: string
+                  enum: [present, absent, late, excused, walk_in]
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Attendance record corrected and audited
+
+  /reports/export:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Export Reports
+      description: Generates and streams PDF, CSV, or Excel binary reports.
+      parameters:
+        - name: report_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [event_attendance, student_history, registration_summary, participation_summary, absentee, walk_in, organizer_summary]
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [pdf, csv, xlsx]
+        - name: event_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: File download stream (PDF/CSV/Excel)
+
+  /device-tokens:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Register Device FCM Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fcm_token
+                - platform
+              properties:
+                fcm_token:
+                  type: string
+                platform:
+                  type: string
+                  enum: [android, ios]
+      responses:
+        '200':
+          description: Device token registered
+
+  /dashboard/{role}:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Role-Specific Dashboard Metrics
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [student, organizer, management, admin]
+      responses:
+        '200':
+          description: Dashboard metrics returned

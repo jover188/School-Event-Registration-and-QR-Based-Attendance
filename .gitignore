@@ -1,0 +1,30 @@
+# Backend
+backend/vendor/
+backend/node_modules/
+backend/public/storage
+backend/public/hot
+backend/storage/*.key
+backend/.env
+backend/.env.backup
+backend/.env.production
+backend/.phpunit.result.cache
+backend/database/database.sqlite
+backend/database/database.sqlite-journal
+
+# Mobile (Flutter)
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/.packages
+
+# Environment & IDE
+.env
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
