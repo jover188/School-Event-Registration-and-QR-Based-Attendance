@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exports\AbsenteeExport;
+use App\Exports\EventAttendanceExport;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Attendance;
@@ -9,8 +11,12 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Student;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
@@ -200,26 +206,46 @@ class ReportController extends Controller
     }
 
     /**
-     * Export Reports (CSV Stream)
+     * Export Reports — supports csv, pdf, xlsx
+     *
+     * Query params:
+     *   report_type  : event_attendance | absentee | student_history | walk_in
+     *   format       : csv | pdf | xlsx
+     *   event_id     : required for event_attendance, absentee, walk_in
+     *   student_id   : required for student_history
      */
-    public function export(Request $request): StreamedResponse|JsonResponse
+    public function export(Request $request): StreamedResponse|BinaryFileResponse|Response|JsonResponse
     {
         $validated = $request->validate([
             'report_type' => ['required', 'in:event_attendance,student_history,absentee,walk_in'],
-            'format' => ['required', 'in:csv,json'],
-            'event_id' => ['required_if:report_type,event_attendance,absentee,walk_in', 'nullable', 'integer'],
-            'student_id' => ['required_if:report_type,student_history', 'nullable', 'integer'],
+            'format'      => ['required', 'in:csv,pdf,xlsx'],
+            'event_id'    => ['required_if:report_type,event_attendance,absentee,walk_in', 'nullable', 'integer'],
+            'student_id'  => ['required_if:report_type,student_history', 'nullable', 'integer'],
         ]);
 
-        $reportType = $validated['report_type'];
-        $format = $validated['format'];
+        $reportType  = $validated['report_type'];
+        $format      = $validated['format'];
+        $generatedBy = $request->user()?->email ?? 'system';
 
-        ActivityLog::log('report_exported', 'reports', $validated['event_id'] ?? $validated['student_id'], [
+        ActivityLog::log('report_exported', 'reports', $validated['event_id'] ?? $validated['student_id'] ?? null, [
             'report_type' => $reportType,
-            'format' => $format,
+            'format'      => $format,
         ]);
 
-        $filename = "report_{$reportType}_" . date('Ymd_His') . ".csv";
+        $timestamp = now()->format('Ymd_His');
+
+        // ── PDF export ────────────────────────────────────────────────────────
+        if ($format === 'pdf') {
+            return $this->exportPdf($reportType, $validated, $generatedBy, $timestamp);
+        }
+
+        // ── Excel (.xlsx) export ──────────────────────────────────────────────
+        if ($format === 'xlsx') {
+            return $this->exportXlsx($reportType, $validated, $generatedBy, $timestamp);
+        }
+
+        // ── CSV stream export ─────────────────────────────────────────────────
+        $filename = "report_{$reportType}_{$timestamp}.csv";
 
         return response()->streamDownload(function () use ($reportType, $validated) {
             $handle = fopen('php://output', 'w');
@@ -259,12 +285,91 @@ class ReportController extends Controller
                         $reg->student?->contact_number,
                     ]);
                 }
+            } elseif ($reportType === 'walk_in') {
+                fputcsv($handle, ['Student ID', 'Full Name', 'Course', 'Check-In Time']);
+                $walkIns = Attendance::with('student')
+                    ->where('event_id', $validated['event_id'])
+                    ->where('status', 'walk_in')
+                    ->cursor();
+
+                foreach ($walkIns as $att) {
+                    fputcsv($handle, [
+                        $att->student?->student_id_number,
+                        $att->student?->full_name,
+                        $att->student?->course,
+                        $att->check_in_time?->format('Y-m-d H:i:s'),
+                    ]);
+                }
             }
 
             fclose($handle);
         }, $filename, [
-            'Content-Type' => 'text/csv',
+            'Content-Type'        => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function exportPdf(string $reportType, array $params, string $generatedBy, string $timestamp): Response
+    {
+        if ($reportType === 'event_attendance') {
+            $event       = Event::with('organizer:id,email')->findOrFail($params['event_id']);
+            $attendances = Attendance::with('student')
+                ->where('event_id', $event->id)
+                ->orderBy('check_in_time', 'asc')
+                ->get();
+
+            $pdf = Pdf::loadView('reports.event_attendance', [
+                'event'          => $event,
+                'attendances'    => $attendances,
+                'totalAttendees' => $attendances->count(),
+                'presentCount'   => $attendances->where('status', 'present')->count(),
+                'lateCount'      => $attendances->where('status', 'late')->count(),
+                'walkInCount'    => $attendances->where('status', 'walk_in')->count(),
+                'generatedBy'    => $generatedBy,
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download("attendance_{$event->id}_{$timestamp}.pdf");
+        }
+
+        if ($reportType === 'absentee') {
+            $event     = Event::findOrFail($params['event_id']);
+            $absentees = EventRegistration::with('student')
+                ->where('event_id', $event->id)
+                ->where('status', 'registered')
+                ->whereDoesntHave('attendance')
+                ->get();
+
+            $pdf = Pdf::loadView('reports.absentee', [
+                'event'       => $event,
+                'absentees'   => $absentees,
+                'generatedBy' => $generatedBy,
+            ])->setPaper('a4', 'portrait');
+
+            return $pdf->download("absentee_{$event->id}_{$timestamp}.pdf");
+        }
+
+        abort(422, "PDF export not supported for report type: {$reportType}");
+    }
+
+    private function exportXlsx(string $reportType, array $params, string $generatedBy, string $timestamp): BinaryFileResponse
+    {
+        if ($reportType === 'event_attendance') {
+            $event    = Event::findOrFail($params['event_id']);
+            $filename = "attendance_{$event->id}_{$timestamp}.xlsx";
+
+            return Excel::download(new EventAttendanceExport($event, $generatedBy), $filename);
+        }
+
+        if ($reportType === 'absentee') {
+            $event    = Event::findOrFail($params['event_id']);
+            $filename = "absentee_{$event->id}_{$timestamp}.xlsx";
+
+            return Excel::download(new AbsenteeExport($event, $generatedBy), $filename);
+        }
+
+        abort(422, "Excel export not supported for report type: {$reportType}");
+    }
 }
+
