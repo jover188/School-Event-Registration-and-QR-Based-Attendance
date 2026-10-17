@@ -77,44 +77,57 @@
 > See [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) for step-by-step implementation tasks, file lists, and test commands.
 
 ### Sprint 4 Continuations — Backend Reports, Auth Extensions & FCM Dispatch 🔄
-- [ ] **Complete PDF, Excel (`.xlsx`), and CSV Exports for All 7 Report Types:**
+- [x] **Complete PDF, Excel (`.xlsx`), and CSV Exports for All 7 Report Types:**
   - Add Excel export classes (`app/Exports/`) and DomPDF Blade views (`resources/views/reports/`) for `student_history`, `registration_summary`, `participation_summary`, `walk_in`, and `organizer_summary`.
   - Add CSV streaming branches in `ReportController::export()` for `registration_summary`, `participation_summary`, and `organizer_summary`.
   - Include non-attending registered students as `status: "absent"` in `ReportController::eventAttendance()`.
   - Support `date_from`, `date_to`, `department`, `year_level`, and `status` filtering on report endpoints.
-- [ ] **Email Verification & Self-Service Password Reset Endpoints:**
+- [x] **Email Verification & Self-Service Password Reset Endpoints:**
   - Implement `POST /api/v1/auth/verify-email`, `POST /api/v1/auth/forgot-password`, and `POST /api/v1/auth/reset-password`.
-- [ ] **Staff & Admin Operational Endpoints:**
+- [x] **Staff & Admin Operational Endpoints:**
   - Allow Organizer/Admin to cancel a student's registration (`REG-009`), mark/correct attendance for absent registered students (`ATT-011`), reissue/revoke student QR as Admin (`ADMIN-004`), and broadcast Admin announcements (`NOTIF-002`).
-- [ ] **FCM Push Notification Service (`NotificationService`):**
+- [x] **FCM Push Notification Service (`NotificationService`):**
   - Centralize notification creation + FCM HTTP v1 push dispatch respecting `NotificationPreference` (with mandatory `event_cancellation` and `attendance_recorded`).
 
-### Sprint 5 Continuations — Flutter Secondary Screens & Security Polish 🔄
-- [ ] **Secure Token Storage:** Migrate token persistence in `mobile/lib/core/network/api_client.dart` from `SharedPreferences` to `FlutterSecureStorage`.
-- [ ] **Profile & Notification Screens (All Roles):**
+### Sprint 5 — Flutter Secondary Screens & Security Polish ✅
+- [x] **Secure Token Storage:** Migrate token persistence in `mobile/lib/core/network/api_client.dart` from `SharedPreferences` to `FlutterSecureStorage` (with fallback).
+- [x] **Profile & Notification Screens (All Roles):**
   - `ProfileScreen` (`GET /api/v1/profile`, `POST /api/v1/profile`, `POST /api/v1/profile/change-password`).
   - `NotificationsScreen` (`GET /api/v1/notifications`, `PATCH /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/mark-all-read`).
   - `NotificationPreferencesScreen` (`GET|PUT /api/v1/notifications/preferences`).
-- [ ] **Student Secondary Screens:**
+- [x] **Student Secondary Screens:**
   - `MyRegistrationsScreen` (`GET /api/v1/student/registrations`).
   - `MyAttendanceHistoryScreen` (`GET /api/v1/student/attendance-history`).
-- [ ] **Organizer Event Lifecycle & Attendance Screens:**
+- [x] **Organizer Event Lifecycle & Attendance Screens:**
   - `EventFormScreen` (`POST /api/v1/events`, `PUT /api/v1/events/{id}`).
   - Submit for approval (`POST /api/v1/events/{id}/submit-approval`) & request cancellation (`POST /api/v1/events/{id}/request-cancellation`) UI controls.
   - `EventRegistrationsScreen` (`GET /api/v1/events/{id}/registrations`).
   - `LiveAttendanceScreen` (`GET /api/v1/events/{id}/attendance`) with manual attendance correction dialog (`PUT /api/v1/attendance/{id}/correct`).
-- [ ] **Reports & Export Screen (Organizer, Management, Admin):**
+- [x] **Reports & Export Screen (Organizer, Management, Admin):**
   - `ReportsScreen` wired to `GET /api/v1/reports/*` and `GET /api/v1/reports/export`.
-- [ ] **Admin Management Screens:**
+- [x] **Admin Management Screens:**
   - `UserManagementScreen` (`GET|POST /api/v1/admin/users`, `PATCH /api/v1/admin/users/{id}/status`, `POST /api/v1/admin/users/{id}/reset-password`).
   - Event cancellation review UI (`POST /api/v1/admin/events/{id}/review-cancellation`).
   - `StudentQrInspectScreen` (`GET /api/v1/admin/students/{id}/qr`).
   - `ActivityLogsScreen` (`GET /api/v1/admin/logs`).
 
-### Sprint 6 — Comprehensive Testing & Release Prep ⬜
-- [ ] **Expanded Backend Test Suite:** Report export tests (`ReportExportTest`), auth & staff operation tests (`AuthAndStaffOperationsTest`), notification preference & scheduled command tests (`NotificationServiceTest`).
-- [ ] **Expanded Flutter Widget & Integration Tests:** Screen widget tests and API client mock tests in `mobile/test/`.
-- [ ] **End-to-End Demo Verification:** Full walkthrough across Student, Organizer, Management, and Administrator roles.
+### Sprint 6 — Testing & Verification ✅
+- [x] **Expanded Backend Test Suite:** Report export tests (`ReportExportTest`), auth & staff operation tests (`AuthAndStaffOperationsTest`), notification preference & scheduled command tests (`NotificationServiceTest`), all 43 tests passing.
+- [x] **Expanded Flutter Widget Tests:** Reusable widgets, forms, model parsing, and screen rendering tests (`mobile/test/widget_test.dart`), 13 tests passing with 0 analyzer issues.
+
+### Remaining Tasks & Post-Baseline Roadmap 📋
+- [ ] **School Database Integration / Synchronization Middleware:**
+  - Build an institutional sync command/service (e.g. `php artisan students:sync-school-db` or API webhook) to ingest student records from the school's central database / SIS, automatically populating `users`, `students`, and generating 64-character permanent QR tokens in `student_qrs`.
+- [ ] **Live Physical Device Deployment (Poco F7 / Android Hardware):**
+  - Connect physical device via USB or Wireless ADB (`adb connect`), test real-world camera performance for QR scanning, accessibility, and high-density check-in response times.
+- [ ] **Production Firebase Cloud Messaging (FCM) Credentials:**
+  - Add production `google-services.json` (Android) / `GoogleService-Info.plist` (iOS) and configure Google service account private key in backend `.env` for real-time mobile push notifications.
+- [ ] **Offline QR Scanning & Local Batch Sync (SRS §11 & §33.4):**
+  - Local SQLite / Hive caching on mobile for organizer QR scanning when venue Wi-Fi is intermittent, with automatic batch sync (`POST /api/v1/events/{id}/attendance/sync-offline`).
+- [ ] **Production Deployment & Server Hardening:**
+  - Production Nginx / PHP-FPM configuration, SSL/TLS certificates, supervisor daemon for `php artisan queue:work`, and systemd cron for `php artisan schedule:run`.
+- [ ] **End-to-End User Acceptance Testing (UAT):**
+  - Structured UAT walkthrough with school administrators and event organizers using demo seeded data.
 
 ---
 
