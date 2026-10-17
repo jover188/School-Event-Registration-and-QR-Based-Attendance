@@ -39,7 +39,7 @@
 - [x] Laravel 11 scaffolded in `backend/` with Laravel Sanctum 4.x
 - [x] 13 domain table migrations + Sanctum `personal_access_tokens` & Laravel system tables
 - [x] 13 Eloquent Models with full relationships, capacity helpers, and `ActivityLog::log()`
-- [x] `AuthController` — `POST /api/v1/auth/register`, `POST /api/v1/auth/login` (numeric student ID or email), `POST /api/v1/auth/logout`, `GET /api/v1/profile`, `PUT|POST /api/v1/profile`, `POST /api/v1/profile/change-password`
+- [x] `AuthController` — `POST /api/v1/auth/login` (numeric student ID or email), `POST /api/v1/auth/logout`, `GET /api/v1/profile`, `PUT|POST /api/v1/profile`, `POST /api/v1/profile/change-password` (public self-registration disabled; pre-provisioned via institutional seeders/middleware)
 - [x] `StudentQRController` — `GET /api/v1/student/qr`, `POST /api/v1/student/qr/reissue`, `GET /api/v1/admin/students/{id}/qr`
 - [x] `EventController` — `GET /api/v1/events`, `GET /api/v1/events/{id}`, `POST /api/v1/events`, `PUT /api/v1/events/{id}`, `POST /api/v1/events/{id}/submit-approval`, `POST /api/v1/admin/events/{id}/review`, `POST /api/v1/events/{id}/request-cancellation`, `POST /api/v1/admin/events/{id}/review-cancellation`
 - [x] Custom Middleware: `CheckRole` (`role` alias) + `EnforceSingleSession` (`single.session` alias)
@@ -62,7 +62,7 @@
 - [x] Cross-platform targets configured (`linux`, `android`, `web`) and building cleanly on Linux desktop
 - [x] `main.dart` — persistent login routing by role + global single-session termination dialog
 - [x] `api_client.dart` & `api_constants.dart` — Bearer token auth, multipart upload, 401 session callback
-- [x] `login_screen.dart` & `register_screen.dart` — wired to `/api/v1/auth/login` and `/api/v1/auth/register`
+- [x] `login_screen.dart` & `forgot_password_screen.dart` — wired to `/api/v1/auth/login`, `/api/v1/auth/forgot-password`, `/api/v1/auth/reset-password`, and `/api/v1/auth/verify-email` (self-registration removed in favor of institutional pre-provisioning)
 - [x] `student_dashboard_screen.dart` — wired to `/api/v1/dashboard/student` and `/api/v1/events`
 - [x] `permanent_qr_screen.dart` — wired to `GET /api/v1/student/qr` and `POST /api/v1/student/qr/reissue` with `QrImageView`
 - [x] `event_detail_screen.dart` — wired to `GET /api/v1/events/{id}`, `POST /api/v1/events/{id}/register`, and `DELETE /api/v1/events/{id}/cancel-registration`

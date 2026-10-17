@@ -31,7 +31,7 @@ Whenever an API route, request/response field, status enum, or database column c
 3. **Four Fixed RBAC Roles (`roles.slug`):**
    - `administrator` (Role ID `1`): Full system management, user creation/status/password reset, event publishing & cancellation review, QR inspection, activity logs.
    - `organizer` (Role ID `2`): Create/edit own events, submit for approval, request cancellation, scan QR codes (check-in/out), correct attendance for own events, view/export reports.
-   - `student` (Role ID `3`): Self-register, browse/register/cancel events, join waiting lists, view/reissue permanent QR, view own attendance history.
+   - `student` (Role ID `3`): Pre-provisioned institutional student account (synchronized from school database / seeders). Authenticate via numeric Student ID or school email. Browse/register/cancel events, join waiting lists, view/reissue permanent QR, view own attendance history (self-registration is disabled).
    - `management` (Role ID `4`): **Strictly Read-Only (`RO`)**. Must never be granted write/mutation access to events, registrations, attendance, or users.
 
 4. **Single Active Session Enforcement:**

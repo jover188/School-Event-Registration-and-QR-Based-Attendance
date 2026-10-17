@@ -79,67 +79,9 @@ Every JSON response conforms to a consistent structure.
 
 # 2. Authentication & Profile Endpoints
 
-### 2.1 Student Self-Registration
-- **Method & Route:** `POST /auth/register`
-- **Access:** Public (Guest)
-- **Content-Type:** `multipart/form-data`
-- **Request Parameters:**
-  | Field | Type | Required | Description |
-  |---|---|---|---|
-  | `first_name` | string | Yes | First name (max 100) |
-  | `middle_name` | string | No | Middle name (max 100) |
-  | `last_name` | string | Yes | Last name (max 100) |
-  | `student_id_number` | string | Yes | Numeric format (e.g., `20260001`), unique |
-  | `email` | string | Yes | School email address, unique |
-  | `password` | string | Yes | Min 8 chars, mixed case, numbers |
-  | `password_confirmation` | string | Yes | Must match `password` |
-  | `course` | string | Yes | Degree program (e.g., `BS Computer Science`) |
-  | `year_level` | string | Yes | E.g., `3rd Year` |
-  | `section` | string | Yes | Class section (e.g., `CS-3A`) |
-  | `department` | string | Yes | College / Department name |
-  | `contact_number` | string | Yes | Mobile phone number |
-  | `profile_photo` | file | No | Optional/nullable JPG/PNG image, max 2MB |
+> **Note on Account Provisioning:** Student and staff accounts are pre-provisioned and synchronized from the institution's central student database via institutional seeders or database synchronization middleware. Public open self-registration is disabled (`POST /auth/register` omitted).
 
-- **Response `201 Created`:**
-```json
-{
-  "success": true,
-  "message": "Registration successful. Please verify your email via the link sent to your school inbox.",
-  "data": {
-    "user_id": 142,
-    "email": "student@school.edu",
-    "student_id_number": "20260001",
-    "status": "pending"
-  }
-}
-```
-
----
-
-### 2.2 Verify Email
-- **Method & Route:** `POST /auth/verify-email`
-- **Access:** Public
-- **Request Body:**
-```json
-{
-  "email": "student@school.edu",
-  "token": "49bf8a892f39d2c49901a..."
-}
-```
-- **Response `200 OK`:**
-```json
-{
-  "success": true,
-  "message": "Email verified successfully. You may now log in.",
-  "data": {
-    "status": "active"
-  }
-}
-```
-
----
-
-### 2.3 User Login
+### 2.1 User Login
 - **Method & Route:** `POST /auth/login`
 - **Access:** Public
 - **Throttle:** 5 requests per minute
@@ -182,7 +124,30 @@ Every JSON response conforms to a consistent structure.
 
 ---
 
-### 2.4 Logout
+### 2.2 Verify Email
+- **Method & Route:** `POST /auth/verify-email`
+- **Access:** Public
+- **Request Body:**
+```json
+{
+  "email": "student@school.edu",
+  "token": "49bf8a892f39d2c49901a..."
+}
+```
+- **Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Email verified successfully. You may now log in.",
+  "data": {
+    "status": "active"
+  }
+}
+```
+
+---
+
+### 2.3 Logout
 - **Method & Route:** `POST /auth/logout`
 - **Access:** Authenticated (Bearer Token)
 - **Response `200 OK`:**
@@ -195,7 +160,7 @@ Every JSON response conforms to a consistent structure.
 
 ---
 
-### 2.5 Password Reset Request & Confirmation
+### 2.4 Password Reset Request & Confirmation
 - **`POST /auth/forgot-password`**
   - **Access:** Public
   - **Body:** `{ "email": "student@school.edu" }`
@@ -215,7 +180,7 @@ Every JSON response conforms to a consistent structure.
 
 ---
 
-### 2.6 Authenticated Profile Management
+### 2.5 Authenticated Profile Management
 - **`GET /profile`**
   - **Access:** Authenticated (All roles)
   - **Description:** Retrieves authenticated user details, student profile (if student), and notification preferences.

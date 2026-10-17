@@ -8,7 +8,6 @@ import '../management/management_dashboard_screen.dart';
 import '../organizer/organizer_dashboard_screen.dart';
 import '../student/student_dashboard_screen.dart';
 import 'forgot_password_screen.dart';
-import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback? onForgotPassword;
@@ -252,44 +251,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               )
                             : const Text('Log In'),
                       ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            "Don't have a student account? ",
-                            style: AppTypography.bodyMuted,
-                          ),
-                          Semantics(
-                            button: true,
-                            label: 'Register Here',
-                            child: InkWell(
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.sm),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const RegisterScreen(),
-                                  ),
-                                );
-                              },
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.xs,
-                                  vertical: AppSpacing.xs,
-                                ),
-                                child: Text(
-                                  'Register Here',
-                                  style: TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: AppSpacing.sm),
+                      const Text(
+                        'Student and staff accounts are pre-provisioned by institutional administration.',
+                        style: AppTypography.caption,
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),

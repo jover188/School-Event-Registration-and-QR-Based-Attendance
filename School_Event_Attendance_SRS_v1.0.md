@@ -197,7 +197,7 @@ The Event Organizer or Staff can:
 
 Students can:
 
--   Self-register for an account using school email verification
+-   Authenticate using pre-provisioned school credentials (synchronized from the school database / institutional seeders via middleware)
 -   Log in using school email or student ID + password
 -   View available events
 -   View event details
@@ -420,11 +420,13 @@ Organizer/Staff, Student, and School Management.
 The API shall reject requests from users who do not have permission to
 access the requested resource.
 
-### AUTH-009 Student Self-Registration
+### AUTH-009 Institutional Student Account Provisioning & Sync
 
-Students shall be able to self-register for an account. The system shall
-send a verification email to the student's school email address.
-The account shall not be activated until the email is verified.
+Student accounts, profile records, and permanent QR identities shall be
+pre-provisioned and synchronized directly from the institution's central
+student database via database seeders and institutional middleware. Public
+open self-registration is disabled to prevent unauthorized account creation
+and ensure strict data synchronization with institutional registrar records.
 
 ### AUTH-010 Password Reset (Email Self-Service)
 
@@ -471,8 +473,8 @@ Authorized administrators shall be able to assign appropriate roles
 ### USER-004 Account Status
 
 The system shall support the following canonical account statuses:
-`active`, `inactive`, and `pending` (pending email verification for
-self-registered students).
+`active`, `inactive`, and `pending` (pending initial activation or
+password verification).
 
 ### USER-005 Student Profile
 
@@ -1388,8 +1390,8 @@ The exact endpoint names are specified in `REST_API_Specification.md` and
 
 ### Authentication
 
--   Self-register (student)
--   Verify email / resend verification
+-   Pre-provisioned account onboarding via institutional database seeders/middleware
+-   Verify email / initial account activation
 -   Login (email + password for all roles, or numeric student ID + password for students)
 -   Logout
 -   Password reset request (email self-service)
@@ -1620,7 +1622,7 @@ Oreo) and iOS (minimum iOS 13) via Flutter cross-platform development.
   --------------------- --------------- ----------------- -------------- ----------
   Login                 Yes             Yes               Yes            Yes
 
-  Self-Register         No              No                Yes            No
+  Self-Register         No              No                No (Pre-prov)  No
 
   Manage Users          Yes             No                No             No
 
@@ -1682,7 +1684,7 @@ Event Organizer/Staff user.
 
 ## 24.1 Student Workflow
 
-**Self-Register → Verify Email → Login → View Available Events → Select
+**Pre-Provisioned Account Synced from School Database → Login (Student ID or Email) → View Available Events → Select
 Event → View Details → Register (or Automatic Waiting List Placement if
 at Capacity) → Registration Confirmed → Attend Event → Open Permanent QR
 → Present QR → Organizer Scans QR (Check-In Mode) → Backend Atomically
@@ -1810,7 +1812,7 @@ requirements have been implemented and verified.
 
 Minimum acceptance criteria:
 
-1.  Students can self-register and verify their school email address (`AUTH-009`, `AUTH-013`).
+1.  Student accounts and permanent QR identities are pre-provisioned and synchronized from the school's central database via institutional seeders/middleware, and students can securely log in using their numeric Student ID or school email (`AUTH-001`, `AUTH-009`, `USER-005`).
 2.  Authorized users can log in securely using email + password (all roles) or numeric Student ID + password (Students), with single active session enforcement invalidating prior device tokens (`AUTH-001`, `AUTH-012`).
 3.  Unauthorized users cannot access protected functions, and role permissions work strictly according to the Permission Matrix (`AUTH-007`, `AUTH-008`, Section 23).
 4.  Organizers can create and manage their own events, and events require Administrator approval before publication or cancellation (`EVENT-001` to `EVENT-006`).
@@ -1989,8 +1991,10 @@ decided as follows:
 ## 33.1 User Details & Authentication
 
 -   **Student Identifier:** Numeric student ID format (e.g., 20260001).
--   **Account Creation:** Self-registration for students with school email
-    verification. Administrator creates Organizer and School Management accounts.
+-   **Account Creation:** Pre-provisioned and synchronized from the school's
+    central database via database seeders and institutional middleware (open
+    public self-registration is disabled). Administrator provisions Organizer
+    and School Management staff accounts.
 -   **Login Credential:** All users may log in using their registered school
     email + password; users with the **Student** role may alternatively log in
     using their numeric Student ID number + password.

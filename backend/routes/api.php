@@ -23,7 +23,6 @@ Route::prefix('v1')->group(function () {
     // 1. Public Authentication Routes
     // ========================================================================
     Route::prefix('auth')->group(function () {
-        Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
         Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
         Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);

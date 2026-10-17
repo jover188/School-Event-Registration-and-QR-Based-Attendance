@@ -61,6 +61,8 @@ graph TD
 
 ## 1.2 Authentication & Session Flow (Single Session Enforcement)
 
+> **Architecture Invariant:** Student profiles, Student IDs, and accounts originate from the institution's central student database via database seeders or synchronization middleware. Public self-registration is disabled to maintain data fidelity with registrar records.
+
 ```mermaid
 sequenceDiagram
     autonumber

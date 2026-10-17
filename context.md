@@ -86,7 +86,7 @@ The system enforces strict Role-Based Access Control (`CheckRole` middleware usi
 |---|---|---|---|---|---|
 | `1` | Administrator | `administrator` | Full control, user/role management, event/cancellation approval, QR inspection, audit logs | `admin@school.edu` | `Admin@12345` |
 | `2` | Event Organizer / Staff | `organizer` | Create/manage own events, scan student QR (check-in/out), monitor/correct attendance, export reports | `organizer@school.edu` | `Organizer@12345` |
-| `3` | Student | `student` | Self-register, browse/register for events, waiting list, view/reissue permanent QR, attendance history | `student@school.edu` or `20260001` | `Student@12345` |
+| `3` | Student | `student` | Pre-provisioned/synced institutional account, browse/register for events, waiting list, view/reissue permanent QR, attendance history | `student@school.edu` or `20260001` | `Student@12345` |
 | `4` | School Management | `management` | **Strictly Read-Only** access to dashboards, events, registrations, attendance, and reports/exports | `management@school.edu` | `Management@12345` |
 
 ---
@@ -124,12 +124,12 @@ The system enforces strict Role-Based Access Control (`CheckRole` middleware usi
 - **Mobile Application (`mobile/`)**:
   - Cross-platform Flutter structure (`linux`, `android`, `web`), centralized Material 3 design token system (`AppColors`, `AppSpacing`, `AppRadius`, `AppTypography`), and reusable widget component library (`StatusBadge`, `StatMetricCard`, `EmptyStateView`, `ErrorStateView`, `SectionHeader`, `EventCard`).
   - `ApiClient` with `FlutterSecureStorage` token persistence, Bearer token injection, `postMultipart`, `downloadBytes`, and 401 session termination listener.
-  - All 22 screens implemented and wired across all 4 roles:
-    - Auth: `LoginScreen`, `RegisterScreen`, `ForgotPasswordScreen`
+  - All 21 screens implemented and wired across all 4 roles:
+    - Auth: `LoginScreen`, `ForgotPasswordScreen`
     - Common: `ProfileScreen`, `NotificationsScreen`, `NotificationPreferencesScreen`, `ReportsScreen`
     - Student: `StudentDashboardScreen`, `PermanentQrScreen`, `EventDetailScreen`, `MyRegistrationsScreen`, `MyAttendanceHistoryScreen`
     - Organizer: `OrganizerDashboardScreen`, `QrScannerScreen`, `EventFormScreen`, `EventRegistrationsScreen`, `LiveAttendanceScreen`
     - Management: `ManagementDashboardScreen` (strictly Read-Only)
     - Admin: `AdminDashboardScreen`, `UserManagementScreen`, `ActivityLogsScreen`, `StudentQrInspectScreen`
-  - 14 Flutter unit and widget tests passing with `0` analyzer issues.
+  - 13 Flutter unit and widget tests passing with `0` analyzer issues.
 

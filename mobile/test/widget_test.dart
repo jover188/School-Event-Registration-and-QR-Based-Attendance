@@ -15,7 +15,6 @@ import 'package:school_event_attendance/models/event_model.dart';
 import 'package:school_event_attendance/models/user_model.dart';
 import 'package:school_event_attendance/screens/auth/forgot_password_screen.dart';
 import 'package:school_event_attendance/screens/auth/login_screen.dart';
-import 'package:school_event_attendance/screens/auth/register_screen.dart';
 import 'package:school_event_attendance/screens/organizer/event_form_screen.dart';
 
 void main() {
@@ -292,21 +291,8 @@ void main() {
     expect(find.text('QR-Based Attendance & Event System'), findsOneWidget);
     expect(find.text('Log In'), findsOneWidget);
     expect(find.text('Forgot Password?'), findsOneWidget);
-    expect(find.text('Register Here'), findsOneWidget);
-  });
-
-  testWidgets('RegisterScreen renders year level dropdown and form inputs',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: const RegisterScreen(),
-      ),
-    );
-
-    expect(find.text('Student Self-Registration'), findsOneWidget);
-    expect(find.text('Complete Registration'), findsOneWidget);
-    expect(find.text('1st Year'), findsOneWidget);
+    expect(find.textContaining('pre-provisioned'), findsOneWidget);
+    expect(find.text('Register Here'), findsNothing);
   });
 
   testWidgets('ForgotPasswordScreen renders password recovery and verification tabs',

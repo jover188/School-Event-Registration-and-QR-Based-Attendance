@@ -46,7 +46,7 @@
 - [x] **Database Seeders (`backend/database/seeders/`):** `RoleSeeder` (4 roles) and `UserSeeder` (4 demo accounts + student profile `20260001` + 64-char permanent QR + notification preferences).
 - [x] **Custom Middleware (`backend/app/Http/Middleware/`):** `CheckRole` (`role` alias) and `EnforceSingleSession` (`single.session` alias).
 - [x] **API v1 Controllers (`backend/app/Http/Controllers/Api/V1/`):**
-  - [x] `AuthController` — `register`, `login` (email or numeric student ID + single-session token creation), `logout`, `profile`, `updateProfile`, `changePassword`.
+  - [x] `AuthController` — `login` (email or numeric student ID + single-session token creation), `logout`, `profile`, `updateProfile`, `changePassword` (public self-registration removed in favor of institutional database seeding/middleware sync).
   - [x] `StudentQRController` — `show` (`GET /student/qr`), `reissue` (`POST /student/qr/reissue`), `inspect` (`GET /admin/students/{id}/qr`).
   - [x] `EventController` — `index`, `show`, `store`, `update`, `submitApproval`, `reviewApproval`, `requestCancellation`, `reviewCancellation`.
   - [x] `RegistrationController` — `register` (with capacity & waiting list placement), `cancelRegistration` (with transactional waiting list auto-promotion), `index` (`GET /events/{id}/registrations`), `studentRegistrations` (`GET /student/registrations`).
@@ -68,14 +68,14 @@
   - [x] `AppTheme` (`AppColors`, `AppSpacing`, `AppRadius`, `AppTypography`) — Centralized Material 3 design token system.
   - [x] Reusable Component Library (`mobile/lib/core/widgets/`): `StatusBadge`, `StatMetricCard`, `EmptyStateView`, `ErrorStateView`, `SectionHeader`, `EventCard`.
 - [x] **Data Models (`mobile/lib/models/`):** `UserModel`, `StudentModel`, `EventModel`, `AttendanceModel`.
-- [x] **Implemented & API-Wired Screens (`mobile/lib/screens/` — 22 screens total):**
-  - [x] `auth/login_screen.dart`, `auth/register_screen.dart`, `auth/forgot_password_screen.dart`
+- [x] **Implemented & API-Wired Screens (`mobile/lib/screens/` — 21 screens total):**
+  - [x] `auth/login_screen.dart`, `auth/forgot_password_screen.dart` (self-registration removed in favor of institutional pre-provisioning)
   - [x] `common/profile_screen.dart`, `common/notifications_screen.dart`, `common/notification_preferences_screen.dart`, `common/reports_screen.dart`
   - [x] `student/student_dashboard_screen.dart`, `student/permanent_qr_screen.dart`, `student/event_detail_screen.dart`, `student/my_registrations_screen.dart`, `student/my_attendance_history_screen.dart`
   - [x] `organizer/organizer_dashboard_screen.dart`, `organizer/qr_scanner_screen.dart`, `organizer/event_form_screen.dart`, `organizer/event_registrations_screen.dart`, `organizer/live_attendance_screen.dart`
   - [x] `management/management_dashboard_screen.dart` (strictly Read-Only)
   - [x] `admin/admin_dashboard_screen.dart`, `admin/user_management_screen.dart`, `admin/activity_logs_screen.dart`, `admin/student_qr_inspect_screen.dart`
-- [x] **Flutter Unit/Widget Tests (`mobile/test/widget_test.dart`):** 14 unit and widget tests covering models, design tokens, `ApiConstants`, `ApiClient` storage, reusable widgets, and screen rendering.
+- [x] **Flutter Unit/Widget Tests (`mobile/test/widget_test.dart`):** 13 unit and widget tests covering models, design tokens, `ApiConstants`, `ApiClient` storage, reusable widgets, and screen rendering.
 
 ---
 
