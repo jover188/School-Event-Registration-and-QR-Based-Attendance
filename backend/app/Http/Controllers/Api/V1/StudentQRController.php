@@ -127,4 +127,49 @@ class StudentQRController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Administrator Forced Reissue of Student Permanent QR Token
+     */
+    public function adminReissue(int $studentId, Request $request): JsonResponse
+    {
+        $student = Student::findOrFail($studentId);
+        $adminUser = $request->user();
+
+        $newQr = DB::transaction(function () use ($student, $adminUser) {
+            StudentQR::where('student_id', $student->id)
+                ->where('status', 'active')
+                ->update([
+                    'status' => 'revoked',
+                    'revoked_at' => now(),
+                ]);
+
+            $createdQr = StudentQR::create([
+                'student_id' => $student->id,
+                'qr_token' => bin2hex(random_bytes(32)),
+                'status' => 'active',
+            ]);
+
+            ActivityLog::log('admin_qr_token_reissued', 'qr', $createdQr->id, [
+                'student_id' => $student->id,
+                'student_id_number' => $student->student_id_number,
+            ], $adminUser?->id);
+
+            return $createdQr;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "Permanent QR code reissued for {$student->full_name}. Previous active token revoked.",
+            'data' => [
+                'student_id' => $student->id,
+                'student_id_number' => $student->student_id_number,
+                'full_name' => $student->full_name,
+                'new_qr_token' => $newQr->qr_token,
+                'qr_token' => $newQr->qr_token,
+                'status' => $newQr->status,
+                'issued_at' => $newQr->created_at->toIso8601String(),
+            ],
+        ]);
+    }
 }

@@ -184,4 +184,49 @@ class AdminController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Send System-Wide or Role-Targeted Admin Announcement
+     */
+    public function sendAnnouncement(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:191'],
+            'message' => ['required', 'string', 'max:2000'],
+            'target_role' => ['nullable', 'in:all,student,organizer,management'],
+        ]);
+
+        $targetRole = $validated['target_role'] ?? 'all';
+        $query = User::where('status', 'active');
+
+        if ($targetRole !== 'all') {
+            $query->whereHas('role', function ($q) use ($targetRole) {
+                $q->where('slug', $targetRole);
+            });
+        }
+
+        $userIds = $query->pluck('id');
+
+        $sentCount = \App\Services\NotificationService::sendToMany(
+            $userIds,
+            $validated['title'],
+            $validated['message'],
+            'admin_announcement',
+            ['target_role' => $targetRole]
+        );
+
+        ActivityLog::log('admin_announcement_sent', 'admin', null, [
+            'title' => $validated['title'],
+            'target_role' => $targetRole,
+            'sent_count' => $sentCount,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Announcement sent to {$sentCount} user(s).",
+            'data' => [
+                'sent_count' => $sentCount,
+            ],
+        ]);
+    }
 }

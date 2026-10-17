@@ -3,6 +3,7 @@
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Notification;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -41,18 +42,18 @@ Schedule::call(function () {
 
             // Avoid duplicate 24h reminders
             $alreadySent = Notification::where('user_id', $userId)
-                ->where('type', 'event_reminder_24h')
-                ->where('data->event_id', $event->id)
+                ->where('notification_type', 'event_reminder_24h')
+                ->where('payload->event_id', $event->id)
                 ->exists();
 
             if (! $alreadySent) {
-                Notification::create([
-                    'user_id' => $userId,
-                    'type'    => 'event_reminder_24h',
-                    'title'   => '📅 Event Tomorrow: ' . $event->title,
-                    'message' => "Reminder: \"{$event->title}\" is happening tomorrow at {$event->start_time} in {$event->venue}. Don't forget to bring your QR code!",
-                    'data'    => ['event_id' => $event->id, 'event_date' => $event->event_date->format('Y-m-d')],
-                ]);
+                NotificationService::send(
+                    $userId,
+                    '📅 Event Tomorrow: ' . $event->title,
+                    "Reminder: \"{$event->title}\" is happening tomorrow at {$event->start_time} in {$event->venue}. Don't forget to bring your QR code!",
+                    'event_reminder_24h',
+                    ['event_id' => $event->id, 'event_date' => $event->event_date->format('Y-m-d')]
+                );
             }
         }
 
@@ -85,18 +86,18 @@ Schedule::call(function () {
             if (! $userId) continue;
 
             $alreadySent = Notification::where('user_id', $userId)
-                ->where('type', 'event_reminder_1h')
-                ->where('data->event_id', $event->id)
+                ->where('notification_type', 'event_reminder_1h')
+                ->where('payload->event_id', $event->id)
                 ->exists();
 
             if (! $alreadySent) {
-                Notification::create([
-                    'user_id' => $userId,
-                    'type'    => 'event_reminder_1h',
-                    'title'   => '⏰ Starting Soon: ' . $event->title,
-                    'message' => "\"{$event->title}\" starts in about 1 hour at {$event->start_time} in {$event->venue}. Please make your way there!",
-                    'data'    => ['event_id' => $event->id],
-                ]);
+                NotificationService::send(
+                    $userId,
+                    '⏰ Starting Soon: ' . $event->title,
+                    "\"{$event->title}\" starts in about 1 hour at {$event->start_time} in {$event->venue}. Please make your way there!",
+                    'event_reminder_1h',
+                    ['event_id' => $event->id]
+                );
             }
         }
 
@@ -104,11 +105,26 @@ Schedule::call(function () {
     }
 })->everyFifteenMinutes()->name('event-reminder-1h')->withoutOverlapping();
 
-// ── 3. Auto-close events past their end_time ─────────────────────────────────
-//    Runs every 5 minutes. Marks published/ongoing events as 'completed'
+// ── 3. Auto-transition ongoing events & auto-close events past their end_time ─
+//    Runs every 5 minutes. Marks published events as 'ongoing' when start_time
+//    has been reached today, and marks published/ongoing events as 'completed'
 //    once their end_time has passed.
 Schedule::call(function () {
     $now = Carbon::now();
+
+    $toOngoing = Event::where('status', 'published')
+        ->whereDate('event_date', Carbon::today())
+        ->get()
+        ->filter(function ($event) use ($now) {
+            $startDt = Carbon::parse($event->event_date->format('Y-m-d') . ' ' . $event->start_time);
+            $endDt   = Carbon::parse($event->event_date->format('Y-m-d') . ' ' . $event->end_time);
+            return $now->greaterThanOrEqualTo($startDt) && $now->lessThan($endDt);
+        });
+
+    foreach ($toOngoing as $event) {
+        $event->update(['status' => 'ongoing']);
+        Log::info("[Scheduler] Event #{$event->id} '{$event->title}' transitioned to ongoing.");
+    }
 
     $toClose = Event::whereIn('status', ['published', 'ongoing'])
         ->get()
@@ -124,16 +140,10 @@ Schedule::call(function () {
 })->everyFiveMinutes()->name('auto-close-events')->withoutOverlapping();
 
 // ── 4. Purge old notifications (30-day retention) ────────────────────────────
-//    Runs at midnight daily. Deletes read notifications older than 30 days
-//    and unread notifications older than 60 days (safety net).
+//    Runs at midnight daily. Deletes notifications older than 30 days.
 Schedule::call(function () {
-    $readDeleted = Notification::whereNotNull('read_at')
-        ->where('read_at', '<', Carbon::now()->subDays(30))
+    $deleted = Notification::where('created_at', '<', Carbon::now()->subDays(30))
         ->delete();
 
-    $unreadDeleted = Notification::whereNull('read_at')
-        ->where('created_at', '<', Carbon::now()->subDays(60))
-        ->delete();
-
-    Log::info("[Scheduler] Notification purge: {$readDeleted} read, {$unreadDeleted} stale-unread notifications deleted.");
+    Log::info("[Scheduler] Notification purge: {$deleted} notifications older than 30 days deleted.");
 })->dailyAt('00:05')->name('purge-old-notifications')->withoutOverlapping();

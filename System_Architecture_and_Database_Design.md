@@ -156,20 +156,24 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Registered : Registration submitted (Capacity not reached)
-    [*] --> Waiting_List : Registration submitted (Capacity full)
-    [*] --> Walk_In : Walk-in scan during event (Walk-in allowed)
+    [*] --> Registered : Registration submitted (Capacity available / unlimited)
+    [*] --> Waiting_List : Registration submitted (Capacity reached)
+    [*] --> Walk_In : Unregistered student scanned during event (Walk-in allowed)
     
-    Registered --> Cancelled : Student cancels before event start
+    Registered --> Cancelled : Student/Staff cancels before event start
+    Cancelled --> Registered : Re-registers while capacity available
+    Cancelled --> Waiting_List : Re-registers when capacity is full
     Cancelled --> [*]
     
     Waiting_List --> Registered : Auto-promoted when a registered slot is cancelled
+    Waiting_List --> Walk_In : Scanned as walk-in during event (Walk-in allowed)
     Waiting_List --> Cancelled : Student cancels waiting list entry
     
-    Registered --> Attended : Attendance checked in
-    Walk_In --> Attended : Attendance checked in
-    Attended --> [*]
+    Registered --> Registered : Attendance checked in (creates linked record in attendances)
+    Walk_In --> Walk_In : Attendance checked in (creates linked record in attendances)
 ```
+
+> **Note:** `event_registrations.status` strictly uses `ENUM('registered', 'waiting_list', 'cancelled', 'walk_in')`. Checking in at an event does not change `event_registrations.status` to a separate `attended` state; instead, it creates a linked record in the `attendances` table (`status`: `present`, `late`, `absent`, `excused`, or `walk_in`).
 
 ---
 
@@ -705,12 +709,12 @@ INSERT INTO `activity_logs` (`user_id`, `action`, `module`, `record_id`, `metada
 # 5. Core Architectural Mechanisms
 
 ### 5.1 Single Active Session Enforcement
-- Each time a user successfully authenticates via `/api/v1/auth/login`, a UUID session token is created and saved in `users.active_session_id`.
-- The user's prior `personal_access_tokens` entries in Laravel Sanctum are deleted or revoked:
+- Each time a user successfully authenticates via `/api/v1/auth/login`, all prior Sanctum tokens for the user are deleted, a UUID session identifier is generated and stored in `users.active_session_id`, and the new Sanctum personal access token is named `"session-{$sessionId}"` (verified on each request by `EnforceSingleSession` middleware):
   ```php
   $user->tokens()->delete(); // Invalidates all previous active devices
-  $token = $user->createToken('mobile-app')->plainTextToken;
-  $user->update(['active_session_id' => Str::uuid()->toString()]);
+  $sessionId = Str::uuid()->toString();
+  $user->update(['active_session_id' => $sessionId]);
+  $token = $user->createToken("session-{$sessionId}")->plainTextToken;
   ```
 
 ### 5.2 Permanent QR Code Generation & Reissue

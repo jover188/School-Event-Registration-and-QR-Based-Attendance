@@ -8,8 +8,9 @@ use App\Models\Attendance;
 use App\Models\AttendanceCorrection;
 use App\Models\Event;
 use App\Models\EventRegistration;
-use App\Models\Notification;
+use App\Models\Student;
 use App\Models\StudentQR;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -100,7 +101,8 @@ class AttendanceController extends Controller
                 'data' => [
                     'attendance_id' => $attendance->id,
                     'mode' => 'check_out',
-                    'check_in_time' => $attendance->check_in_time->toIso8601String(),
+                    'status' => $attendance->status,
+                    'check_in_time' => $attendance->check_in_time?->toIso8601String(),
                     'check_out_time' => $attendance->check_out_time->toIso8601String(),
                     'student' => [
                         'id' => $student->id,
@@ -126,9 +128,9 @@ class AttendanceController extends Controller
             return response()->json([
                 'success' => false,
                 'error_code' => 'ERR_DUPLICATE_CHECK_IN',
-                'message' => "Check-in was already recorded for {$student->full_name} at {$existingAttendance->check_in_time->format('h:i A')} (Status: " . strtoupper($existingAttendance->status) . ").",
+                'message' => "Check-in was already recorded for {$student->full_name} at {$existingAttendance->check_in_time?->format('h:i A')} (Status: " . strtoupper($existingAttendance->status) . ").",
                 'data' => [
-                    'check_in_time' => $existingAttendance->check_in_time->toIso8601String(),
+                    'check_in_time' => $existingAttendance->check_in_time?->toIso8601String(),
                     'status' => $existingAttendance->status,
                     'student' => [
                         'id' => $student->id,
@@ -184,6 +186,9 @@ class AttendanceController extends Controller
             $regRecord = $registration;
 
             if ($isWalkIn) {
+                $wasWaiting = $registration && $registration->status === 'waiting_list';
+                $oldPosition = $wasWaiting ? $registration->waiting_list_position : null;
+
                 $regRecord = EventRegistration::updateOrCreate(
                     ['event_id' => $event->id, 'student_id' => $student->id],
                     [
@@ -193,6 +198,13 @@ class AttendanceController extends Controller
                         'cancelled_at' => null,
                     ]
                 );
+
+                if ($wasWaiting && !is_null($oldPosition)) {
+                    EventRegistration::where('event_id', $event->id)
+                        ->where('status', 'waiting_list')
+                        ->where('waiting_list_position', '>', $oldPosition)
+                        ->decrement('waiting_list_position');
+                }
             }
 
             $createdAttendance = Attendance::create([
@@ -204,18 +216,18 @@ class AttendanceController extends Controller
                 'scanner_id' => $scannerUser->id,
             ]);
 
-            // Notify Student
+            // Notify Student (mandatory notification)
             if ($student->user) {
-                Notification::create([
-                    'user_id' => $student->user->id,
-                    'title' => 'Attendance Recorded',
-                    'message' => "Your attendance for '{$event->title}' has been recorded as " . strtoupper($attendanceStatus) . '.',
-                    'notification_type' => 'attendance_recorded',
-                    'payload' => [
+                NotificationService::send(
+                    $student->user->id,
+                    'Attendance Recorded',
+                    "Your attendance for '{$event->title}' has been recorded as " . strtoupper($attendanceStatus) . '.',
+                    'attendance_recorded',
+                    [
                         'event_id' => $event->id,
                         'status' => $attendanceStatus,
-                    ],
-                ]);
+                    ]
+                );
             }
 
             ActivityLog::log('attendance_recorded', 'attendance', $createdAttendance->id, [
@@ -254,6 +266,103 @@ class AttendanceController extends Controller
                     'department' => $student->department,
                     'profile_photo_url' => $student->profile_photo_url,
                 ],
+            ],
+        ]);
+    }
+
+    /**
+     * Manual Attendance Mark for Registered / Unscanned Student (Admin / Organizer)
+     */
+    public function mark(int $eventId, Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'student_id' => ['required', 'integer', 'exists:students,id'],
+            'status' => ['required', 'in:present,absent,late,excused,walk_in'],
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        $event = Event::findOrFail($eventId);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && $event->organizer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You do not have permission to mark attendance for this event.',
+            ], 403);
+        }
+
+        $student = Student::with('user')->findOrFail($validated['student_id']);
+
+        $attendance = DB::transaction(function () use ($event, $student, $validated, $user) {
+            $reg = EventRegistration::firstOrCreate(
+                ['event_id' => $event->id, 'student_id' => $student->id],
+                [
+                    'status' => $validated['status'] === 'walk_in' ? 'walk_in' : 'registered',
+                    'registered_at' => now(),
+                ]
+            );
+
+            $existing = Attendance::where('event_id', $event->id)
+                ->where('student_id', $student->id)
+                ->first();
+
+            $originalStatus = $existing ? $existing->status : 'absent';
+            $checkInTime = $validated['status'] === 'absent'
+                ? null
+                : ($existing?->check_in_time ?? now());
+
+            $att = Attendance::updateOrCreate(
+                ['event_id' => $event->id, 'student_id' => $student->id],
+                [
+                    'event_registration_id' => $reg->id,
+                    'check_in_time' => $checkInTime,
+                    'status' => $validated['status'],
+                    'scanner_id' => $user->id,
+                ]
+            );
+
+            AttendanceCorrection::create([
+                'attendance_id' => $att->id,
+                'corrected_by' => $user->id,
+                'original_status' => $originalStatus,
+                'new_status' => $validated['status'],
+                'reason' => $validated['reason'],
+            ]);
+
+            if ($student->user) {
+                NotificationService::send(
+                    $student->user->id,
+                    'Attendance Recorded',
+                    "Your attendance for '{$event->title}' has been marked as " . strtoupper($validated['status']) . '.',
+                    'attendance_recorded',
+                    [
+                        'event_id' => $event->id,
+                        'status' => $validated['status'],
+                    ]
+                );
+            }
+
+            ActivityLog::log('attendance_manually_marked', 'attendance', $att->id, [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'original_status' => $originalStatus,
+                'new_status' => $validated['status'],
+                'reason' => $validated['reason'],
+            ]);
+
+            return $att;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "Attendance manually marked as '{$validated['status']}' for {$student->full_name}.",
+            'data' => [
+                'attendance_id' => $attendance->id,
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'status' => $attendance->status,
+                'check_in_time' => $attendance->check_in_time?->toIso8601String(),
             ],
         ]);
     }

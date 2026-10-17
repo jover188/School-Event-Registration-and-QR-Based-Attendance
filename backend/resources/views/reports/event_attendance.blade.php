@@ -17,16 +17,13 @@
         .badge-present { background: #e8f5e9; color: #2e7d32; }
         .badge-late    { background: #fff8e1; color: #f57f17; }
         .badge-walk_in { background: #e3f2fd; color: #1565c0; }
+        .badge-absent  { background: #ffebee; color: #c62828; }
+        .badge-excused { background: #f3e5f5; color: #6a1b9a; }
         .data-table { width: 100%; border-collapse: collapse; margin: 0 0 20px 0; }
         .data-table th { background: #3949ab; color: #fff; padding: 7px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
         .data-table td { padding: 6px 8px; border-bottom: 1px solid #e8eaf6; }
         .data-table tr:nth-child(even) td { background: #f3f4fb; }
         .summary { padding: 0 20px; margin-bottom: 16px; }
-        .summary-grid { display: table; width: 100%; }
-        .summary-card { display: table-cell; padding: 10px 12px; background: #e8eaf6; border-radius: 6px; text-align: center; width: 25%; }
-        .summary-card + .summary-card { margin-left: 8px; }
-        .summary-card .num { font-size: 20px; font-weight: bold; color: #1a237e; }
-        .summary-card .lbl { font-size: 9px; color: #555; margin-top: 2px; }
         .footer { padding: 8px 20px; border-top: 1px solid #ddd; font-size: 9px; color: #888; }
     </style>
 </head>
@@ -50,21 +47,25 @@
 <div class="summary">
     <table style="width:100%; border-collapse:separate; border-spacing:6px 0;">
         <tr>
-            <td style="background:#e8f5e9; border-radius:6px; padding:10px; text-align:center; width:25%;">
+            <td style="background:#e8f5e9; border-radius:6px; padding:10px; text-align:center; width:20%;">
                 <div style="font-size:20px; font-weight:bold; color:#2e7d32;">{{ $totalAttendees }}</div>
-                <div style="font-size:9px; color:#555; margin-top:2px;">Total Attendees</div>
+                <div style="font-size:9px; color:#555; margin-top:2px;">Total Records</div>
             </td>
-            <td style="background:#e8eaf6; border-radius:6px; padding:10px; text-align:center; width:25%;">
+            <td style="background:#e8eaf6; border-radius:6px; padding:10px; text-align:center; width:20%;">
                 <div style="font-size:20px; font-weight:bold; color:#1a237e;">{{ $presentCount }}</div>
-                <div style="font-size:9px; color:#555; margin-top:2px;">On Time</div>
+                <div style="font-size:9px; color:#555; margin-top:2px;">Present</div>
             </td>
-            <td style="background:#fff8e1; border-radius:6px; padding:10px; text-align:center; width:25%;">
+            <td style="background:#fff8e1; border-radius:6px; padding:10px; text-align:center; width:20%;">
                 <div style="font-size:20px; font-weight:bold; color:#f57f17;">{{ $lateCount }}</div>
                 <div style="font-size:9px; color:#555; margin-top:2px;">Late</div>
             </td>
-            <td style="background:#e3f2fd; border-radius:6px; padding:10px; text-align:center; width:25%;">
+            <td style="background:#e3f2fd; border-radius:6px; padding:10px; text-align:center; width:20%;">
                 <div style="font-size:20px; font-weight:bold; color:#1565c0;">{{ $walkInCount }}</div>
                 <div style="font-size:9px; color:#555; margin-top:2px;">Walk-In</div>
+            </td>
+            <td style="background:#ffebee; border-radius:6px; padding:10px; text-align:center; width:20%;">
+                <div style="font-size:20px; font-weight:bold; color:#c62828;">{{ $absentCount ?? 0 }}</div>
+                <div style="font-size:9px; color:#555; margin-top:2px;">Absent</div>
             </td>
         </tr>
     </table>
@@ -94,8 +95,8 @@
             <td>
                 <span class="badge badge-{{ $att->status }}">{{ strtoupper($att->status) }}</span>
             </td>
-            <td>{{ $att->check_in_time?->format('h:i A') ?? '—' }}</td>
-            <td>{{ $att->check_out_time?->format('h:i A') ?? 'N/A' }}</td>
+            <td>{{ $att->check_in_time ? \Carbon\Carbon::parse($att->check_in_time)->format('h:i A') : '—' }}</td>
+            <td>{{ $att->check_out_time ? \Carbon\Carbon::parse($att->check_out_time)->format('h:i A') : 'N/A' }}</td>
         </tr>
         @empty
         <tr><td colspan="8" style="text-align:center; padding:20px; color:#888;">No attendance records found.</td></tr>

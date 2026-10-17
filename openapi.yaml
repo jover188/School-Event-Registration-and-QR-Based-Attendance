@@ -30,6 +30,22 @@ components:
         data:
           type: object
 
+    PaginatedMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        last_page:
+          type: integer
+          example: 5
+        per_page:
+          type: integer
+          example: 15
+        total:
+          type: integer
+          example: 72
+
     ErrorResponse:
       type: object
       properties:
@@ -82,8 +98,13 @@ components:
             role:
               type: string
               example: "student"
+            status:
+              type: string
+              enum: [active, inactive, pending]
+              example: "active"
         student_profile:
           type: object
+          nullable: true
           properties:
             id:
               type: integer
@@ -106,8 +127,12 @@ components:
             department:
               type: string
               example: "College of Computer Studies"
+            contact_number:
+              type: string
+              example: "09171234567"
             profile_photo_url:
               type: string
+              nullable: true
               example: "https://api.school-events.edu/storage/profiles/photo_142.jpg"
 
     Event:
@@ -164,6 +189,128 @@ components:
           type: string
           enum: [draft, pending_approval, published, ongoing, completed, cancelled]
           example: "published"
+        organizer:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              example: 5
+            email:
+              type: string
+              example: "organizer@school.edu"
+            name:
+              type: string
+              nullable: true
+              example: "Prof. Alan Turing"
+        user_registration_status:
+          type: string
+          nullable: true
+          enum: [registered, waiting_list, cancelled, walk_in]
+          example: "registered"
+
+    CreateEventRequest:
+      type: object
+      required:
+        - title
+        - description
+        - venue
+        - event_date
+        - start_time
+        - end_time
+        - registration_start
+        - registration_end
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          example: "Annual Tech Symposium 2026"
+        description:
+          type: string
+          example: "Exploration of emerging computing technologies."
+        venue:
+          type: string
+          maxLength: 200
+          example: "University Auditorium"
+        event_date:
+          type: string
+          format: date
+          example: "2026-10-25"
+        start_time:
+          type: string
+          example: "09:00:00"
+        end_time:
+          type: string
+          example: "16:00:00"
+        registration_start:
+          type: string
+          format: date-time
+          example: "2026-10-10 00:00:00"
+        registration_end:
+          type: string
+          format: date-time
+          example: "2026-10-23 23:59:59"
+        max_participants:
+          type: integer
+          nullable: true
+          minimum: 1
+          example: 200
+        late_grace_period_minutes:
+          type: integer
+          minimum: 0
+          maximum: 120
+          default: 15
+          example: 15
+        walk_in_allowed:
+          type: boolean
+          default: false
+          example: true
+
+    UpdateEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          example: "Annual Tech Symposium 2026"
+        description:
+          type: string
+          example: "Exploration of emerging computing technologies."
+        venue:
+          type: string
+          maxLength: 200
+          example: "University Auditorium"
+        event_date:
+          type: string
+          format: date
+          example: "2026-10-25"
+        start_time:
+          type: string
+          example: "09:00:00"
+        end_time:
+          type: string
+          example: "16:00:00"
+        registration_start:
+          type: string
+          format: date-time
+          example: "2026-10-10 00:00:00"
+        registration_end:
+          type: string
+          format: date-time
+          example: "2026-10-23 23:59:59"
+        max_participants:
+          type: integer
+          nullable: true
+          minimum: 1
+          example: 200
+        late_grace_period_minutes:
+          type: integer
+          minimum: 0
+          maximum: 120
+          example: 15
+        walk_in_allowed:
+          type: boolean
+          example: true
 
     ScanRequest:
       type: object
@@ -188,6 +335,10 @@ components:
         attendance_id:
           type: integer
           example: 905
+        mode:
+          type: string
+          enum: [check_in, check_out]
+          example: "check_in"
         status:
           type: string
           enum: [present, late, walk_in]
@@ -226,13 +377,72 @@ components:
               example: "College of Computer Studies"
             profile_photo_url:
               type: string
+              nullable: true
               example: "https://api.school-events.edu/storage/profiles/photo_142.jpg"
 
+    NotificationPreferencesRequest:
+      type: object
+      properties:
+        new_event_published:
+          type: boolean
+          example: true
+        registration_confirmed:
+          type: boolean
+          example: true
+        event_reminders:
+          type: boolean
+          example: true
+        event_updates:
+          type: boolean
+          example: true
+        waiting_list_promoted:
+          type: boolean
+          example: true
+        admin_announcements:
+          type: boolean
+          example: false
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          maxLength: 100
+        middle_name:
+          type: string
+          maxLength: 100
+          nullable: true
+        last_name:
+          type: string
+          maxLength: 100
+        course:
+          type: string
+          maxLength: 100
+        year_level:
+          type: string
+          maxLength: 20
+        section:
+          type: string
+          maxLength: 50
+        department:
+          type: string
+          maxLength: 100
+        contact_number:
+          type: string
+          maxLength: 25
+        profile_photo:
+          type: string
+          format: binary
+          nullable: true
+
 paths:
+  # ==========================================================================
+  # 2. Authentication & Profile Endpoints
+  # ==========================================================================
   /auth/register:
     post:
       summary: Student Self-Registration
-      description: Allows a student to register with profile photo and numeric student ID. Dispatches email verification.
+      description: Allows a student to register with optional profile photo and numeric student ID. Dispatches email verification.
       requestBody:
         required: true
         content:
@@ -251,12 +461,12 @@ paths:
                 - section
                 - department
                 - contact_number
-                - profile_photo
               properties:
                 first_name:
                   type: string
                 middle_name:
                   type: string
+                  nullable: true
                 last_name:
                   type: string
                 student_id_number:
@@ -282,15 +492,52 @@ paths:
                 profile_photo:
                   type: string
                   format: binary
+                  nullable: true
+                  description: Optional JPG/PNG image (max 2MB)
       responses:
         '201':
-          description: Registration successful, verification pending
+          description: Registration successful
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
         '422':
           description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-email:
+    post:
+      summary: Verify Email
+      description: Verifies a student's school email address using the verification token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - token
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "student@school.edu"
+                token:
+                  type: string
+                  example: "49bf8a892f39d2c49901a..."
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+        '422':
+          description: Invalid or expired verification token
           content:
             application/json:
               schema:
@@ -317,10 +564,19 @@ paths:
                   success:
                     type: boolean
                     example: true
+                  message:
+                    type: string
+                    example: Login successful.
                   data:
                     $ref: '#/components/schemas/LoginResponseData'
         '401':
           description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account inactive or email unverified
           content:
             application/json:
               schema:
@@ -331,11 +587,187 @@ paths:
       security:
         - SanctumBearerAuth: []
       summary: Logout
-      description: Revokes the current device Sanctum token.
+      description: Revokes the current device Sanctum token and clears active session ID.
       responses:
         '200':
           description: Successfully logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
 
+  /auth/forgot-password:
+    post:
+      summary: Request Password Reset Link
+      description: Sends a password reset token/link to the registered school email.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "student@school.edu"
+      responses:
+        '200':
+          description: Password reset link dispatched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /auth/reset-password:
+    post:
+      summary: Reset Password with Token
+      description: Resets user password using the reset token sent via email.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - token
+                - password
+                - password_confirmation
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "student@school.edu"
+                token:
+                  type: string
+                  example: "reset_token_string"
+                password:
+                  type: string
+                  format: password
+                  example: "NewPassword@123"
+                password_confirmation:
+                  type: string
+                  format: password
+                  example: "NewPassword@123"
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+        '422':
+          description: Invalid token or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /profile:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Get Authenticated User Profile
+      description: Retrieves authenticated user details, student profile, and notification preferences.
+      responses:
+        '200':
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+    put:
+      security:
+        - SanctumBearerAuth: []
+      summary: Update Authenticated Profile
+      description: Updates editable profile details (student_id_number and email are immutable).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Update Authenticated Profile (Multipart Photo Upload)
+      description: Updates editable profile details including multipart profile_photo upload.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /profile/change-password:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Change Authenticated User Password
+      description: Changes password for the authenticated user after verifying current_password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - current_password
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                new_password:
+                  type: string
+                  format: password
+                new_password_confirmation:
+                  type: string
+                  format: password
+                password:
+                  type: string
+                  format: password
+                password_confirmation:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Password updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+        '422':
+          description: Current password mismatch or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========================================================================
+  # 3. Permanent Student QR Endpoints
+  # ==========================================================================
   /student/qr:
     get:
       security:
@@ -345,17 +777,72 @@ paths:
       responses:
         '200':
           description: Permanent QR details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
 
   /student/qr/reissue:
     post:
       security:
         - SanctumBearerAuth: []
       summary: Self-Service QR Reissue
-      description: Revokes current permanent QR code immediately and generates a fresh token.
+      description: Revokes current permanent QR code immediately and generates a fresh 64-char token.
       responses:
         '200':
           description: QR token successfully reissued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
 
+  /admin/students/{id}/qr:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Inspect Student QR History (Admin)
+      description: Retrieves a student's active QR token and complete history of active and revoked tokens.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Student QR status and history returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+        '404':
+          description: Student not found
+
+  /admin/students/{id}/qr/reissue:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Admin Force-Reissue Student QR (Admin)
+      description: Atomically revokes a student's active permanent QR token and generates a fresh 64-character token.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: New permanent QR token issued and previous token revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+        '404':
+          description: Student not found
+
+  # ==========================================================================
+  # 4. Event Management Endpoints
+  # ==========================================================================
   /events:
     get:
       security:
@@ -367,6 +854,17 @@ paths:
           in: query
           schema:
             type: string
+            enum: [draft, pending_approval, published, ongoing, completed, cancelled]
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
         - name: search
           in: query
           schema:
@@ -375,9 +873,29 @@ paths:
           in: query
           schema:
             type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 15
       responses:
         '200':
           description: Paginated events returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
 
     post:
       security:
@@ -389,16 +907,92 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Event'
+              $ref: '#/components/schemas/CreateEventRequest'
       responses:
         '201':
           description: Event created in draft status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Event'
+
+  /events/{id}:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Get Single Event Details
+      description: Retrieves single event detail with capacity and authenticated student's registration status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Event details returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '404':
+          description: Event not found
+
+    put:
+      security:
+        - SanctumBearerAuth: []
+      summary: Update Event Details
+      description: Updates an existing event (Organizer/Admin).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        '200':
+          description: Event updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '403':
+          description: Forbidden (not organizer of event)
 
   /events/{id}/submit-approval:
     post:
       security:
         - SanctumBearerAuth: []
       summary: Submit Event for Approval
+      description: Transitions a draft event to pending_approval status.
       parameters:
         - name: id
           in: path
@@ -414,6 +1008,7 @@ paths:
       security:
         - SanctumBearerAuth: []
       summary: Admin Review Event Publishing
+      description: Approves (published) or rejects (draft) an event awaiting approval.
       parameters:
         - name: id
           in: path
@@ -434,16 +1029,79 @@ paths:
                   enum: [approved, rejected]
                 remarks:
                   type: string
+                  nullable: true
       responses:
         '200':
           description: Event approved or rejected
 
+  /events/{id}/request-cancellation:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Request Event Cancellation (Organizer/Admin)
+      description: Submits a request to cancel an event with a justification reason.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  example: "Speaker unavailable due to emergency."
+      responses:
+        '200':
+          description: Cancellation request recorded
+
+  /admin/events/{id}/review-cancellation:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Admin Review Event Cancellation
+      description: Approves or rejects an event cancellation request. If approved, sets status to cancelled and notifies registered students.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  enum: [approved, rejected]
+                remarks:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Cancellation request reviewed
+
+  # ==========================================================================
+  # 5. Event Registration & Waiting List Endpoints
+  # ==========================================================================
   /events/{id}/register:
     post:
       security:
         - SanctumBearerAuth: []
       summary: Event Registration / Join Waiting List
-      description: Registers authenticated student for an event. Placed on waiting list if cap reached.
+      description: Registers authenticated student for an event. Placed on waiting list if capacity reached.
       parameters:
         - name: id
           in: path
@@ -461,7 +1119,7 @@ paths:
       security:
         - SanctumBearerAuth: []
       summary: Cancel Registration (Student)
-      description: Cancels student registration and auto-promotes the next student on the waiting list.
+      description: Cancels student registration before event start time and auto-promotes the next student on the waiting list.
       parameters:
         - name: id
           in: path
@@ -472,6 +1130,78 @@ paths:
         '200':
           description: Cancelled and waiting list updated
 
+  /student/registrations:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: View Own Event Registrations (Student)
+      description: Returns paginated list of the authenticated student's event registrations and waiting list positions.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated list of student's registrations
+
+  /events/{id}/registrations:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: List Event Attendees & Waiting List
+      description: Lists registrations and waiting list entries for an event (Organizer/Admin/Management).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [registered, waiting_list, cancelled, walk_in]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated event registrations returned
+
+  /events/{id}/registrations/{registrationId}:
+    delete:
+      security:
+        - SanctumBearerAuth: []
+      summary: Cancel Student Registration (Organizer/Admin)
+      description: Cancels a student's event registration or waiting list entry and auto-promotes the next student on the waiting list if a registered slot is vacated.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: registrationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Registration cancelled and waiting list updated
+
+  # ==========================================================================
+  # 6. QR Attendance & Scanner Endpoints
+  # ==========================================================================
   /events/{id}/attendance/scan:
     post:
       security:
@@ -500,14 +1230,49 @@ paths:
                 properties:
                   success:
                     type: boolean
+                  message:
+                    type: string
                   data:
                     $ref: '#/components/schemas/ScanResponseData'
         '403':
           description: Student not registered and walk-in attendance disallowed
         '409':
-          description: Duplicate scan for check-in
+          description: Duplicate scan for check-in or check-out
         '422':
           description: Invalid or revoked QR token
+
+  /events/{id}/attendance:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Live Event Attendance List & Summary
+      description: Returns paginated attendance records and real-time summary counts for an event (Organizer/Admin/Management).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [present, late, walk_in, excused, absent]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Live attendance records and summary counts returned
 
   /attendance/{id}/correct:
     put:
@@ -540,6 +1305,162 @@ paths:
         '200':
           description: Attendance record corrected and audited
 
+  /events/{id}/attendance/mark:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Manually Mark Student Attendance (Organizer/Admin)
+      description: Manually creates or updates an attendance record (including marking a registered student as absent or excused) with a mandatory audit reason.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - student_id
+                - status
+                - reason
+              properties:
+                student_id:
+                  type: integer
+                status:
+                  type: string
+                  enum: [present, absent, late, excused, walk_in]
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Attendance record manually marked and audited
+
+  /student/attendance-history:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Student Personal Attendance History
+      description: Returns paginated attendance history across events for the authenticated student.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated student attendance history returned
+
+  # ==========================================================================
+  # 7. Reports & Export Endpoints
+  # ==========================================================================
+  /reports/event-attendance/{id}:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Event Attendance Report (JSON)
+      description: Attendance list per event (Admin, Organizer, Management).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Event attendance report data
+
+  /reports/student-history/{student_id}:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Student Attendance History Report (JSON)
+      description: Attendance history across all events for a specific student (Admin, Organizer, Management).
+      parameters:
+        - name: student_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Student attendance history report data
+
+  /reports/registration-summary/{id}:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Registration Summary Report (JSON)
+      description: Registration turnout and waiting list breakdown for an event (Admin, Organizer, Management).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Registration summary report data
+
+  /reports/participation-summary:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Institutional Participation Summary Report (JSON)
+      description: Institutional participation and attendance percentages (Admin, Organizer, Management).
+      responses:
+        '200':
+          description: Institutional participation summary report data
+
+  /reports/absentee/{id}:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Absentee Report (JSON)
+      description: List of registered students who failed to check in for an event (Admin, Organizer, Management).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Absentee report data
+
+  /reports/walk-in/{id}:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Walk-In Report (JSON)
+      description: List of students who attended an event as walk-in attendees (Admin, Organizer, Management).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Walk-in report data
+
+  /reports/organizer-summary:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Organizer Summary Report (JSON)
+      description: Summary of events created and managed per organizer (Admin, Organizer, Management).
+      responses:
+        '200':
+          description: Organizer summary report data
+
   /reports/export:
     get:
       security:
@@ -563,10 +1484,27 @@ paths:
           in: query
           schema:
             type: integer
+        - name: student_id
+          in: query
+          schema:
+            type: integer
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
       responses:
         '200':
           description: File download stream (PDF/CSV/Excel)
 
+  # ==========================================================================
+  # 8. Notifications & FCM Device Endpoints
+  # ==========================================================================
   /device-tokens:
     post:
       security:
@@ -591,18 +1529,317 @@ paths:
         '200':
           description: Device token registered
 
-  /dashboard/{role}:
+    delete:
+      security:
+        - SanctumBearerAuth: []
+      summary: Deregister Device FCM Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fcm_token
+              properties:
+                fcm_token:
+                  type: string
+      responses:
+        '200':
+          description: Device token removed
+
+  /notifications:
     get:
       security:
         - SanctumBearerAuth: []
-      summary: Role-Specific Dashboard Metrics
+      summary: Get Notification Inbox
+      description: Returns paginated in-app notifications and unread count for the authenticated user.
       parameters:
-        - name: role
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Notification inbox returned
+
+  /notifications/{id}/read:
+    patch:
+      security:
+        - SanctumBearerAuth: []
+      summary: Mark Single Notification as Read
+      parameters:
+        - name: id
           in: path
           required: true
           schema:
-            type: string
-            enum: [student, organizer, management, admin]
+            type: integer
       responses:
         '200':
-          description: Dashboard metrics returned
+          description: Notification marked as read
+
+  /notifications/mark-all-read:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Mark All Notifications as Read
+      responses:
+        '200':
+          description: All notifications marked as read
+
+  /notifications/preferences:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Get Notification Preferences
+      responses:
+        '200':
+          description: Current notification preferences returned
+
+    put:
+      security:
+        - SanctumBearerAuth: []
+      summary: Update Notification Preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferencesRequest'
+      responses:
+        '200':
+          description: Notification preferences updated
+
+  # ==========================================================================
+  # 9. Dashboard Endpoints
+  # ==========================================================================
+  /dashboard/student:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Student Dashboard Metrics
+      description: Returns upcoming registered events, total attended count, active QR token, and unread notification count.
+      responses:
+        '200':
+          description: Student dashboard metrics returned
+
+  /dashboard/organizer:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Organizer Dashboard Metrics
+      description: Returns summary counts of organized events and recent events with registration/attendance tallies.
+      responses:
+        '200':
+          description: Organizer dashboard metrics returned
+
+  /dashboard/management:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: School Management Dashboard Metrics
+      description: Returns read-only institutional participation metrics, turnout rates, attendance status breakdown, and department distribution.
+      responses:
+        '200':
+          description: Management dashboard metrics returned
+
+  /dashboard/admin:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Administrator Dashboard Metrics
+      description: Returns events pending approval, user/student/organizer counts, active permanent QR count, and recent audit logs.
+      responses:
+        '200':
+          description: Admin dashboard metrics returned
+
+  # ==========================================================================
+  # 10. Administration & Audit Logging Endpoints
+  # ==========================================================================
+  /admin/users:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: List Users (Admin)
+      description: Paginated user list with role, status, and search filters.
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [administrator, organizer, student, management]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, pending]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated list of users
+
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Create Staff User Account (Admin)
+      description: Creates a non-student staff account (organizer, management, or administrator).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - role_id
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "organizer2@school.edu"
+                password:
+                  type: string
+                  format: password
+                  example: "Password@123"
+                role_id:
+                  type: integer
+                  enum: [1, 2, 4]
+                  description: "1 = administrator, 2 = organizer, 4 = management"
+                  example: 2
+      responses:
+        '201':
+          description: Staff user account created
+
+  /admin/users/{id}/status:
+    patch:
+      security:
+        - SanctumBearerAuth: []
+      summary: Activate / Deactivate User Account (Admin)
+      description: Toggles or updates user account status and revokes active tokens if deactivated.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User account status updated
+
+  /admin/users/{id}/reset-password:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Admin Manual Password Reset
+      description: Resets a user's password and revokes active sessions.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+                  format: password
+                  example: "NewTempPassword@123"
+      responses:
+        '200':
+          description: Password reset successfully
+
+  /admin/logs:
+    get:
+      security:
+        - SanctumBearerAuth: []
+      summary: Query System Activity Logs (Admin)
+      description: Returns paginated audit log entries with filtering by module, action, user, and date range.
+      parameters:
+        - name: module
+          in: query
+          schema:
+            type: string
+            enum: [events, attendance, auth, registration, qr, reports, admin]
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated activity logs returned
+
+  /admin/announcements:
+    post:
+      security:
+        - SanctumBearerAuth: []
+      summary: Broadcast Administrative Announcement (Admin)
+      description: Dispatches an announcement notification to all active users or a targeted role, respecting each recipient's admin_announcements preference.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - message
+              properties:
+                title:
+                  type: string
+                  example: "Campus Network Maintenance"
+                message:
+                  type: string
+                  example: "The registration portal will undergo scheduled maintenance tonight."
+                target_role:
+                  type: string
+                  nullable: true
+                  enum: [all, student, organizer, management]
+      responses:
+        '200':
+          description: Announcement dispatched
+

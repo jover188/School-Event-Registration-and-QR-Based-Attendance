@@ -243,5 +243,106 @@ class SchoolAttendanceWorkflowTest extends TestCase
             'waiting_list_position' => null,
         ]);
     }
+
+    public function test_walk_in_from_waiting_list_resequences_remaining_positions(): void
+    {
+        $organizer = User::where('role_id', 2)->first();
+        $event = Event::create([
+            'organizer_id' => $organizer->id,
+            'title' => 'Walk-in Waitlist Test Event',
+            'description' => 'Testing waitlist re-sequencing on walk-in',
+            'venue' => 'Room 101',
+            'event_date' => now()->toDateString(),
+            'start_time' => '08:00:00',
+            'end_time' => '17:00:00',
+            'registration_start' => now()->subDay(),
+            'registration_end' => now()->addDay(),
+            'max_participants' => 1,
+            'walk_in_allowed' => true,
+            'status' => 'published',
+        ]);
+
+        // Student 1 takes slot 1 (registered)
+        $s1 = Student::where('student_id_number', '20260001')->first();
+        $event->registrations()->create([
+            'student_id' => $s1->id,
+            'status' => 'registered',
+            'registered_at' => now(),
+        ]);
+
+        // Student 2 is waiting #1
+        $u2 = User::create(['role_id' => 3, 'email' => 's2@school.edu', 'password' => bcrypt('Pass@1234'), 'status' => 'active']);
+        $s2 = Student::create([
+            'user_id' => $u2->id, 'student_id_number' => '20260002', 'first_name' => 'Two', 'last_name' => 'Student',
+            'course' => 'BSCS', 'year_level' => '1st Year', 'section' => 'A', 'department' => 'CCS', 'contact_number' => '09170000002',
+        ]);
+        $qr2 = StudentQR::create(['student_id' => $s2->id, 'qr_token' => str_repeat('b', 64), 'status' => 'active']);
+        $event->registrations()->create([
+            'student_id' => $s2->id,
+            'status' => 'waiting_list',
+            'waiting_list_position' => 1,
+            'registered_at' => now(),
+        ]);
+
+        // Student 3 is waiting #2
+        $u3 = User::create(['role_id' => 3, 'email' => 's3@school.edu', 'password' => bcrypt('Pass@1234'), 'status' => 'active']);
+        $s3 = Student::create([
+            'user_id' => $u3->id, 'student_id_number' => '20260003', 'first_name' => 'Three', 'last_name' => 'Student',
+            'course' => 'BSCS', 'year_level' => '1st Year', 'section' => 'A', 'department' => 'CCS', 'contact_number' => '09170000003',
+        ]);
+        $event->registrations()->create([
+            'student_id' => $s3->id,
+            'status' => 'waiting_list',
+            'waiting_list_position' => 2,
+            'registered_at' => now(),
+        ]);
+
+        // Organizer scans Student 2 as walk-in
+        $orgLogin = $this->postJson('/api/v1/auth/login', [
+            'login' => 'organizer@school.edu',
+            'password' => 'Organizer@12345',
+        ]);
+        $orgToken = $orgLogin->json('data.token');
+
+        $scan = $this->requestAs($orgToken, 'POST', "/api/v1/events/{$event->id}/attendance/scan", [
+            'qr_token' => $qr2->qr_token,
+            'mode' => 'check_in',
+        ]);
+        $scan->assertStatus(200);
+        $this->assertEquals('walk_in', $scan->json('data.status'));
+
+        // Student 3 should now be at waiting_list_position 1
+        $this->assertDatabaseHas('event_registrations', [
+            'event_id' => $event->id,
+            'student_id' => $s3->id,
+            'status' => 'waiting_list',
+            'waiting_list_position' => 1,
+        ]);
+    }
+
+    public function test_profile_update_and_password_change_compatibility(): void
+    {
+        $login = $this->postJson('/api/v1/auth/login', [
+            'login' => '20260001',
+            'password' => 'Student@12345',
+        ]);
+        $token = $login->json('data.token');
+
+        // Update profile via POST /api/v1/profile
+        $updateResp = $this->requestAs($token, 'POST', '/api/v1/profile', [
+            'section' => 'CS-4Z',
+            'contact_number' => '+639991112233',
+        ]);
+        $updateResp->assertStatus(200);
+        $this->assertEquals('CS-4Z', $updateResp->json('data.student_profile.section'));
+
+        // Change password using new_password & new_password_confirmation
+        $pwResp = $this->requestAs($token, 'POST', '/api/v1/profile/change-password', [
+            'current_password' => 'Student@12345',
+            'new_password' => 'NewPass@12345',
+            'new_password_confirmation' => 'NewPass@12345',
+        ]);
+        $pwResp->assertStatus(200);
+    }
 }
 

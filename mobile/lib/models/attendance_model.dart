@@ -1,4 +1,4 @@
-import 'student_model.dart';
+import 'user_model.dart';
 
 class AttendanceModel {
   final int id;

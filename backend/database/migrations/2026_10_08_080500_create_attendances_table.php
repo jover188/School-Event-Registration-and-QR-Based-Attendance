@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('event_id')->constrained('events')->cascadeOnUpdate()->cascadeOnDelete();
             $table->foreignId('student_id')->constrained('students')->cascadeOnUpdate()->cascadeOnDelete();
             $table->foreignId('event_registration_id')->constrained('event_registrations')->cascadeOnUpdate()->cascadeOnDelete();
-            $table->dateTime('check_in_time')->useCurrent();
+            $table->dateTime('check_in_time')->nullable()->useCurrent();
             $table->dateTime('check_out_time')->nullable();
             $table->enum('status', ['present', 'absent', 'late', 'excused', 'walk_in'])->default('present');
             $table->foreignId('scanner_id')->nullable()->constrained('users')->cascadeOnUpdate()->nullOnDelete();

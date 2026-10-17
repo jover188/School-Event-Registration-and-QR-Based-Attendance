@@ -6,7 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Event;
 use App\Models\EventApproval;
-use App\Models\Notification;
+use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -172,6 +173,21 @@ class EventController extends Controller
 
         $event->update($validated);
 
+        if ($event->status === 'published') {
+            $registrations = $event->activeRegistrations()->with('student.user')->get();
+            foreach ($registrations as $reg) {
+                if ($reg->student?->user) {
+                    NotificationService::send(
+                        $reg->student->user->id,
+                        "Event Updated: {$event->title}",
+                        "Details for '{$event->title}' have been updated. Please check the event page for changes.",
+                        'event_updates',
+                        ['event_id' => $event->id]
+                    );
+                }
+            }
+        }
+
         ActivityLog::log('event_updated', 'events', $event->id, [
             'title' => $event->title,
         ]);
@@ -252,6 +268,20 @@ class EventController extends Controller
                 'remarks' => $validated['remarks'] ?? null,
             ]);
 
+            if ($validated['action'] === 'approved') {
+                $studentUserIds = User::where('role_id', 3)
+                    ->where('status', 'active')
+                    ->pluck('id');
+
+                NotificationService::sendToMany(
+                    $studentUserIds,
+                    "New Event Published: {$event->title}",
+                    "Registration is now open for '{$event->title}' on {$event->event_date->format('M d, Y')} at {$event->venue}.",
+                    'new_event_published',
+                    ['event_id' => $event->id]
+                );
+            }
+
             ActivityLog::log("event_publish_{$validated['action']}", 'events', $event->id, [
                 'title' => $event->title,
                 'remarks' => $validated['remarks'] ?? null,
@@ -275,6 +305,15 @@ class EventController extends Controller
         ]);
 
         $event = Event::findOrFail($id);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && $event->organizer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You can only request cancellation for your own events.',
+            ], 403);
+        }
 
         ActivityLog::log('event_cancellation_requested', 'events', $event->id, [
             'reason' => $validated['reason'],
@@ -310,17 +349,17 @@ class EventController extends Controller
                     'remarks' => $validated['remarks'] ?? null,
                 ]);
 
-                // Notify all registered attendees of cancellation
+                // Notify all registered attendees of cancellation (mandatory notification)
                 $registrations = $event->activeRegistrations()->with('student.user')->get();
                 foreach ($registrations as $reg) {
                     if ($reg->student?->user) {
-                        Notification::create([
-                            'user_id' => $reg->student->user->id,
-                            'title' => "Event Cancelled: {$event->title}",
-                            'message' => "The event '{$event->title}' scheduled for {$event->event_date} has been cancelled.",
-                            'notification_type' => 'event_cancellation',
-                            'payload' => ['event_id' => $event->id],
-                        ]);
+                        NotificationService::send(
+                            $reg->student->user->id,
+                            "Event Cancelled: {$event->title}",
+                            "The event '{$event->title}' scheduled for {$event->event_date} has been cancelled.",
+                            'event_cancellation',
+                            ['event_id' => $event->id]
+                        );
                     }
                 }
 
@@ -334,6 +373,20 @@ class EventController extends Controller
                 'message' => 'Event has been cancelled and attendees have been notified.',
             ]);
         }
+
+        DB::transaction(function () use ($event, $validated, $request) {
+            EventApproval::create([
+                'event_id' => $event->id,
+                'admin_id' => $request->user()->id,
+                'approval_type' => 'cancellation',
+                'status' => 'rejected',
+                'remarks' => $validated['remarks'] ?? null,
+            ]);
+
+            ActivityLog::log('event_cancellation_rejected', 'events', $event->id, [
+                'remarks' => $validated['remarks'] ?? null,
+            ]);
+        });
 
         return response()->json([
             'success' => true,

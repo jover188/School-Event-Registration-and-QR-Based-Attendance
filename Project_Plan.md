@@ -1,10 +1,11 @@
 # School Event Registration & QR-Based Attendance Management System
-## 6-Week Project Plan
+## 6-Week Project Plan & Implementation Status
 
 > **Project Title:** School Event Registration and QR-Based Attendance Management System  
-> **Duration:** 6 Weeks  
+> **Duration:** 6 Weeks (Agile Sprints 1–6)  
 > **Team Size:** Individual / Small Team  
-> **Stack:** Laravel 11 (Backend API) · Flutter (Mobile) · MySQL 8 (Production) · SQLite (Testing)
+> **Stack:** Laravel 11 / PHP 8.3+ (Backend API) · Flutter 3.x / Dart 3.x (Mobile & Desktop) · MySQL 8.0+ / MariaDB (Production) · SQLite `:memory:` (Automated Testing)  
+> **Detailed Task Plan:** See [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) and [`context.md`](./context.md)
 
 ---
 
@@ -14,54 +15,110 @@
 |------|--------|------------|--------|
 | 1 | Sprint 1 | Requirements, Architecture & Database Design | ✅ Done |
 | 2 | Sprint 2 | Backend Core — Auth, QR, Events, Migrations | ✅ Done |
-| 3 | Sprint 3 | Registration, Attendance & Scanner API | ✅ Done |
-| 4 | Sprint 4 | Reports, Notifications & Scheduled Tasks | 🔄 In Progress |
-| 5 | Sprint 5 | Flutter Mobile UI — All Screens & Integration | 🔄 Scaffolded |
-| 6 | Sprint 6 | Testing, Debugging & Presentation Prep | ⬜ Upcoming |
+| 3 | Sprint 3 | Registration, Attendance, Dashboards & RBAC API | ✅ Done |
+| 4 | Sprint 4 | Reports, Notifications, Scheduled Tasks & Policy Tests | 🔄 In Progress (Core Done, Continuations Remaining) |
+| 5 | Sprint 5 | Flutter Mobile UI — Core Screens Wired & Secondary Screens | 🔄 In Progress (9 Screens Wired, Continuations Remaining) |
+| 6 | Sprint 6 | Full Export Coverage, Secondary Screens & E2E Polish | ⬜ Upcoming |
 
 ---
 
-## Week 1 — Sprint 1: Requirements, Architecture & Database Design ✅
+## 1. Already Made (Completed Deliverables)
 
-**Goal:** Establish the full project foundation before writing a single line of application code.
+### Week 1 — Sprint 1: Requirements, Architecture & Database Design ✅
+- [x] **Software Requirements Specification (SRS v1.1 Baseline)** — [`School_Event_Attendance_SRS_v1.0.md`](./School_Event_Attendance_SRS_v1.0.md) (audited and aligned across all 35 sections)
+- [x] **System Architecture & Database Design** — [`System_Architecture_and_Database_Design.md`](./System_Architecture_and_Database_Design.md)
+  - High-level multi-tier architecture diagram
+  - Sequence diagrams (single-session login flow, atomic QR scan & verification flow)
+  - State machine diagrams (event lifecycle, registration & waiting list lifecycle)
+  - 13-domain-table Entity-Relationship (ER) diagram & MySQL 8.0+ DDL
+- [x] **REST API Specification** — [`REST_API_Specification.md`](./REST_API_Specification.md) (all 46 implemented v1 endpoints + auth verification/reset specs)
+- [x] **OpenAPI 3.0.3 Machine-Readable Spec** — [`openapi.yaml`](./openapi.yaml)
+- [x] **Agent & Context Documentation** — [`AGENTS.md`](./AGENTS.md), [`context.md`](./context.md), and [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md)
 
-### Deliverables
-- [x] Software Requirements Specification (SRS v1.1) — `School_Event_Attendance_SRS_v1.0.md`
-- [x] System Architecture Document — `System_Architecture_and_Database_Design.md`
-  - Entity-Relationship Diagram (ER)
-  - State Machine Diagrams (event lifecycle, registration lifecycle)
-  - Sequence Diagrams (login flow, QR scan flow)
-  - Full MySQL DDL with FK constraints
-- [x] REST API Specification — `REST_API_Specification.md`
-- [x] OpenAPI 3.0 Machine-Readable Spec — `openapi.yaml` (importable into Postman)
-- [x] Git repository initialized with root `.gitignore`
+### Week 2 — Sprint 2: Backend Core — Auth, QR, Events ✅
+- [x] Laravel 11 scaffolded in `backend/` with Laravel Sanctum 4.x
+- [x] 13 domain table migrations + Sanctum `personal_access_tokens` & Laravel system tables
+- [x] 13 Eloquent Models with full relationships, capacity helpers, and `ActivityLog::log()`
+- [x] `AuthController` — `POST /api/v1/auth/register`, `POST /api/v1/auth/login` (numeric student ID or email), `POST /api/v1/auth/logout`, `GET /api/v1/profile`, `PUT|POST /api/v1/profile`, `POST /api/v1/profile/change-password`
+- [x] `StudentQRController` — `GET /api/v1/student/qr`, `POST /api/v1/student/qr/reissue`, `GET /api/v1/admin/students/{id}/qr`
+- [x] `EventController` — `GET /api/v1/events`, `GET /api/v1/events/{id}`, `POST /api/v1/events`, `PUT /api/v1/events/{id}`, `POST /api/v1/events/{id}/submit-approval`, `POST /api/v1/admin/events/{id}/review`, `POST /api/v1/events/{id}/request-cancellation`, `POST /api/v1/admin/events/{id}/review-cancellation`
+- [x] Custom Middleware: `CheckRole` (`role` alias) + `EnforceSingleSession` (`single.session` alias)
+- [x] Seeders: `RoleSeeder` (4 roles) + `UserSeeder` (4 demo accounts + student `20260001` with permanent 64-char hex QR)
+- [x] MariaDB/MySQL `school_event_attendance` database migrated & seeded; `phpunit.xml` isolated on SQLite `:memory:`
 
-### Milestones
-| # | Milestone | Done |
-|---|-----------|------|
-| 1.1 | SRS approved and baselined | ✅ |
-| 1.2 | 13-table ER diagram finalized | ✅ |
-| 1.3 | OpenAPI spec complete (49 routes) | ✅ |
-| 1.4 | Git repo initialized | ✅ |
+### Week 3 — Sprint 3: Registration, Attendance & Scanner API ✅
+- [x] `RegistrationController` — `POST /api/v1/events/{id}/register` (with capacity & waiting list placement), `DELETE /api/v1/events/{id}/cancel-registration` (with transactional waiting list auto-promotion), `GET /api/v1/events/{id}/registrations`, `GET /api/v1/student/registrations`
+- [x] `AttendanceController` — `POST /api/v1/events/{id}/attendance/scan` (check-in/out modes, grace-period late detection, walk-in support with waiting list re-indexing, student profile photo response), `GET /api/v1/events/{id}/attendance`, `PUT /api/v1/attendance/{id}/correct`, `GET /api/v1/student/attendance-history`
+- [x] `NotificationController` — `GET /api/v1/notifications`, `PATCH /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/mark-all-read`, `GET|PUT /api/v1/notifications/preferences`, `POST|DELETE /api/v1/device-tokens`
+- [x] `DashboardController` — `GET /api/v1/dashboard/{student|organizer|management|admin}`
+- [x] `AdminController` — `GET|POST /api/v1/admin/users`, `PATCH /api/v1/admin/users/{id}/status`, `POST /api/v1/admin/users/{id}/reset-password`, `GET /api/v1/admin/logs`
+- [x] `ReportController` — 7 JSON report endpoints + CSV/PDF/Excel exports for `event_attendance` and `absentee` + CSV exports for `walk_in` and `student_history`
+- [x] Scheduled Console Commands (`backend/routes/console.php`): `events:send-reminders-24h`, `events:send-reminders-1h`, `notifications:purge` (30-day retention), `events:auto-close`
+- [x] Automated Backend Feature Tests:
+  - [x] `SchoolAttendanceWorkflowTest` (5 end-to-end domain workflow tests passing)
+  - [x] `AuthorizationPolicyTest` (21 RBAC policy tests across all 4 roles passing)
+
+### Week 5 (Initial Phase) — Flutter Application Core & Primary Screens ✅
+- [x] Cross-platform targets configured (`linux`, `android`, `web`) and building cleanly on Linux desktop
+- [x] `main.dart` — persistent login routing by role + global single-session termination dialog
+- [x] `api_client.dart` & `api_constants.dart` — Bearer token auth, multipart upload, 401 session callback
+- [x] `login_screen.dart` & `register_screen.dart` — wired to `/api/v1/auth/login` and `/api/v1/auth/register`
+- [x] `student_dashboard_screen.dart` — wired to `/api/v1/dashboard/student` and `/api/v1/events`
+- [x] `permanent_qr_screen.dart` — wired to `GET /api/v1/student/qr` and `POST /api/v1/student/qr/reissue` with `QrImageView`
+- [x] `event_detail_screen.dart` — wired to `GET /api/v1/events/{id}`, `POST /api/v1/events/{id}/register`, and `DELETE /api/v1/events/{id}/cancel-registration`
+- [x] `organizer_dashboard_screen.dart` & `qr_scanner_screen.dart` — wired to `/api/v1/dashboard/organizer` and `POST /api/v1/events/{id}/attendance/scan` (check-in & check-out with student photo verification sheet)
+- [x] `management_dashboard_screen.dart` — wired to `GET /api/v1/dashboard/management`
+- [x] `admin_dashboard_screen.dart` — wired to `GET /api/v1/dashboard/admin` and `POST /api/v1/admin/events/{id}/review`
 
 ---
 
-## Week 2 — Sprint 2: Backend Core — Auth, QR, Events ✅
+## 2. Continuations (Remaining Work by Sprint)
 
-**Goal:** Scaffold and fully implement the Laravel 11 backend with authentication, permanent QR management, and event lifecycle management.
+> See [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) for step-by-step implementation tasks, file lists, and test commands.
 
-### Deliverables
-- [x] Laravel 11.57 scaffolded in `backend/` via `composer create-project`
-- [x] Laravel Sanctum 4.3.3 installed (`php artisan install:api`)
-- [x] 13 custom migration files (roles → users → students → QRs → events → approvals → registrations → attendances → corrections → notifications → preferences → device tokens → activity logs)
-- [x] 13 Eloquent Models with full relationships and business logic helpers
-- [x] `AuthController` — register, login (student ID or email), logout, profile, change password
-- [x] `StudentQRController` — get active QR, self-reissue, admin inspect history
-- [x] `EventController` — CRUD, submit for approval, admin review, cancellation workflow
-- [x] Custom Middleware: `CheckRole` (role-based access) + `EnforceSingleSession` (one active device)
-- [x] 2 Seeders: `RoleSeeder` (4 roles) + `UserSeeder` (4 demo accounts + student with permanent QR)
-- [x] MySQL 8.0 production DB seeded (`school_event_attendance`)
-- [x] `.env` configured for MySQL
+### Sprint 4 Continuations — Backend Reports, Auth Extensions & FCM Dispatch 🔄
+- [ ] **Complete PDF, Excel (`.xlsx`), and CSV Exports for All 7 Report Types:**
+  - Add Excel export classes (`app/Exports/`) and DomPDF Blade views (`resources/views/reports/`) for `student_history`, `registration_summary`, `participation_summary`, `walk_in`, and `organizer_summary`.
+  - Add CSV streaming branches in `ReportController::export()` for `registration_summary`, `participation_summary`, and `organizer_summary`.
+  - Include non-attending registered students as `status: "absent"` in `ReportController::eventAttendance()`.
+  - Support `date_from`, `date_to`, `department`, `year_level`, and `status` filtering on report endpoints.
+- [ ] **Email Verification & Self-Service Password Reset Endpoints:**
+  - Implement `POST /api/v1/auth/verify-email`, `POST /api/v1/auth/forgot-password`, and `POST /api/v1/auth/reset-password`.
+- [ ] **Staff & Admin Operational Endpoints:**
+  - Allow Organizer/Admin to cancel a student's registration (`REG-009`), mark/correct attendance for absent registered students (`ATT-011`), reissue/revoke student QR as Admin (`ADMIN-004`), and broadcast Admin announcements (`NOTIF-002`).
+- [ ] **FCM Push Notification Service (`NotificationService`):**
+  - Centralize notification creation + FCM HTTP v1 push dispatch respecting `NotificationPreference` (with mandatory `event_cancellation` and `attendance_recorded`).
+
+### Sprint 5 Continuations — Flutter Secondary Screens & Security Polish 🔄
+- [ ] **Secure Token Storage:** Migrate token persistence in `mobile/lib/core/network/api_client.dart` from `SharedPreferences` to `FlutterSecureStorage`.
+- [ ] **Profile & Notification Screens (All Roles):**
+  - `ProfileScreen` (`GET /api/v1/profile`, `POST /api/v1/profile`, `POST /api/v1/profile/change-password`).
+  - `NotificationsScreen` (`GET /api/v1/notifications`, `PATCH /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/mark-all-read`).
+  - `NotificationPreferencesScreen` (`GET|PUT /api/v1/notifications/preferences`).
+- [ ] **Student Secondary Screens:**
+  - `MyRegistrationsScreen` (`GET /api/v1/student/registrations`).
+  - `MyAttendanceHistoryScreen` (`GET /api/v1/student/attendance-history`).
+- [ ] **Organizer Event Lifecycle & Attendance Screens:**
+  - `EventFormScreen` (`POST /api/v1/events`, `PUT /api/v1/events/{id}`).
+  - Submit for approval (`POST /api/v1/events/{id}/submit-approval`) & request cancellation (`POST /api/v1/events/{id}/request-cancellation`) UI controls.
+  - `EventRegistrationsScreen` (`GET /api/v1/events/{id}/registrations`).
+  - `LiveAttendanceScreen` (`GET /api/v1/events/{id}/attendance`) with manual attendance correction dialog (`PUT /api/v1/attendance/{id}/correct`).
+- [ ] **Reports & Export Screen (Organizer, Management, Admin):**
+  - `ReportsScreen` wired to `GET /api/v1/reports/*` and `GET /api/v1/reports/export`.
+- [ ] **Admin Management Screens:**
+  - `UserManagementScreen` (`GET|POST /api/v1/admin/users`, `PATCH /api/v1/admin/users/{id}/status`, `POST /api/v1/admin/users/{id}/reset-password`).
+  - Event cancellation review UI (`POST /api/v1/admin/events/{id}/review-cancellation`).
+  - `StudentQrInspectScreen` (`GET /api/v1/admin/students/{id}/qr`).
+  - `ActivityLogsScreen` (`GET /api/v1/admin/logs`).
+
+### Sprint 6 — Comprehensive Testing & Release Prep ⬜
+- [ ] **Expanded Backend Test Suite:** Report export tests (`ReportExportTest`), auth & staff operation tests (`AuthAndStaffOperationsTest`), notification preference & scheduled command tests (`NotificationServiceTest`).
+- [ ] **Expanded Flutter Widget & Integration Tests:** Screen widget tests and API client mock tests in `mobile/test/`.
+- [ ] **End-to-End Demo Verification:** Full walkthrough across Student, Organizer, Management, and Administrator roles.
+
+---
+
+## Technical Reference
 
 ### Seeded Test Accounts
 | Role | Login | Password |
@@ -71,194 +128,28 @@
 | Management | `management@school.edu` | `Management@12345` |
 | Student | `20260001` or `student@school.edu` | `Student@12345` |
 
-### Milestones
-| # | Milestone | Done |
-|---|-----------|------|
-| 2.1 | Laravel scaffolded and key:generate complete | ✅ |
-| 2.2 | All 13 migrations run on MySQL without errors | ✅ |
-| 2.3 | Auth endpoints working (login, logout, profile) | ✅ |
-| 2.4 | QR reissue atomically revokes old token | ✅ |
-| 2.5 | Single-session enforcement middleware active | ✅ |
-
----
-
-## Week 3 — Sprint 3: Registration, Attendance & Scanner API ✅
-
-**Goal:** Implement the core event registration and QR attendance scanning workflows, including waiting list auto-promotion and late detection.
-
-### Deliverables
-- [x] `RegistrationController` — register (with waiting list), cancel (with auto-promotion), list endpoints
-- [x] `AttendanceController` — QR scan check-in (late detection, walk-in support, photo response), check-out, live monitor, correction endpoint, student history
-- [x] `NotificationController` — inbox, mark read, preferences, device token registration
-- [x] `DashboardController` — role-specific dashboard summaries (student, organizer, management, admin)
-- [x] `AdminController` — user management, staff creation, activity log viewer
-- [x] `ReportController` — 7 report types as JSON + CSV streaming export
-- [x] All 49 API routes defined in `routes/api.php`
-- [x] Feature test suite: **5 domain workflow tests, all passing** (42 assertions, 3.32s)
-  - ✅ Student can login with numeric student ID
-  - ✅ Single active session enforcement
-  - ✅ Student can fetch and reissue permanent QR
-  - ✅ Full attendance check-in and check-out workflow
-  - ✅ Waiting list auto-promotion on cancellation
-
-### Key Architecture Decisions Implemented
-| Feature | Implementation |
-|---------|----------------|
-| Late detection | `Carbon::parse(event_date + start_time)->addMinutes(grace_period)` vs `now()` |
-| Waiting list promotion | Wrapped in `DB::transaction()`, lowest `waiting_list_position` promoted first |
-| Walk-in | Creates `walk_in` EventRegistration + `walk_in` Attendance if `walk_in_allowed = true` |
-| QR token | `bin2hex(random_bytes(32))` = 64-char hex, stored in `student_qrs` table |
-| Single session | Login deletes all prior Sanctum tokens, creates `"session-{$uuid}"` token |
-
-### Milestones
-| # | Milestone | Done |
-|---|-----------|------|
-| 3.1 | Waiting list auto-promotion tested and passing | ✅ |
-| 3.2 | QR scan returns student photo URL for face verification | ✅ |
-| 3.3 | 7 report types returning JSON data | ✅ |
-| 3.4 | All 49 routes reachable (no 404s on route list) | ✅ |
-| 3.5 | Test suite: 5/5 passing on SQLite | ✅ |
-
----
-
-## Week 4 — Sprint 4: Reports, Notifications & Scheduled Tasks 🔄
-
-**Goal:** Complete the reporting subsystem with PDF/Excel export, implement push notification infrastructure, and set up automated scheduled jobs.
-
-### Deliverables
-- [ ] **PDF Report Export** — Install `barryvdh/laravel-dompdf`, create Blade report templates, update `ReportController::export()` to serve PDF
-- [ ] **Excel Report Export** — Install `maatwebsite/excel`, generate `.xlsx` exports with proper column formatting
-- [ ] **Scheduled Console Tasks** — Populate `routes/console.php`:
-  - Event reminder job (24h before event → notify all registered students)
-  - Event reminder job (1h before event → final reminder)
-  - Notification purge cron (delete notifications older than 30 days)
-  - Auto-close attendance windows (mark events as ended at `end_time`)
-- [ ] **Push Notification Dispatch** — Integrate FCM (Firebase Cloud Messaging) for in-app push to Flutter via `device_tokens` table
-- [ ] **Policy/Authorization Tests** — Role-based access tests (student cannot access admin endpoints, organizer cannot approve own event, etc.)
-
-### Milestones
-| # | Milestone | Done |
-|---|-----------|------|
-| 4.1 | PDF attendance report downloadable from API | ⬜ |
-| 4.2 | Excel registration report downloadable from API | ⬜ |
-| 4.3 | 24h and 1h reminder scheduled commands working | ⬜ |
-| 4.4 | Notification purge cron running without errors | ⬜ |
-| 4.5 | Authorization policy tests passing | ⬜ |
-
----
-
-## Week 5 — Sprint 5: Flutter Mobile UI — All Screens & Integration 🔄
-
-**Goal:** Complete the Flutter mobile application with all screens fully wired to the live Laravel API. Currently scaffolded; needs API integration and UI polish.
-
-### Scaffolded (needs wiring to live API)
-- [x] `main.dart` — persistent login state, single-session termination dialog
-- [x] `api_client.dart` — Bearer auth, multipart upload, session callback
-- [x] `login_screen.dart` / `register_screen.dart`
-- [x] `student_dashboard_screen.dart` / `permanent_qr_screen.dart` / `event_detail_screen.dart`
-- [x] `qr_scanner_screen.dart` (organizer)
-- [x] `organizer_dashboard_screen.dart`
-- [x] `management_dashboard_screen.dart`
-- [x] `admin_dashboard_screen.dart`
-
-### Remaining Flutter Work
-- [ ] Wire login screen to `POST /api/v1/auth/login` → store token in `flutter_secure_storage`
-- [ ] Wire student dashboard to `GET /api/v1/dashboard/student`
-- [ ] Wire QR screen to `GET /api/v1/qr/my-qr` — render QR code widget with `qr_flutter`
-- [ ] Wire event list + detail to `GET /api/v1/events`
-- [ ] Wire event registration / cancellation buttons
-- [ ] Wire QR scanner to `POST /api/v1/attendance/scan` — display student photo for face verification
-- [ ] Wire check-out to `POST /api/v1/attendance/checkout`
-- [ ] Wire organizer event management (create, submit for approval)
-- [ ] Wire notification inbox to `GET /api/v1/notifications`
-- [ ] Profile photo upload (`image_picker` → multipart `POST /api/v1/auth/profile`)
-- [ ] Admin: user management screens wired to `GET/POST /api/v1/admin/users`
-- [ ] Management: reports screen wired to `GET /api/v1/reports/*`
-- [ ] Test on Android emulator with backend running at `10.0.2.2:8000`
-
-### Milestones
-| # | Milestone | Done |
-|---|-----------|------|
-| 5.1 | Login → token stored → dashboard loads from API | ⬜ |
-| 5.2 | Student QR screen renders live QR from API | ⬜ |
-| 5.3 | QR scanner decodes and POSTs to attendance/scan | ⬜ |
-| 5.4 | Student photo displayed after successful scan | ⬜ |
-| 5.5 | Event registration and cancellation flows complete | ⬜ |
-| 5.6 | Notification inbox loads and marks read | ⬜ |
-| 5.7 | App tested end-to-end on Android emulator | ⬜ |
-
----
-
-## Week 6 — Sprint 6: Testing, Debugging & Presentation Prep ⬜
-
-**Goal:** Achieve full test coverage, fix all discovered bugs, produce final deliverables, and rehearse the demo.
-
-### Deliverables
-- [ ] **Expanded Backend Test Suite**
-  - Unit tests per controller (individual method coverage)
-  - Policy/authorization tests (role enforcement on all protected routes)
-  - Report generation tests (CSV, PDF, Excel output validation)
-  - Edge case tests (duplicate registration attempt, expired event scan, already-checked-out)
-- [ ] **Flutter Widget Tests** — Unit tests for models, API client mock tests
-- [ ] **End-to-End Demo Script** — Step-by-step walkthrough of all 4 user roles
-- [ ] **Final Git Tag** — `v1.0.0` release tag with clean commit history
-- [ ] **README.md** — Setup guide covering:
-  - Prerequisites (PHP 8.2, Composer, MySQL 8, Flutter 3.x)
-  - Local dev setup steps
-  - Seeded test account credentials
-  - Running tests (`php artisan test`)
-  - Starting the server (`php artisan serve`)
-- [ ] **Presentation Slides** — System overview, architecture diagram, live demo flow, challenges & solutions
-- [ ] **Dry Run Demo** — Full end-to-end demo rehearsal with XAMPP/MySQL running
-
-### Milestones
-| # | Milestone | Done |
-|---|-----------|------|
-| 6.1 | Backend test suite expanded to ≥ 20 test cases | ⬜ |
-| 6.2 | All edge cases handled (duplicate registration, etc.) | ⬜ |
-| 6.3 | README.md complete and setup guide verified | ⬜ |
-| 6.4 | `v1.0.0` git tag created | ⬜ |
-| 6.5 | Full demo rehearsed end-to-end without errors | ⬜ |
-
----
-
-## Technical Reference
-
 ### Running the Backend
-```powershell
-cd 'c:\Users\domin\OneDrive\Documents\Projects\School Event Registration and QR-Based Attendance Management System\backend'
-php artisan serve
+```bash
+cd backend
+php artisan serve --host=127.0.0.1 --port=8000
 # API available at: http://127.0.0.1:8000/api/v1/
 ```
 
-### Running Tests
-```powershell
-cd 'c:\Users\domin\OneDrive\Documents\Projects\School Event Registration and QR-Based Attendance Management System\backend'
+### Running Backend Tests
+```bash
+cd backend
 php artisan test
-# Expected: 7 tests, 42 assertions — all passing
+# Runs against isolated in-memory SQLite database
 ```
 
-### Resetting the Database
-```powershell
+### Resetting & Seeding the MySQL/MariaDB Database
+```bash
+cd backend
 php artisan migrate:fresh --seed
-# Drops all tables, re-runs migrations, re-seeds 4 demo accounts
 ```
 
-### Git Commits to Date
-| Commit | Description |
-|--------|-------------|
-| `feat:` | Complete SRS v1.1, database architecture, OpenAPI spec, and Laravel 11 backend with verified tests |
-| `feat:` | Scaffold Flutter mobile application with screens, API client, models, and QR scanner |
-| `chore:` | Update .env.example with MySQL database configuration template |
-
----
-
-## Risk Register
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Flutter SDK setup delays on test device | Medium | High | Use Android emulator; test early in Week 5 |
-| FCM push notification setup complexity | Medium | Medium | Fall back to in-app polling if FCM blocks progress |
-| PDF generation layout issues | Low | Low | Use simple Blade table template; avoid complex CSS |
-| MySQL connection issues on demo machine | Low | High | Keep SQLite fallback; document MySQL setup steps |
-| Time overrun on Flutter API wiring | Medium | High | Prioritize student + organizer flows; admin is secondary |
+### Running the Flutter Application
+```bash
+cd mobile
+/home/thea/development/flutter/bin/flutter run -d linux
+```

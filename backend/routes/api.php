@@ -25,6 +25,9 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+        Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
+        Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+        Route::post('/reset-password', [AuthController::class, 'resetPassword']);
     });
 
     // ========================================================================
@@ -36,6 +39,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/profile', [AuthController::class, 'profile']);
         Route::put('/profile', [AuthController::class, 'updateProfile']);
+        Route::post('/profile', [AuthController::class, 'updateProfile']);
         Route::post('/profile/change-password', [AuthController::class, 'changePassword']);
 
         // Notifications & Device Registration
@@ -79,11 +83,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/events/{id}/submit-approval', [EventController::class, 'submitApproval']);
             Route::post('/events/{id}/request-cancellation', [EventController::class, 'requestCancellation']);
 
-            // Attendee List
-            Route::get('/events/{id}/registrations', [RegistrationController::class, 'index']);
+            // Staff Registration Management
+            Route::delete('/events/{id}/registrations/{registrationId}', [RegistrationController::class, 'cancelByStaff']);
 
-            // QR Attendance Scanner
+            // QR Attendance Scanner & Manual Marking
             Route::post('/events/{id}/attendance/scan', [AttendanceController::class, 'scan'])->middleware('throttle:60,1');
+            Route::post('/events/{id}/attendance/mark', [AttendanceController::class, 'mark']);
             Route::put('/attendance/{id}/correct', [AttendanceController::class, 'correct']);
 
             // Organizer Dashboard
@@ -104,8 +109,12 @@ Route::prefix('v1')->group(function () {
             Route::patch('/admin/users/{id}/status', [AdminController::class, 'toggleStatus']);
             Route::post('/admin/users/{id}/reset-password', [AdminController::class, 'resetPassword']);
 
-            // QR Inspection
+            // QR Inspection & Reissue
             Route::get('/admin/students/{id}/qr', [StudentQRController::class, 'inspect']);
+            Route::post('/admin/students/{id}/qr/reissue', [StudentQRController::class, 'adminReissue']);
+
+            // System Announcements
+            Route::post('/admin/announcements', [AdminController::class, 'sendAnnouncement']);
 
             // Audit Logs & Admin Dashboard
             Route::get('/admin/logs', [AdminController::class, 'activityLogs']);
@@ -116,7 +125,8 @@ Route::prefix('v1')->group(function () {
         // Role: School Management, Organizer, & Administrator (Read-Only / Monitoring)
         // ====================================================================
         Route::middleware('role:administrator,organizer,management')->group(function () {
-            // Live Attendance Monitor
+            // Attendee / Registration List & Live Attendance Monitor
+            Route::get('/events/{id}/registrations', [RegistrationController::class, 'index']);
             Route::get('/events/{id}/attendance', [AttendanceController::class, 'index']);
 
             // Reports

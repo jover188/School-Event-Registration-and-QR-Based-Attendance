@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Event;
 use App\Models\EventRegistration;
-use App\Models\Notification;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -93,13 +93,13 @@ class RegistrationController extends Controller
 
                 $reg = $existing ? tap($existing)->update($regData) : EventRegistration::create($regData);
 
-                Notification::create([
-                    'user_id' => $student->user_id,
-                    'title' => 'Placed on Waiting List',
-                    'message' => "You have joined the waiting list for '{$event->title}' at position #{$nextPosition}.",
-                    'notification_type' => 'waiting_list_joined',
-                    'payload' => ['event_id' => $event->id, 'waiting_position' => $nextPosition],
-                ]);
+                NotificationService::send(
+                    $student->user_id,
+                    'Placed on Waiting List',
+                    "You have joined the waiting list for '{$event->title}' at position #{$nextPosition}.",
+                    'waiting_list_joined',
+                    ['event_id' => $event->id, 'waiting_position' => $nextPosition]
+                );
 
                 ActivityLog::log('waiting_list_joined', 'registration', $reg->id, [
                     'event_id' => $event->id,
@@ -120,13 +120,13 @@ class RegistrationController extends Controller
 
                 $reg = $existing ? tap($existing)->update($regData) : EventRegistration::create($regData);
 
-                Notification::create([
-                    'user_id' => $student->user_id,
-                    'title' => 'Registration Confirmed',
-                    'message' => "You are registered for '{$event->title}' on {$event->event_date->format('M d, Y')}.",
-                    'notification_type' => 'registration_confirmed',
-                    'payload' => ['event_id' => $event->id],
-                ]);
+                NotificationService::send(
+                    $student->user_id,
+                    'Registration Confirmed',
+                    "You are registered for '{$event->title}' on {$event->event_date->format('M d, Y')}.",
+                    'registration_confirmed',
+                    ['event_id' => $event->id]
+                );
 
                 ActivityLog::log('event_registered', 'registration', $reg->id, [
                     'event_id' => $event->id,
@@ -196,8 +196,10 @@ class RegistrationController extends Controller
         }
 
         $wasRegistered = $registration->status === 'registered';
+        $wasWaiting = $registration->status === 'waiting_list';
+        $oldPosition = $registration->waiting_list_position;
 
-        DB::transaction(function () use ($registration, $event, $wasRegistered) {
+        DB::transaction(function () use ($registration, $event, $wasRegistered, $wasWaiting, $oldPosition) {
             // Cancel current registration
             $registration->update([
                 'status' => 'cancelled',
@@ -231,13 +233,13 @@ class RegistrationController extends Controller
 
                     // Notify promoted student
                     if ($nextCandidate->student?->user) {
-                        Notification::create([
-                            'user_id' => $nextCandidate->student->user->id,
-                            'title' => "Slot Available: {$event->title}",
-                            'message' => "A slot opened up! You have been promoted from the waiting list to registered attendee for '{$event->title}'.",
-                            'notification_type' => 'waiting_list_promoted',
-                            'payload' => ['event_id' => $event->id],
-                        ]);
+                        NotificationService::send(
+                            $nextCandidate->student->user->id,
+                            "Slot Available: {$event->title}",
+                            "A slot opened up! You have been promoted from the waiting list to registered attendee for '{$event->title}'.",
+                            'waiting_list_promoted',
+                            ['event_id' => $event->id]
+                        );
                     }
 
                     ActivityLog::log('waiting_list_promoted', 'registration', $nextCandidate->id, [
@@ -245,12 +247,120 @@ class RegistrationController extends Controller
                         'promoted_student_id' => $nextCandidate->student_id,
                     ]);
                 }
+            } elseif ($wasWaiting && !is_null($oldPosition)) {
+                EventRegistration::where('event_id', $event->id)
+                    ->where('status', 'waiting_list')
+                    ->where('waiting_list_position', '>', $oldPosition)
+                    ->decrement('waiting_list_position');
             }
         });
 
         return response()->json([
             'success' => true,
             'message' => 'Registration cancelled successfully.',
+        ]);
+    }
+
+    /**
+     * Cancel a Student's Registration by Staff (Organizer / Administrator)
+     * Auto-promotes the next waiting list candidate if a registered slot was vacated.
+     */
+    public function cancelByStaff(int $eventId, int $registrationId, Request $request): JsonResponse
+    {
+        $event = Event::findOrFail($eventId);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && $event->organizer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You may only manage registrations for events you organized.',
+            ], 403);
+        }
+
+        $registration = EventRegistration::with('student.user')
+            ->where('event_id', $event->id)
+            ->findOrFail($registrationId);
+
+        if ($registration->status === 'cancelled') {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_ALREADY_CANCELLED',
+                'message' => 'This registration has already been cancelled.',
+            ], 422);
+        }
+
+        $wasRegistered = $registration->status === 'registered';
+        $wasWaiting = $registration->status === 'waiting_list';
+        $oldPosition = $registration->waiting_list_position;
+
+        DB::transaction(function () use ($registration, $event, $wasRegistered, $wasWaiting, $oldPosition) {
+            $registration->update([
+                'status' => 'cancelled',
+                'waiting_list_position' => null,
+                'cancelled_at' => now(),
+            ]);
+
+            if ($registration->student?->user) {
+                NotificationService::send(
+                    $registration->student->user->id,
+                    "Registration Cancelled: {$event->title}",
+                    "Your registration for '{$event->title}' has been cancelled by event staff.",
+                    'event_updates',
+                    ['event_id' => $event->id]
+                );
+            }
+
+            ActivityLog::log('registration_cancelled_by_staff', 'registration', $registration->id, [
+                'event_id' => $event->id,
+                'student_id' => $registration->student_id,
+            ]);
+
+            if ($wasRegistered) {
+                $nextCandidate = EventRegistration::with('student.user')
+                    ->where('event_id', $event->id)
+                    ->where('status', 'waiting_list')
+                    ->orderBy('waiting_list_position', 'asc')
+                    ->first();
+
+                if ($nextCandidate) {
+                    $nextCandidate->update([
+                        'status' => 'registered',
+                        'waiting_list_position' => null,
+                        'registered_at' => now(),
+                    ]);
+
+                    EventRegistration::where('event_id', $event->id)
+                        ->where('status', 'waiting_list')
+                        ->where('waiting_list_position', '>', 1)
+                        ->decrement('waiting_list_position');
+
+                    if ($nextCandidate->student?->user) {
+                        NotificationService::send(
+                            $nextCandidate->student->user->id,
+                            "Slot Available: {$event->title}",
+                            "A slot opened up! You have been promoted from the waiting list to registered attendee for '{$event->title}'.",
+                            'waiting_list_promoted',
+                            ['event_id' => $event->id]
+                        );
+                    }
+
+                    ActivityLog::log('waiting_list_promoted', 'registration', $nextCandidate->id, [
+                        'event_id' => $event->id,
+                        'promoted_student_id' => $nextCandidate->student_id,
+                    ]);
+                }
+            } elseif ($wasWaiting && !is_null($oldPosition)) {
+                EventRegistration::where('event_id', $event->id)
+                    ->where('status', 'waiting_list')
+                    ->where('waiting_list_position', '>', $oldPosition)
+                    ->decrement('waiting_list_position');
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Student registration cancelled successfully.',
         ]);
     }
 

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
@@ -13,21 +14,34 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  final _firstName = TextEditingController();
-  final _middleName = TextEditingController();
-  final _lastName = TextEditingController();
-  final _studentIdNumber = TextEditingController();
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  final _confirmPassword = TextEditingController();
-  final _course = TextEditingController();
-  final _yearLevel = TextEditingController();
-  final _section = TextEditingController();
-  final _department = TextEditingController();
-  final _contactNumber = TextEditingController();
+  final TextEditingController _firstName = TextEditingController();
+  final TextEditingController _middleName = TextEditingController();
+  final TextEditingController _lastName = TextEditingController();
+  final TextEditingController _studentIdNumber = TextEditingController();
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _password = TextEditingController();
+  final TextEditingController _confirmPassword = TextEditingController();
+  final TextEditingController _course = TextEditingController();
+  final TextEditingController _yearLevel =
+      TextEditingController(text: '1st Year');
+  final TextEditingController _section = TextEditingController();
+  final TextEditingController _department = TextEditingController();
+  final TextEditingController _contactNumber = TextEditingController();
 
+  static const List<String> _yearLevels = <String>[
+    '1st Year',
+    '2nd Year',
+    '3rd Year',
+    '4th Year',
+    '5th Year',
+  ];
+
+  String _selectedYearLevel = '1st Year';
+  AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   File? _pickedPhoto;
   bool _isLoading = false;
   String? _errorMessage;
@@ -51,8 +65,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
-    if (picked != null) {
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (picked != null && mounted) {
       setState(() {
         _pickedPhoto = File(picked.path);
       });
@@ -60,7 +77,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submitRegistration() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      setState(() {
+        _autovalidateMode = AutovalidateMode.onUserInteraction;
+      });
+      return;
+    }
 
     if (_password.text != _confirmPassword.text) {
       setState(() {
@@ -74,7 +96,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _errorMessage = null;
     });
 
-    final fields = {
+    final fields = <String, String>{
       'first_name': _firstName.text.trim(),
       'middle_name': _middleName.text.trim(),
       'last_name': _lastName.text.trim(),
@@ -83,7 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'password': _password.text,
       'password_confirmation': _confirmPassword.text,
       'course': _course.text.trim(),
-      'year_level': _yearLevel.text.trim(),
+      'year_level': _selectedYearLevel,
       'section': _section.text.trim(),
       'department': _department.text.trim(),
       'contact_number': _contactNumber.text.trim(),
@@ -96,12 +118,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       fileField: 'profile_photo',
     );
 
+    if (!mounted) return;
+
     setState(() {
       _isLoading = false;
     });
 
     if (response.success) {
-      if (!mounted) return;
+      TextInput.finishAutofillContext(shouldSave: true);
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -123,7 +147,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
     } else {
       setState(() {
-        _errorMessage = response.message ?? 'Registration failed. Please check your information.';
+        _errorMessage = response.message ??
+            'Registration failed. Please check your information.';
       });
     }
   }
@@ -132,199 +157,354 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Student Self-Registration')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Photo Upload Picker
-              Center(
-                child: GestureDetector(
-                  onTap: _pickImage,
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: AppTheme.primaryLight.withOpacity(0.2),
-                        backgroundImage: _pickedPhoto != null ? FileImage(_pickedPhoto!) : null,
-                        child: _pickedPhoto == null
-                            ? const Icon(Icons.add_a_photo, size: 36, color: AppTheme.primary)
-                            : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: AppTheme.primary,
-                          child: const Icon(Icons.edit, size: 16, color: Colors.white),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.md + 4),
+          child: FocusTraversalGroup(
+            child: AutofillGroup(
+              child: Form(
+                key: _formKey,
+                autovalidateMode: _autovalidateMode,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Photo Upload Picker
+                    Center(
+                      child: Semantics(
+                        button: true,
+                        label: 'Upload verification profile photo',
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _pickImage,
+                          child: Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 50,
+                                backgroundColor: AppColors.primaryLight,
+                                backgroundImage: _pickedPhoto != null
+                                    ? FileImage(_pickedPhoto!)
+                                    : null,
+                                child: _pickedPhoto == null
+                                    ? const Icon(
+                                        Icons.add_a_photo,
+                                        size: 36,
+                                        color: AppColors.primary,
+                                      )
+                                    : null,
+                              ),
+                              const Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: AppColors.primary,
+                                  child: Icon(
+                                    Icons.edit,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const Center(
+                      child: Text(
+                        'Tap to upload verification profile photo',
+                        style: AppTypography.caption,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md + 4),
+
+                    if (_errorMessage != null) ...[
+                      Semantics(
+                        liveRegion: true,
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm + 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.absent.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            border: Border.all(color: AppColors.absent),
+                          ),
+                          child: Text(
+                            _errorMessage!,
+                            style: AppTypography.bodyMuted.copyWith(
+                              color: AppColors.absent,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
                     ],
-                  ),
+
+                    // Full Name Fields
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            key: const ValueKey<String>('register-first-name'),
+                            controller: _firstName,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.givenName],
+                            decoration: const InputDecoration(
+                              labelText: 'First Name *',
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm + 4),
+                        Expanded(
+                          child: TextFormField(
+                            key: const ValueKey<String>('register-last-name'),
+                            controller: _lastName,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.familyName],
+                            decoration: const InputDecoration(
+                              labelText: 'Last Name *',
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm + 4),
+                    TextFormField(
+                      key: const ValueKey<String>('register-middle-name'),
+                      controller: _middleName,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.middleName],
+                      decoration: const InputDecoration(
+                        labelText: 'Middle Name (Optional)',
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm + 4),
+
+                    // Academic Identification
+                    TextFormField(
+                      key: const ValueKey<String>('register-student-id'),
+                      controller: _studentIdNumber,
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.username],
+                      decoration: const InputDecoration(
+                        labelText: 'Student ID Number *',
+                        hintText: 'e.g. 20260001 (Numeric only)',
+                        prefixIcon: Icon(Icons.badge_outlined),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (!RegExp(r'^[0-9]+$').hasMatch(v.trim())) {
+                          return 'Numeric format only';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.sm + 4),
+                    TextFormField(
+                      key: const ValueKey<String>('register-email'),
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
+                      decoration: const InputDecoration(
+                        labelText: 'School Email Address *',
+                        hintText: 'student@school.edu',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                      validator: (v) => v == null || !v.contains('@')
+                          ? 'Enter a valid school email'
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.sm + 4),
+
+                    // Degree Program & Year Level Dropdown
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextFormField(
+                            key: const ValueKey<String>('register-course'),
+                            controller: _course,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'Course / Program *',
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm + 4),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: const ValueKey<String>('register-year-level'),
+                            initialValue: _selectedYearLevel,
+                            decoration: const InputDecoration(
+                              labelText: 'Year Level *',
+                            ),
+                            items: _yearLevels
+                                .map(
+                                  (level) => DropdownMenuItem<String>(
+                                    value: level,
+                                    child: Text(level),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  _selectedYearLevel = value;
+                                  _yearLevel.text = value;
+                                });
+                              }
+                            },
+                            validator: (v) =>
+                                v == null || v.isEmpty ? 'Required' : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm + 4),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            key: const ValueKey<String>('register-section'),
+                            controller: _section,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'Section *',
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm + 4),
+                        Expanded(
+                          child: TextFormField(
+                            key: const ValueKey<String>('register-contact'),
+                            controller: _contactNumber,
+                            keyboardType: TextInputType.phone,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [
+                              AutofillHints.telephoneNumber
+                            ],
+                            decoration: const InputDecoration(
+                              labelText: 'Contact Number *',
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm + 4),
+                    TextFormField(
+                      key: const ValueKey<String>('register-department'),
+                      controller: _department,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Department / College *',
+                      ),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null,
+                    ),
+                    const SizedBox(height: AppSpacing.sm + 4),
+
+                    // Passwords
+                    TextFormField(
+                      key: const ValueKey<String>('register-password'),
+                      controller: _password,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.newPassword],
+                      decoration: InputDecoration(
+                        labelText:
+                            'Password (min. 8 chars, 1 uppercase, 1 number) *',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          tooltip: _obscurePassword
+                              ? 'Show password'
+                              : 'Hide password',
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
+                      validator: (v) => v == null || v.length < 8
+                          ? 'Minimum 8 characters'
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.sm + 4),
+                    TextFormField(
+                      key: const ValueKey<String>('register-confirm-password'),
+                      controller: _confirmPassword,
+                      obscureText: _obscureConfirmPassword,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.newPassword],
+                      onFieldSubmitted: (_) => _submitRegistration(),
+                      decoration: InputDecoration(
+                        labelText: 'Confirm Password *',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          tooltip: _obscureConfirmPassword
+                              ? 'Show confirm password'
+                              : 'Hide confirm password',
+                          icon: Icon(
+                            _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
+                            });
+                          },
+                        ),
+                      ),
+                      validator: (v) => v == null || v.isEmpty
+                          ? 'Please confirm password'
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+
+                    ElevatedButton(
+                      key: const ValueKey<String>('register-submit-button'),
+                      onPressed: _isLoading ? null : _submitRegistration,
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text('Complete Registration'),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              const Center(
-                child: Text('Tap to upload verification profile photo', style: TextStyle(fontSize: 12, color: Colors.black54)),
-              ),
-              const SizedBox(height: 20),
-
-              if (_errorMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.absentColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.absentColor),
-                  ),
-                  child: Text(_errorMessage!, style: const TextStyle(color: AppTheme.absentColor, fontSize: 13)),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Full Name Fields
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _firstName,
-                      decoration: const InputDecoration(labelText: 'First Name *'),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _lastName,
-                      decoration: const InputDecoration(labelText: 'Last Name *'),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _middleName,
-                decoration: const InputDecoration(labelText: 'Middle Name (Optional)'),
-              ),
-              const SizedBox(height: 12),
-
-              // Academic Identification
-              TextFormField(
-                controller: _studentIdNumber,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Student ID Number *',
-                  hintText: 'e.g. 20260001 (Numeric only)',
-                  prefixIcon: Icon(Icons.badge_outlined),
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  if (!RegExp(r'^[0-9]+$').hasMatch(v.trim())) return 'Numeric format only';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'School Email Address *',
-                  hintText: 'student@school.edu',
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
-                validator: (v) => v == null || !v.contains('@') ? 'Enter a valid school email' : null,
-              ),
-              const SizedBox(height: 12),
-
-              // Degree Program & Year
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _course,
-                      decoration: const InputDecoration(labelText: 'Course / Program *'),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _yearLevel,
-                      decoration: const InputDecoration(labelText: 'Year Level *'),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _section,
-                      decoration: const InputDecoration(labelText: 'Section *'),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _contactNumber,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(labelText: 'Contact Number *'),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _department,
-                decoration: const InputDecoration(labelText: 'Department / College *'),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-
-              // Passwords
-              TextFormField(
-                controller: _password,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Password (min. 8 chars, 1 uppercase, 1 number) *',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
-                validator: (v) => v == null || v.length < 8 ? 'Minimum 8 characters' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _confirmPassword,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm Password *',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
-                validator: (v) => v == null || v.isEmpty ? 'Please confirm password' : null,
-              ),
-              const SizedBox(height: 24),
-
-              ElevatedButton(
-                onPressed: _isLoading ? null : _submitRegistration,
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Text('Complete Registration'),
-              ),
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
         ),
       ),

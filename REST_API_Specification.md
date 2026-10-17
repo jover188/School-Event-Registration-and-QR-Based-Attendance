@@ -87,18 +87,18 @@ Every JSON response conforms to a consistent structure.
   | Field | Type | Required | Description |
   |---|---|---|---|
   | `first_name` | string | Yes | First name (max 100) |
-  | `middle_name` | string | No | Middle name |
+  | `middle_name` | string | No | Middle name (max 100) |
   | `last_name` | string | Yes | Last name (max 100) |
   | `student_id_number` | string | Yes | Numeric format (e.g., `20260001`), unique |
   | `email` | string | Yes | School email address, unique |
-  | `password` | string | Yes | Min 8 chars, 1 uppercase, 1 number, 1 special |
+  | `password` | string | Yes | Min 8 chars, mixed case, numbers |
   | `password_confirmation` | string | Yes | Must match `password` |
   | `course` | string | Yes | Degree program (e.g., `BS Computer Science`) |
   | `year_level` | string | Yes | E.g., `3rd Year` |
   | `section` | string | Yes | Class section (e.g., `CS-3A`) |
   | `department` | string | Yes | College / Department name |
   | `contact_number` | string | Yes | Mobile phone number |
-  | `profile_photo` | file | Yes | JPG/PNG image, max 2MB |
+  | `profile_photo` | file | No | Optional/nullable JPG/PNG image, max 2MB |
 
 - **Response `201 Created`:**
 ```json
@@ -108,6 +108,7 @@ Every JSON response conforms to a consistent structure.
   "data": {
     "user_id": 142,
     "email": "student@school.edu",
+    "student_id_number": "20260001",
     "status": "pending"
   }
 }
@@ -145,7 +146,7 @@ Every JSON response conforms to a consistent structure.
 - **Request Body:**
 ```json
 {
-  "login": "20260001", 
+  "login": "20260001",
   "password": "Password@123"
 }
 ```
@@ -171,6 +172,7 @@ Every JSON response conforms to a consistent structure.
       "year_level": "3rd Year",
       "section": "CS-3A",
       "department": "College of Computer Studies",
+      "contact_number": "09171234567",
       "profile_photo_url": "https://api.school-events.edu/storage/profiles/photo_142.jpg"
     }
   }
@@ -187,7 +189,7 @@ Every JSON response conforms to a consistent structure.
 ```json
 {
   "success": true,
-  "message": "Logged out successfully. Active session terminated."
+  "message": "Logged out successfully. Device session terminated."
 }
 ```
 
@@ -195,9 +197,11 @@ Every JSON response conforms to a consistent structure.
 
 ### 2.5 Password Reset Request & Confirmation
 - **`POST /auth/forgot-password`**
+  - **Access:** Public
   - **Body:** `{ "email": "student@school.edu" }`
-  - **Response `200 OK`:** Reset link sent to registered email.
+  - **Response `200 OK`:** Reset link/token sent to registered email.
 - **`POST /auth/reset-password`**
+  - **Access:** Public
   - **Body:**
 ```json
 {
@@ -207,14 +211,29 @@ Every JSON response conforms to a consistent structure.
   "password_confirmation": "NewPassword@123"
 }
 ```
-  - **Response `200 OK`:** Password reset successfully.
+  - **Response `200 OK`:** Password reset successfully; any existing sessions are invalidated.
 
 ---
 
 ### 2.6 Authenticated Profile Management
-- **`GET /profile`**: Retrieves authenticated user and student profile.
-- **`PUT /profile`**: Updates editable profile details (`contact_number`, `profile_photo`). Note: `student_id_number` and `email` are immutable by students.
-- **`POST /profile/change-password`**: `{ "current_password": "...", "new_password": "...", "new_password_confirmation": "..." }`
+- **`GET /profile`**
+  - **Access:** Authenticated (All roles)
+  - **Description:** Retrieves authenticated user details, student profile (if student), and notification preferences.
+- **`PUT /profile`** (and **`POST /profile`** for `multipart/form-data` photo upload)
+  - **Access:** Authenticated (All roles)
+  - **Description:** Updates editable student profile details: `first_name`, `middle_name`, `last_name`, `course`, `year_level`, `section`, `department`, `contact_number`, `profile_photo` (JPG/PNG, max 2MB).
+  - **Note:** `student_id_number` and `email` are immutable by students.
+- **`POST /profile/change-password`**
+  - **Access:** Authenticated (All roles)
+  - **Body:** Accepts `current_password` and `new_password` + `new_password_confirmation` (or `password` + `password_confirmation`):
+```json
+{
+  "current_password": "OldPassword@123",
+  "new_password": "NewPassword@123",
+  "new_password_confirmation": "NewPassword@123"
+}
+```
+  - **Response `200 OK`:** Password updated successfully.
 
 ---
 
@@ -248,14 +267,64 @@ Every JSON response conforms to a consistent structure.
 ```json
 {
   "success": true,
-  "message": "A new permanent QR code has been generated. Your old QR code has been revoked.",
+  "message": "A new permanent QR code has been generated. Your previous QR code has been revoked.",
   "data": {
+    "student_id_number": "20260001",
+    "full_name": "Juan Dela Cruz",
     "new_qr_token": "9876543210abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     "status": "active",
     "issued_at": "2026-10-08T08:15:00Z"
   }
 }
 ```
+
+---
+
+### 3.3 Admin Inspect Student QR History
+- **Method & Route:** `GET /admin/students/{id}/qr`
+- **Access:** Authenticated (`administrator` role only)
+- **Description:** Inspects a student's active QR token and complete history of active and revoked QR tokens.
+- **Response `200 OK`:**
+```json
+{
+  "success": true,
+  "data": {
+    "student_id": 88,
+    "student_id_number": "20260001",
+    "full_name": "Juan Dela Cruz",
+    "active_qr": {
+      "id": 15,
+      "qr_token": "9876543210abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "status": "active",
+      "created_at": "2026-10-08T08:15:00Z"
+    },
+    "qr_history": [
+      {
+        "id": 15,
+        "qr_token": "9876543210abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "status": "active",
+        "revoked_at": null,
+        "created_at": "2026-10-08T08:15:00Z"
+      },
+      {
+        "id": 1,
+        "qr_token": "a1f8c3d9e2b4056789abcdef0123456789abcdef0123456789abcdef01234567",
+        "status": "revoked",
+        "revoked_at": "2026-10-08T08:15:00Z",
+        "created_at": "2026-09-01T10:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 3.4 Admin Force-Reissue Student QR Code
+- **Method & Route:** `POST /admin/students/{id}/qr/reissue`
+- **Access:** Authenticated (`administrator` role only)
+- **Description:** Atomically revokes a student's active QR token (`status = 'revoked'`, `revoked_at = now()`) and generates a fresh 64-character permanent QR token.
+- **Response `200 OK`:** Returns the newly issued QR token details.
 
 ---
 
@@ -267,7 +336,7 @@ Every JSON response conforms to a consistent structure.
 - **Query Parameters:**
   | Param | Type | Description |
   |---|---|---|
-  | `status` | string | `published`, `ongoing`, `completed`, `cancelled` (Students only see `published` & `ongoing`) |
+  | `status` | string | `draft`, `pending_approval`, `published`, `ongoing`, `completed`, `cancelled` (Students only see `published` & `ongoing`) |
   | `date_from` | date | Format: `YYYY-MM-DD` |
   | `date_to` | date | Format: `YYYY-MM-DD` |
   | `search` | string | Matches `title` or `venue` |
@@ -297,18 +366,26 @@ Every JSON response conforms to a consistent structure.
       "status": "published",
       "organizer": {
         "id": 5,
-        "name": "Prof. Alan Turing"
+        "email": "organizer@school.edu"
       },
       "user_registration_status": "registered"
     }
   ],
-  "meta": { "current_page": 1, "last_page": 1, "total": 1 }
+  "meta": { "current_page": 1, "last_page": 1, "per_page": 15, "total": 1 }
 }
 ```
 
 ---
 
-### 4.2 Create Event
+### 4.2 Get Single Event Detail
+- **Method & Route:** `GET /events/{id}`
+- **Access:** Authenticated (All roles)
+- **Description:** Returns single event details including organizer info, approval records, capacity (`current_registered_count`, `remaining_slots`), and the authenticated student's registration status (`user_registration_status`, `user_waiting_position`).
+- **Response `200 OK`:** Returns event detail object in `data`.
+
+---
+
+### 4.3 Create Event
 - **Method & Route:** `POST /events`
 - **Access:** `organizer`, `administrator`
 - **Request Body:**
@@ -331,14 +408,22 @@ Every JSON response conforms to a consistent structure.
 
 ---
 
-### 4.3 Submit Event for Admin Publishing Approval
+### 4.4 Update Event
+- **Method & Route:** `PUT /events/{id}`
+- **Access:** `organizer` (must own the event), `administrator`
+- **Request Body:** Any subset of editable event fields (`title`, `description`, `venue`, `event_date`, `start_time`, `end_time`, `registration_start`, `registration_end`, `max_participants`, `late_grace_period_minutes`, `walk_in_allowed`).
+- **Response `200 OK`:** Event updated successfully.
+
+---
+
+### 4.5 Submit Event for Admin Publishing Approval
 - **Method & Route:** `POST /events/{id}/submit-approval`
-- **Access:** `organizer` (must own the event)
+- **Access:** `organizer` (must own the event), `administrator`
 - **Response `200 OK`:** Status transitioned to `pending_approval`.
 
 ---
 
-### 4.4 Admin Review Event (Publishing Approval)
+### 4.6 Admin Review Event (Publishing Approval)
 - **Method & Route:** `POST /admin/events/{id}/review`
 - **Access:** `administrator`
 - **Request Body:**
@@ -352,12 +437,13 @@ Every JSON response conforms to a consistent structure.
 
 ---
 
-### 4.5 Request Event Cancellation & Admin Review
-- **`POST /events/{id}/request-cancellation`** (Organizer)
+### 4.7 Request Event Cancellation & Admin Review
+- **`POST /events/{id}/request-cancellation`** (`organizer`, `administrator`)
   - **Body:** `{ "reason": "Speaker unavailable due to emergency." }`
-- **`POST /admin/events/{id}/review-cancellation`** (Admin)
+  - **Response `200 OK`:** Cancellation request recorded and awaiting administrator approval.
+- **`POST /admin/events/{id}/review-cancellation`** (`administrator`)
   - **Body:** `{ "action": "approved", "remarks": "Cancellation approved." }`
-  - **Side Effect:** Automatically sets event status to `cancelled`, rejects ongoing registrations, dispatches FCM cancellation push notification to all registered students.
+  - **Side Effect:** Automatically sets event status to `cancelled`, rejects ongoing registrations, and dispatches cancellation notifications to all registered students.
 
 ---
 
@@ -370,11 +456,12 @@ Every JSON response conforms to a consistent structure.
 ```json
 {
   "success": true,
-  "message": "Successfully registered for event.",
+  "message": "Registration successful. Present your permanent QR code at the venue check-in.",
   "data": {
     "registration_id": 312,
     "event_id": 12,
     "status": "registered",
+    "waiting_list_position": null,
     "registered_at": "2026-10-10T09:30:00Z"
   }
 }
@@ -384,7 +471,7 @@ Every JSON response conforms to a consistent structure.
 ```json
 {
   "success": true,
-  "message": "Participant limit reached. You have been placed on the waiting list.",
+  "message": "Event capacity reached. You are at position #4 on the waiting list.",
   "data": {
     "registration_id": 313,
     "event_id": 12,
@@ -405,20 +492,35 @@ Every JSON response conforms to a consistent structure.
 ```json
 {
   "success": true,
-  "message": "Your registration has been cancelled.",
-  "data": {
-    "cancelled_at": "2026-10-12T14:00:00Z"
-  }
+  "message": "Registration cancelled successfully."
 }
 ```
-*(Side Effect: The next student on the waiting list is auto-promoted to `registered` and notified via FCM).*
+*(Side Effect: The next student on the waiting list is auto-promoted to `registered` and notified).*
 
 ---
 
-### 5.3 List Event Attendees & Waiting List
+### 5.3 View Own Registrations (Student)
+- **Method & Route:** `GET /student/registrations`
+- **Access:** `student`
+- **Query Params:** `page`, `per_page`
+- **Description:** Retrieves a paginated list of the authenticated student's event registrations, including waiting list positions, event details, and attendance records.
+- **Response `200 OK`:** Paginated list of registrations.
+
+---
+
+### 5.4 List Event Attendees & Waiting List
 - **Method & Route:** `GET /events/{id}/registrations`
 - **Access:** `organizer`, `administrator`, `management`
-- **Query Params:** `status=registered|waiting_list|cancelled|walk_in`
+- **Query Params:** `status=registered|waiting_list|cancelled|walk_in`, `page`, `per_page`
+- **Response `200 OK`:** Paginated list of event registrations with student and attendance details.
+
+---
+
+### 5.5 Staff / Admin Cancel Student Registration
+- **Method & Route:** `DELETE /events/{id}/registrations/{registrationId}`
+- **Access:** `organizer` (must own event), `administrator`
+- **Description:** Cancels a student's event registration or waiting list entry. If the student held an active `registered` slot, the lowest `waiting_list_position` candidate is atomically promoted to `registered` and remaining waiting list positions are decremented.
+- **Response `200 OK`:** Registration cancelled and waiting list updated.
 
 ---
 
@@ -440,9 +542,10 @@ Every JSON response conforms to a consistent structure.
 ```json
 {
   "success": true,
-  "message": "Check-in successful.",
+  "message": "Check-in recorded as PRESENT for Juan Dela Cruz.",
   "data": {
     "attendance_id": 905,
+    "mode": "check_in",
     "status": "present",
     "check_in_time": "2026-10-25T09:05:22Z",
     "check_out_time": null,
@@ -464,11 +567,13 @@ Every JSON response conforms to a consistent structure.
 ```json
 {
   "success": true,
-  "message": "Check-in recorded as LATE (exceeded 15-minute grace period).",
+  "message": "Check-in recorded as LATE for Juan Dela Cruz. (Exceeded 15-minute grace period).",
   "data": {
     "attendance_id": 906,
+    "mode": "check_in",
     "status": "late",
     "check_in_time": "2026-10-25T09:22:15Z",
+    "check_out_time": null,
     "student": { ... }
   }
 }
@@ -478,11 +583,13 @@ Every JSON response conforms to a consistent structure.
 ```json
 {
   "success": true,
-  "message": "Student was not registered. Attendance recorded as WALK-IN.",
+  "message": "Check-in recorded as WALK_IN for Juan Dela Cruz. (Walk-in attendee).",
   "data": {
     "attendance_id": 907,
+    "mode": "check_in",
     "status": "walk_in",
     "check_in_time": "2026-10-25T09:12:00Z",
+    "check_out_time": null,
     "student": { ... }
   }
 }
@@ -492,24 +599,54 @@ Every JSON response conforms to a consistent structure.
 ```json
 {
   "success": true,
-  "message": "Check-out recorded successfully.",
+  "message": "Check-out successfully recorded for Juan Dela Cruz.",
   "data": {
     "attendance_id": 905,
-    "check_out_time": "2026-10-25T16:02:10Z"
+    "mode": "check_out",
+    "check_in_time": "2026-10-25T09:05:22Z",
+    "check_out_time": "2026-10-25T16:02:10Z",
+    "student": { ... }
   }
 }
 ```
 
 - **Error Responses:**
-  - `409 Conflict`: Check-in already recorded for this event.
+  - `409 Conflict`: Check-in or check-out already recorded for this event.
   - `403 Forbidden`: Student not registered and walk-in attendance is disabled.
-  - `422 Unprocessable`: QR code invalid or revoked.
+  - `422 Unprocessable`: QR code invalid/revoked, event not active, or no check-in record on check-out.
 
 ---
 
-### 6.2 Manual Attendance Correction
+### 6.2 Live Event Attendance List & Summary
+- **Method & Route:** `GET /events/{id}/attendance`
+- **Access:** `organizer`, `administrator`, `management`
+- **Query Params:** `status=present|late|walk_in|excused|absent`, `search` (student name or ID), `page`, `per_page`
+- **Description:** Returns a paginated list of attendance records for the event along with real-time summary counts (`total_checked_in`, `present`, `late`, `walk_in`, `excused`).
+- **Response `200 OK`:**
+```json
+{
+  "success": true,
+  "data": [ ... ],
+  "summary": {
+    "total_checked_in": 120,
+    "present": 105,
+    "late": 10,
+    "walk_in": 4,
+    "excused": 1
+  },
+  "meta": {
+    "current_page": 1,
+    "last_page": 5,
+    "total": 120
+  }
+}
+```
+
+---
+
+### 6.3 Manual Attendance Correction
 - **Method & Route:** `PUT /attendance/{id}/correct`
-- **Access:** `administrator`, `organizer`
+- **Access:** `organizer`, `administrator`
 - **Request Body:**
 ```json
 {
@@ -521,18 +658,43 @@ Every JSON response conforms to a consistent structure.
 
 ---
 
+### 6.4 Manual Mark Student Attendance (Organizer / Admin)
+- **Method & Route:** `POST /events/{id}/attendance/mark`
+- **Access:** `organizer` (must own event), `administrator`
+- **Description:** Manually creates or updates an attendance record for a student (including marking a registered non-attending student as `absent` or `excused`) with a mandatory audit `reason`.
+- **Request Body:**
+```json
+{
+  "student_id": 88,
+  "status": "excused",
+  "reason": "Approved medical clearance submitted to organizer."
+}
+```
+- **Response `200 OK`:** Attendance record created/updated and logged in `attendance_corrections` and `activity_logs`.
+
+---
+
+### 6.5 Student Personal Attendance History
+- **Method & Route:** `GET /student/attendance-history`
+- **Access:** `student`
+- **Query Params:** `page`, `per_page`
+- **Description:** Returns a paginated list of the authenticated student's attendance history across all events.
+- **Response `200 OK`:** Paginated attendance records with associated event details.
+
+---
+
 # 7. Reports & Export Endpoints
 
 ### 7.1 Report Data Endpoints (JSON)
 | Endpoint | Access | Description |
 |---|---|---|
-| `GET /reports/event-attendance/{id}` | Admin, Organizer, Management | Attendance list per event (Present, Absent, Late, Walk-in) |
-| `GET /reports/student-history/{student_id}` | Admin, Organizer, Management | Attendance history across all events for a student |
-| `GET /reports/registration-summary/{id}` | Admin, Organizer, Management | Registration turnout and waiting list breakdown |
-| `GET /reports/participation-summary` | Admin, Organizer, Management | Institutional participation and attendance percentages |
-| `GET /reports/absentee/{id}` | Admin, Organizer, Management | Students registered who failed to check in |
-| `GET /reports/walk-in/{id}` | Admin, Organizer, Management | Students who attended as walk-in attendees |
-| `GET /reports/organizer-summary` | Admin, Management | Summary of events created and managed per organizer |
+| `GET /reports/event-attendance/{id}` | `administrator`, `organizer`, `management` | Attendance list per event (Present, Absent, Late, Walk-in, Excused) with optional `status`, `department`, `year_level` filters |
+| `GET /reports/student-history/{student_id}` | `administrator`, `organizer`, `management` | Attendance history across all events for a student with optional `date_from`, `date_to`, `status` filters |
+| `GET /reports/registration-summary/{id}` | `administrator`, `organizer`, `management` | Registration turnout and waiting list breakdown with optional `department`, `year_level` filters |
+| `GET /reports/participation-summary` | `administrator`, `organizer`, `management` | Institutional participation and attendance percentages with optional `date_from`, `date_to`, `department`, `year_level` filters |
+| `GET /reports/absentee/{id}` | `administrator`, `organizer`, `management` | Students registered who failed to check in with optional `department`, `year_level` filters |
+| `GET /reports/walk-in/{id}` | `administrator`, `organizer`, `management` | Students who attended as walk-in attendees with optional `department`, `year_level` filters |
+| `GET /reports/organizer-summary` | `administrator`, `organizer`, `management` | Summary of events created and managed per organizer with optional `date_from`, `date_to` filters |
 
 ---
 
@@ -544,10 +706,10 @@ Every JSON response conforms to a consistent structure.
   |---|---|---|---|
   | `report_type` | string | Yes | `event_attendance`, `student_history`, `registration_summary`, `participation_summary`, `absentee`, `walk_in`, `organizer_summary` |
   | `format` | string | Yes | `pdf`, `csv`, `xlsx` |
-  | `event_id` | integer | Conditional | Required for event-specific reports |
-  | `student_id` | integer | Conditional | Required for student history |
-  | `date_from` | date | No | Filter range start |
-  | `date_to` | date | No | Filter range end |
+  | `event_id` | integer | Conditional | Required for event-specific reports (`event_attendance`, `registration_summary`, `absentee`, `walk_in`) |
+  | `student_id` | integer | Conditional | Required for `student_history` |
+  | `date_from` | date | No | Filter range start (`YYYY-MM-DD`) |
+  | `date_to` | date | No | Filter range end (`YYYY-MM-DD`) |
 
 - **Response `200 OK`:** Returns binary stream with appropriate `Content-Type` header:
   - PDF: `application/pdf`
@@ -559,23 +721,34 @@ Every JSON response conforms to a consistent structure.
 
 # 8. Notifications & FCM Device Endpoints
 
-### 8.1 Register Device FCM Token
-- **Method & Route:** `POST /device-tokens`
-- **Access:** Authenticated (All roles)
-- **Request Body:**
+### 8.1 Register & Remove Device FCM Token
+- **`POST /device-tokens`**
+  - **Access:** Authenticated (All roles)
+  - **Request Body:**
 ```json
 {
   "fcm_token": "dK8j99sK8-f_sK89s_3k90...",
   "platform": "android" // or "ios"
 }
 ```
+  - **Response `200 OK`:** Device token registered for push notifications.
+- **`DELETE /device-tokens`**
+  - **Access:** Authenticated (All roles)
+  - **Request Body:**
+```json
+{
+  "fcm_token": "dK8j99sK8-f_sK89s_3k90..."
+}
+```
+  - **Response `200 OK`:** Device token removed.
 
 ---
 
-### 8.2 Get Notification Inbox
-- **Method & Route:** `GET /notifications`
-- **Access:** Authenticated (All roles)
-- **Response `200 OK`:**
+### 8.2 Notification Inbox & Read Status
+- **`GET /notifications`**
+  - **Access:** Authenticated (All roles)
+  - **Query Params:** `page`, `per_page`
+  - **Response `200 OK`:**
 ```json
 {
   "success": true,
@@ -589,24 +762,38 @@ Every JSON response conforms to a consistent structure.
       "payload": { "event_id": 12 },
       "created_at": "2026-10-25T08:00:00Z"
     }
-  ]
+  ],
+  "unread_count": 1,
+  "meta": { "current_page": 1, "last_page": 1, "total": 1 }
 }
 ```
+- **`PATCH /notifications/{id}/read`**
+  - **Access:** Authenticated (All roles)
+  - **Response `200 OK`:** Marks the specified notification as read.
+- **`POST /notifications/mark-all-read`**
+  - **Access:** Authenticated (All roles)
+  - **Response `200 OK`:** Marks all unread notifications for the authenticated user as read.
 
 ---
 
 ### 8.3 Notification Preferences
-- **`GET /notifications/preferences`**: Returns current preference state.
-- **`PUT /notifications/preferences`**:
+- **`GET /notifications/preferences`**
+  - **Access:** Authenticated (All roles)
+  - **Response `200 OK`:** Returns current notification preference state.
+- **`PUT /notifications/preferences`**
+  - **Access:** Authenticated (All roles)
+  - **Request Body (all 6 boolean fields are optional):**
 ```json
 {
   "new_event_published": true,
+  "registration_confirmed": true,
   "event_reminders": true,
   "event_updates": true,
+  "waiting_list_promoted": true,
   "admin_announcements": false
 }
 ```
-*(Note: Critical alerts like `event_cancellation` and `attendance_confirmed` cannot be disabled).*
+*(Note: Critical alerts like `event_cancellation` and `attendance_recorded` cannot be disabled).*
 
 ---
 
@@ -614,17 +801,97 @@ Every JSON response conforms to a consistent structure.
 
 | Endpoint | Access | Content Description |
 |---|---|---|
-| `GET /dashboard/student` | `student` | Upcoming registered events, total attended count, active QR status, unread notification count |
-| `GET /dashboard/organizer` | `organizer` | Active events managed, live attendee check-in counts, pending scan actions |
-| `GET /dashboard/management` | `management` (Read-Only) | Institutional participation metrics, event attendance rates by department and month |
-| `GET /dashboard/admin` | `administrator` | Events pending approval, active user count, system health, recent audit events |
+| `GET /dashboard/student` | `student` | Upcoming registered events, total registered/attended counts, active QR token, unread notification count |
+| `GET /dashboard/organizer` | `organizer`, `administrator` | Summary of organized events (`total_events`, `published_events`, `ongoing_events`, `draft_events`) and recent events with registration/attendance counts |
+| `GET /dashboard/management` | `management`, `organizer`, `administrator` | Read-only institutional participation metrics, overall turnout rate, attendance breakdown by status, department distribution, and recent events |
+| `GET /dashboard/admin` | `administrator` | Events pending approval, total user/student/organizer counts, active permanent QR count, and recent system activity logs |
 
 ---
 
-# 10. Audit Logging Endpoints (Admin Only)
+# 10. Administration & Audit Logging Endpoints (Admin Only)
 
-### 10.1 Query Activity Logs
+### 10.1 List Users
+- **Method & Route:** `GET /admin/users`
+- **Access:** `administrator`
+- **Query Parameters:**
+  | Param | Type | Description |
+  |---|---|---|
+  | `role` | string | Filter by role slug (`administrator`, `organizer`, `student`, `management`) |
+  | `status` | string | Filter by status (`active`, `inactive`, `pending`) |
+  | `search` | string | Search by email, student name, or student ID number |
+  | `page` | integer | Page number |
+  | `per_page` | integer | Items per page (default: 20) |
+- **Response `200 OK`:** Paginated list of users with role and student profile relationships.
+
+---
+
+### 10.2 Create Non-Student Staff Account
+- **Method & Route:** `POST /admin/users`
+- **Access:** `administrator`
+- **Description:** Creates an `organizer`, `management`, or `administrator` account.
+- **Request Body:**
+```json
+{
+  "email": "organizer2@school.edu",
+  "password": "Password@123",
+  "role_id": 2
+}
+```
+*(Note: `role_id` values: `1` = `administrator`, `2` = `organizer`, `4` = `management`).*
+- **Response `201 Created`:** Newly created user account with role details.
+
+---
+
+### 10.3 Activate / Deactivate User Account
+- **Method & Route:** `PATCH /admin/users/{id}/status`
+- **Access:** `administrator`
+- **Description:** Toggles or updates a user's account status between `active` and `inactive`. Deactivating an account immediately revokes all active Sanctum tokens for that user.
+- **Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "User status updated to inactive.",
+  "data": {
+    "status": "inactive"
+  }
+}
+```
+
+---
+
+### 10.4 Admin Manual Password Reset
+- **Method & Route:** `POST /admin/users/{id}/reset-password`
+- **Access:** `administrator`
+- **Description:** Administrative password reset fallback; sets a new password and terminates all prior sessions for the user.
+- **Request Body:**
+```json
+{
+  "password": "NewTempPassword@123"
+}
+```
+- **Response `200 OK`:** Password reset confirmation.
+
+---
+
+### 10.5 Query System Activity Logs
 - **Method & Route:** `GET /admin/logs`
 - **Access:** `administrator`
-- **Query Parameters:** `module=events|attendance|auth`, `user_id`, `date_from`, `date_to`, `page`
-- **Response `200 OK`:** Paginated audit entries containing actor, action, IP address, user agent, and JSON delta metadata.
+- **Query Parameters:** `module` (`events`, `attendance`, `auth`, `registration`, `qr`, `reports`, `admin`), `action`, `user_id`, `date_from`, `date_to`, `page`, `per_page`
+- **Response `200 OK`:** Paginated audit entries containing actor, action, module, target ID, IP address, user agent, and JSON delta metadata.
+
+---
+
+### 10.6 Broadcast Administrative Announcement
+- **Method & Route:** `POST /admin/announcements`
+- **Access:** `administrator`
+- **Description:** Dispatches an announcement notification (`admin_announcement`) to all active users or a targeted role, respecting each recipient's `admin_announcements` notification preference.
+- **Request Body:**
+```json
+{
+  "title": "Campus Network Maintenance",
+  "message": "The registration portal will undergo scheduled maintenance tonight from 11:00 PM to 12:00 AM.",
+  "target_role": "all"
+}
+```
+- **Response `200 OK`:** Returns `sent_count` of delivered notifications.
+

@@ -1,9 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/status_badge.dart';
 import '../../models/event_model.dart';
 
 class QrScannerScreen extends StatefulWidget {
@@ -25,7 +26,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     super.dispose();
   }
 
-  void _onDetect(BarcodeCapture capture) async {
+  Future<void> _onDetect(BarcodeCapture capture) async {
     if (_isProcessing) return;
 
     final List<Barcode> barcodes = capture.barcodes;
@@ -35,8 +36,10 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     if (rawValue == null || rawValue.length != 64) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: AppTheme.absentColor,
-          content: Text('Invalid QR code format. Expected 64-character token.'),
+          backgroundColor: AppColors.absent,
+          content: Text(
+            'Invalid QR code format. Expected 64-character token.',
+          ),
           duration: Duration(seconds: 1),
         ),
       );
@@ -46,7 +49,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     setState(() => _isProcessing = true);
     _scannerController.stop();
 
-    // Call attendance API
     final response = await ApiClient().post(
       ApiConstants.scanAttendance(widget.event.id),
       {
@@ -57,8 +59,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
     if (!mounted) return;
 
-    if (response.success && response.data != null) {
-      await _showVerificationModal(response.data);
+    if (response.success && response.data is Map<String, dynamic>) {
+      await _showVerificationModal(response.data as Map<String, dynamic>);
     } else {
       await _showErrorDialog(response.message ?? 'Attendance scan failed.');
     }
@@ -70,86 +72,76 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 
   Future<void> _showVerificationModal(Map<String, dynamic> data) async {
-    final student = data['student'] ?? {};
-    final status = (data['status'] ?? 'present').toString().toUpperCase();
-    final checkInTime = data['check_in_time'];
-    final photoUrl = student['profile_photo_url'];
-
-    Color statusColor;
-    switch (status) {
-      case 'LATE':
-        statusColor = AppTheme.lateColor;
-        break;
-      case 'WALK_IN':
-        statusColor = AppTheme.walkInColor;
-        break;
-      default:
-        statusColor = AppTheme.presentColor;
-    }
+    final student = (data['student'] as Map<String, dynamic>?) ?? {};
+    final rawStatus = (data['status'] ?? 'present').toString();
+    final statusUpper = rawStatus.toUpperCase();
+    final isCheckOut = _mode == 'check_out';
+    final displayTime = isCheckOut
+        ? (data['check_out_time'] ?? data['check_in_time'] ?? 'N/A')
+        : (data['check_in_time'] ?? 'N/A');
+    final timeLabel = isCheckOut ? 'Check-out Time' : 'Check-in Time';
+    final photoUrl = student['profile_photo_url']?.toString();
 
     return showModalBottomSheet(
       context: context,
       isDismissible: false,
       enableDrag: false,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xl),
+        ),
       ),
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Student Profile Photo for Face Verification
             CircleAvatar(
               radius: 48,
-              backgroundColor: Colors.grey.shade200,
-              backgroundImage: photoUrl != null ? CachedNetworkImageProvider(photoUrl) : null,
-              child: photoUrl == null
-                  ? const Icon(Icons.person, size: 48, color: Colors.grey)
+              backgroundColor: AppColors.border,
+              backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                  ? CachedNetworkImageProvider(photoUrl)
+                  : null,
+              child: photoUrl == null || photoUrl.isEmpty
+                  ? const Icon(
+                      Icons.person,
+                      size: 48,
+                      color: AppColors.textMuted,
+                    )
                   : null,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm + 4),
 
             Text(
-              student['full_name'] ?? 'Student',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              student['full_name']?.toString() ?? 'Student',
+              style: AppTypography.headline.copyWith(fontSize: 20),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 2),
             Text(
               'ID: ${student['student_id_number'] ?? ''} • ${student['course'] ?? ''}',
-              style: const TextStyle(color: Colors.black54, fontSize: 13),
+              style: AppTypography.bodyMuted,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm + 4),
 
             // Status Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: statusColor),
-              ),
-              child: Text(
-                _mode == 'check_out' ? 'CHECK-OUT RECORDED' : 'CHECK-IN: $status',
-                style: TextStyle(
-                  color: statusColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
+            StatusBadge(
+              status: rawStatus,
+              label: isCheckOut ? 'CHECK-OUT RECORDED' : 'CHECK-IN: $statusUpper',
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
 
             Text(
-              'Time: ${checkInTime ?? ''}',
-              style: const TextStyle(fontSize: 12, color: Colors.black45),
+              '$timeLabel: $displayTime',
+              style: AppTypography.caption,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.md + 4),
 
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
-                backgroundColor: AppTheme.primary,
+                backgroundColor: AppColors.primary,
               ),
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Confirm & Scan Next'),
@@ -166,8 +158,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       builder: (ctx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.error_outline, color: AppTheme.absentColor),
-            SizedBox(width: 8),
+            Icon(Icons.error_outline, color: AppColors.absent),
+            SizedBox(width: AppSpacing.sm),
             Text('Scan Error'),
           ],
         ),
@@ -189,96 +181,126 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         title: Text('Scanner: ${widget.event.title}'),
         actions: [
           IconButton(
+            tooltip: 'Toggle Flash',
             icon: const Icon(Icons.flash_on),
             onPressed: () => _scannerController.toggleTorch(),
           ),
           IconButton(
+            tooltip: 'Switch Camera',
             icon: const Icon(Icons.flip_camera_ios),
             onPressed: () => _scannerController.switchCamera(),
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Camera Viewfinder
-          MobileScanner(
-            controller: _scannerController,
-            onDetect: _onDetect,
-          ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Camera Viewfinder
+            MobileScanner(
+              controller: _scannerController,
+              onDetect: _onDetect,
+            ),
 
-          // Scanning Reticle / Overlay
-          Center(
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 2),
-                borderRadius: BorderRadius.circular(16),
+            // Scanning Reticle / Overlay
+            Center(
+              child: Container(
+                width: 260,
+                height: 260,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white, width: 2),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
               ),
             ),
-          ),
 
-          // Mode Selector (Check-In vs Check-Out)
-          Positioned(
-            top: 20,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _mode = 'check_in'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _mode == 'check_in' ? AppTheme.presentColor : Colors.transparent,
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'Check-In Mode',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            // Mode Selector (Check-In vs Check-Out)
+            Positioned(
+              top: 20,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        selected: _mode == 'check_in',
+                        label: 'Check-In Mode',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          onTap: () => setState(() => _mode = 'check_in'),
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 44),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _mode == 'check_in'
+                                  ? AppColors.present
+                                  : Colors.transparent,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.full),
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'Check-In Mode',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _mode = 'check_out'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _mode == 'check_out' ? AppTheme.primaryLight : Colors.transparent,
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'Check-Out Mode',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        selected: _mode == 'check_out',
+                        label: 'Check-Out Mode',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          onTap: () => setState(() => _mode = 'check_out'),
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 44),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _mode == 'check_out'
+                                  ? AppColors.walkIn
+                                  : Colors.transparent,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.full),
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'Check-Out Mode',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
 
-          // Processing Indicator
-          if (_isProcessing)
-            Container(
-              color: Colors.black45,
-              child: const Center(
-                child: CircularProgressIndicator(color: Colors.white),
+            // Processing Indicator
+            if (_isProcessing)
+              Container(
+                color: Colors.black45,
+                child: const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

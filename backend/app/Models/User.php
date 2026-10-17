@@ -123,4 +123,9 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->role?->slug === 'management';
     }
+
+    public function hasRole(string $role): bool
+    {
+        return $this->role?->slug === $role;
+    }
 }

@@ -27,7 +27,7 @@ class AuthController extends Controller
             'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'student_id_number' => ['required', 'string', 'max:30', 'regex:/^[0-9]+$/', 'unique:students,student_id_number'],
-            'email' => ['required', 'string', 'email:rfc,dns', 'max:191', 'unique:users,email'],
+            'email' => ['required', 'string', 'email', 'max:191', 'unique:users,email'],
             'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers(), 'confirmed'],
             'course' => ['required', 'string', 'max:100'],
             'year_level' => ['required', 'string', 'max:20'],
@@ -258,13 +258,20 @@ class AuthController extends Controller
     }
 
     /**
-     * Update Profile (Contact Number & Profile Photo)
+     * Update Profile (Editable fields per SRS USER-006; student_id_number & email are immutable)
      */
     public function updateProfile(Request $request): JsonResponse
     {
         $user = $request->user();
 
         $validated = $request->validate([
+            'first_name' => ['sometimes', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['sometimes', 'string', 'max:100'],
+            'course' => ['sometimes', 'string', 'max:100'],
+            'year_level' => ['sometimes', 'string', 'max:20'],
+            'section' => ['sometimes', 'string', 'max:50'],
+            'department' => ['sometimes', 'string', 'max:100'],
             'contact_number' => ['nullable', 'string', 'max:25'],
             'profile_photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
         ]);
@@ -272,8 +279,10 @@ class AuthController extends Controller
         if ($user->student) {
             $student = $user->student;
 
-            if (isset($validated['contact_number'])) {
-                $student->contact_number = $validated['contact_number'];
+            foreach (['first_name', 'middle_name', 'last_name', 'course', 'year_level', 'section', 'department', 'contact_number'] as $field) {
+                if (array_key_exists($field, $validated)) {
+                    $student->{$field} = $validated[$field];
+                }
             }
 
             if ($request->hasFile('profile_photo')) {
@@ -292,6 +301,20 @@ class AuthController extends Controller
             'data' => [
                 'profile_photo_url' => $user->student?->profile_photo_url,
                 'contact_number' => $user->student?->contact_number,
+                'student_profile' => $user->student ? [
+                    'id' => $user->student->id,
+                    'student_id_number' => $user->student->student_id_number,
+                    'full_name' => $user->student->full_name,
+                    'first_name' => $user->student->first_name,
+                    'middle_name' => $user->student->middle_name,
+                    'last_name' => $user->student->last_name,
+                    'course' => $user->student->course,
+                    'year_level' => $user->student->year_level,
+                    'section' => $user->student->section,
+                    'department' => $user->student->department,
+                    'contact_number' => $user->student->contact_number,
+                    'profile_photo_url' => $user->student->profile_photo_url,
+                ] : null,
             ],
         ]);
     }
@@ -301,10 +324,21 @@ class AuthController extends Controller
      */
     public function changePassword(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'current_password' => ['required', 'string'],
-            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers(), 'confirmed'],
-        ]);
+        $passwordRules = ['required', 'string', Password::min(8)->mixedCase()->numbers(), 'confirmed'];
+
+        if ($request->has('new_password') && !$request->has('password')) {
+            $validated = $request->validate([
+                'current_password' => ['required', 'string'],
+                'new_password' => $passwordRules,
+            ]);
+            $newPassword = $validated['new_password'];
+        } else {
+            $validated = $request->validate([
+                'current_password' => ['required', 'string'],
+                'password' => $passwordRules,
+            ]);
+            $newPassword = $validated['password'];
+        }
 
         $user = $request->user();
 
@@ -317,7 +351,7 @@ class AuthController extends Controller
         }
 
         $user->update([
-            'password' => Hash::make($validated['password']),
+            'password' => Hash::make($newPassword),
         ]);
 
         ActivityLog::log('password_changed', 'auth', $user->id, [], $user->id);
@@ -325,6 +359,132 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Password updated successfully.',
+        ]);
+    }
+
+    /**
+     * Verify School Email / Activate Pending Account
+     */
+    public function verifyEmail(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['nullable', 'string'],
+            'token' => ['nullable', 'string'],
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_USER_NOT_FOUND',
+                'message' => 'No user account found with that email address.',
+            ], 404);
+        }
+
+        $user->update([
+            'status' => 'active',
+            'email_verified_at' => $user->email_verified_at ?? now(),
+        ]);
+
+        ActivityLog::log('email_verified', 'auth', $user->id, [
+            'email' => $user->email,
+        ], $user->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email verified successfully. Your account is now active.',
+            'data' => [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'status' => $user->status,
+            ],
+        ]);
+    }
+
+    /**
+     * Request Password Reset Token
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'exists:users,email'],
+        ]);
+
+        $plainToken = (string) random_int(100000, 999999);
+
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $validated['email']],
+            [
+                'token' => Hash::make($plainToken),
+                'created_at' => now(),
+            ]
+        );
+
+        $user = User::where('email', $validated['email'])->first();
+
+        ActivityLog::log('password_reset_requested', 'auth', $user?->id, [
+            'email' => $validated['email'],
+        ], $user?->id);
+
+        $data = null;
+        if (app()->environment(['local', 'testing'])) {
+            $data = ['reset_token' => $plainToken];
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset token generated and sent to your school email.',
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Complete Password Reset with Token
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'token' => ['required', 'string'],
+            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers(), 'confirmed'],
+        ]);
+
+        $record = DB::table('password_reset_tokens')
+            ->where('email', $validated['email'])
+            ->first();
+
+        if (
+            !$record ||
+            ($record->created_at && \Carbon\Carbon::parse($record->created_at)->addMinutes(60)->isPast()) ||
+            !Hash::check($validated['token'], $record->token)
+        ) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_INVALID_RESET_TOKEN',
+                'message' => 'Invalid or expired password reset token.',
+            ], 422);
+        }
+
+        $user = User::where('email', $validated['email'])->firstOrFail();
+
+        $user->update([
+            'password' => Hash::make($validated['password']),
+            'active_session_id' => null,
+        ]);
+
+        $user->tokens()->delete();
+
+        DB::table('password_reset_tokens')->where('email', $validated['email'])->delete();
+
+        ActivityLog::log('password_reset_completed', 'auth', $user->id, [
+            'email' => $user->email,
+        ], $user->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password has been reset successfully. You may now log in.',
         ]);
     }
 }

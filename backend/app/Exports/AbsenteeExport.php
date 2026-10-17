@@ -21,6 +21,8 @@ class AbsenteeExport implements
     WithTitle,
     ShouldAutoSize
 {
+    private int $row = 0;
+
     public function __construct(
         protected Event $event,
         protected string $generatedBy
@@ -56,11 +58,10 @@ class AbsenteeExport implements
 
     public function map($reg): array
     {
-        static $row = 0;
-        $row++;
+        $this->row++;
 
         return [
-            $row,
+            $this->row,
             $reg->student?->student_id_number ?? '—',
             $reg->student?->full_name ?? '—',
             $reg->student?->course ?? '—',
