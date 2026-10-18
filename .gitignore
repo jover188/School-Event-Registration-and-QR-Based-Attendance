@@ -17,6 +17,7 @@ mobile/.flutter-plugins
 mobile/.flutter-plugins-dependencies
 mobile/build/
 mobile/build.bak/
+mobile/android/.kotlin/
 mobile/.packages
 
 # Backups & Temporary
