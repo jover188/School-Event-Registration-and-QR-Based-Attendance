@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/status_badge.dart';
@@ -126,12 +128,12 @@ class _NotificationPreferencesScreenState
       actions: [
         IconButton(
           tooltip: 'Refresh Preferences',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(LucideIcons.refreshCw, size: 20),
           onPressed: _isLoading ? null : _fetchPreferences,
         ),
       ],
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: AppSpinner(color: d.authDark, size: 28))
           : _errorMessage != null
               ? ErrorStateView(
                   message: _errorMessage!,
@@ -148,65 +150,87 @@ class _NotificationPreferencesScreenState
                             'Required by school policy (SRS NOTIF-004) and cannot be disabled.',
                       ),
                       SizedBox(height: d.sm),
-                      Card(
-                        child: Column(
-                          children: [
-                            SwitchListTile(
-                              value: true,
-                              onChanged: null,
-                              secondary: Icon(
-                                Icons.lock_outline,
-                                color: d.destructive,
-                              ),
-                              title: Wrap(
-                                spacing: d.sm,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(
-                                    'Event Cancellations',
-                                    style: d.cardTitle,
-                                  ),
-                                  const StatusBadge(
-                                    status: 'active',
-                                    label: 'LOCKED',
-                                    showIcon: false,
-                                  ),
-                                ],
-                              ),
-                              subtitle: Text(
-                                'Mandatory per school policy (SRS NOTIF-004) — immediate notice when a registered event is cancelled.',
-                                style: d.supporting,
-                              ),
-                            ),
-                            const Divider(height: 1),
-                            SwitchListTile(
-                              value: true,
-                              onChanged: null,
-                              secondary: Icon(
-                                Icons.lock_outline,
-                                color: d.success,
-                              ),
-                              title: Wrap(
-                                spacing: d.sm,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(
-                                    'Attendance Confirmation',
-                                    style: d.cardTitle,
-                                  ),
-                                  const StatusBadge(
-                                    status: 'active',
-                                    label: 'LOCKED',
-                                    showIcon: false,
-                                  ),
-                                ],
-                              ),
-                              subtitle: Text(
-                                'Mandatory per school policy (SRS NOTIF-004) — real-time receipt when your QR code is scanned.',
-                                style: d.supporting,
-                              ),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(d.radiusCard),
+                          border: Border.all(
+                            color: d.isDark
+                                ? d.border
+                                : d.authDark.withValues(alpha: 0.08),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: d.authDark.withValues(alpha: 0.04),
+                              offset: const Offset(0, 2),
+                              blurRadius: 8,
                             ),
                           ],
+                        ),
+                        child: Material(
+                          color: d.card,
+                          borderRadius: BorderRadius.circular(d.radiusCard),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
+                            children: [
+                              SwitchListTile(
+                                value: true,
+                                onChanged: null,
+                                secondary: Icon(
+                                  LucideIcons.lock,
+                                  size: 20,
+                                  color: d.destructive,
+                                ),
+                                title: Wrap(
+                                  spacing: d.sm,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Event Cancellations',
+                                      style: d.cardTitle,
+                                    ),
+                                    const StatusBadge(
+                                      status: 'active',
+                                      label: 'LOCKED',
+                                      showIcon: false,
+                                    ),
+                                  ],
+                                ),
+                                subtitle: Text(
+                                  'Mandatory per school policy (SRS NOTIF-004) — immediate notice when a registered event is cancelled.',
+                                  style: d.supporting,
+                                ),
+                              ),
+                              const Divider(height: 1),
+                              SwitchListTile(
+                                value: true,
+                                onChanged: null,
+                                secondary: Icon(
+                                  LucideIcons.lock,
+                                  size: 20,
+                                  color: d.success,
+                                ),
+                                title: Wrap(
+                                  spacing: d.sm,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Attendance Confirmation',
+                                      style: d.cardTitle,
+                                    ),
+                                    const StatusBadge(
+                                      status: 'active',
+                                      label: 'LOCKED',
+                                      showIcon: false,
+                                    ),
+                                  ],
+                                ),
+                                subtitle: Text(
+                                  'Mandatory per school policy (SRS NOTIF-004) — real-time receipt when your QR code is scanned.',
+                                  style: d.supporting,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       SizedBox(height: d.lg),
@@ -218,13 +242,32 @@ class _NotificationPreferencesScreenState
                             'Customize non-critical event reminders and announcements.',
                       ),
                       SizedBox(height: d.sm),
-                      Card(
-                        child: Column(
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(d.radiusCard),
+                          border: Border.all(
+                            color: d.isDark
+                                ? d.border
+                                : d.authDark.withValues(alpha: 0.08),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: d.authDark.withValues(alpha: 0.04),
+                              offset: const Offset(0, 2),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: d.card,
+                          borderRadius: BorderRadius.circular(d.radiusCard),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
                           children: [
                             SwitchListTile(
                               value: _newEventPublished,
                               onChanged: (val) =>
-                                  setState(() => _newEventPublished = val),
+                                   setState(() => _newEventPublished = val),
                               title: Text(
                                 'New Events Published',
                                 style: d.cardTitle,
@@ -308,15 +351,17 @@ class _NotificationPreferencesScreenState
                           ],
                         ),
                       ),
+                    ),
                       SizedBox(height: d.lg),
 
                       AppButton(
                         key: const ValueKey<String>(
                           'save-notification-preferences-button',
                         ),
+                        pill: true,
                         onPressed: _isSaving ? null : _savePreferences,
                         isLoading: _isSaving,
-                        icon: Icons.save_outlined,
+                        icon: LucideIcons.save,
                         label: 'Save Preferences',
                       ),
                     ],

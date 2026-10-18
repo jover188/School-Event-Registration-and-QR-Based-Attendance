@@ -7,6 +7,7 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/event_card.dart';
@@ -244,6 +245,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     if (event.isRegistered) {
       return AppButton(
         variant: AppButtonVariant.outline,
+        pill: true,
         onPressed: () => _openEventDetail(event),
         label: 'Manage Registration',
       );
@@ -257,13 +259,15 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     if (isFull) {
       return AppButton(
         variant: AppButtonVariant.outline,
-        icon: Icons.queue_rounded,
+        pill: true,
+        icon: LucideIcons.listOrdered,
         onPressed: () => _openEventDetail(event),
         label: 'Join Waiting List',
       );
     }
     return AppButton(
       variant: AppButtonVariant.ghost,
+      pill: true,
       onPressed: () => _openEventDetail(event),
       label: 'View Event',
     );
@@ -291,7 +295,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         color: d.warningBackground,
                         borderRadius: BorderRadius.circular(d.radiusCard),
                         border: Border.all(
-                          color: d.warning.withValues(alpha: 0.4),
+                          color: d.warning.withValues(alpha: 0.28),
                         ),
                       ),
                       child: Wrap(
@@ -304,9 +308,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.warning_amber_rounded,
+                                LucideIcons.alertTriangle,
                                 color: d.warning,
-                                size: 20,
+                                size: 18,
                               ),
                               SizedBox(width: d.sm),
                               Flexible(
@@ -322,7 +326,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           ),
                           AppButton(
                             variant: AppButtonVariant.outline,
-                            icon: Icons.refresh,
+                            pill: true,
+                            icon: LucideIcons.refreshCw,
                             onPressed: _fetchEvents,
                             label: 'Retry',
                           ),
@@ -341,7 +346,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           label: 'Registered',
                           value:
                               '${(_stats!['total_registered_events'] ?? _stats!['registered'] ?? 0)}',
-                          icon: Icons.event_available,
+                          icon: LucideIcons.calendarCheck,
                           color: d.primary,
                           onTap: () =>
                               setState(() => _selectedId = 'registrations'),
@@ -350,7 +355,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           label: 'Attended',
                           value:
                               '${(_stats!['total_attended_events'] ?? _stats!['attended'] ?? 0)}',
-                          icon: Icons.verified_user_outlined,
+                          icon: LucideIcons.shieldCheck,
                           color: d.success,
                           onTap: () => setState(() => _selectedId = 'history'),
                         ),
@@ -358,7 +363,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           label: 'Waiting List',
                           value:
                               '${(_stats!['waiting_list_count'] ?? _stats!['total_waiting_list'] ?? _stats!['waiting_list'] ?? _stats!['unread_notifications'] ?? 0)}',
-                          icon: Icons.queue_rounded,
+                          icon: LucideIcons.listOrdered,
                           color: d.waiting,
                           onTap: () =>
                               setState(() => _selectedId = 'registrations'),
@@ -374,12 +379,20 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                     decoration: InputDecoration(
                       labelText: 'Search events by title or venue',
                       hintText: 'Search events or venues...',
-                      prefixIcon: const Icon(Icons.search),
+                      prefixIcon: Icon(
+                        LucideIcons.search,
+                        size: 18,
+                        color: d.authDark.withValues(alpha: 0.62),
+                      ),
                       suffixIcon: (_searchQuery.isNotEmpty ||
                               _searchController.text.isNotEmpty)
                           ? IconButton(
                               tooltip: 'Clear search',
-                              icon: const Icon(Icons.clear),
+                              icon: Icon(
+                                LucideIcons.x,
+                                size: 18,
+                                color: d.authDark.withValues(alpha: 0.62),
+                              ),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _searchQuery = '');
@@ -408,9 +421,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
               ),
             ),
             if (_isLoading)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(
+                  child: AppSpinner(
+                    size: 28,
+                    color: d.authDark,
+                  ),
+                ),
               )
             else if (_errorMessage != null && _events.isEmpty)
               SliverFillRemaining(
@@ -424,7 +442,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: EmptyStateView(
-                  icon: Icons.event_busy,
+                  icon: LucideIcons.calendarX2,
                   title: 'No upcoming events found.',
                   message:
                       'Check back soon or adjust your search filters.',
@@ -456,6 +474,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return AppShell(
       title: _currentTitle,
       destinations: _destinations,
@@ -465,12 +484,12 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       },
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
           tooltip: 'Refresh',
           onPressed: _isLoading ? null : _fetchEvents,
         ),
         IconButton(
-          icon: const Icon(Icons.notifications_outlined),
+          icon: Icon(LucideIcons.bell, size: 18, color: d.foreground),
           tooltip: 'Notifications',
           onPressed: () async {
             await Navigator.push(
@@ -484,7 +503,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.person_outline),
+          icon: Icon(LucideIcons.user, size: 18, color: d.foreground),
           tooltip: 'My Profile',
           onPressed: () {
             Navigator.push(
@@ -494,7 +513,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.logout),
+          icon: Icon(LucideIcons.logOut, size: 18, color: d.foreground),
           tooltip: 'Logout',
           onPressed: _logout,
         ),

@@ -294,9 +294,10 @@ class AppDesignTokens extends ThemeExtension<AppDesignTokens> {
   double get lg => 24;
   double get xl => 32;
   double get xxl => 48;
-  double get radiusControl => 8; // --radius: 0.5rem (8px)
-  double get radiusCard => 8; // --radius: 0.5rem (8px)
-  double get radiusOverlay => 12;
+  double get radiusControl => 12; // 12px for modern rounded controls
+  double get radiusCard => 16; // 16px matching authFieldRadius and login cards
+  double get radiusOverlay => 16;
+  bool get isDark => background == AppPalette.darkBackground;
   double get radiusPill => 999;
   double get minimumTarget => 48;
   double get compactBreakpoint => 600;

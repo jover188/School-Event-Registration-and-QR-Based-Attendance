@@ -182,11 +182,11 @@ class AppShell extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: selected
-                ? (horizontal ? d.sidebarPrimary : d.sidebarAccent)
+                ? (horizontal ? d.authDark : d.authDark.withValues(alpha: 0.08))
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(d.radiusControl),
+            borderRadius: BorderRadius.circular(horizontal ? d.radiusControl : d.radiusPill),
             border: selected && !horizontal
-                ? Border.all(color: d.sidebarBorder)
+                ? Border.all(color: d.authDark.withValues(alpha: 0.08))
                 : null,
           ),
           child: horizontal
@@ -197,7 +197,7 @@ class AppShell extends StatelessWidget {
                       size: 18,
                       weight: 300,
                       color: selected
-                          ? d.sidebarPrimaryForeground
+                          ? d.authLight
                           : d.mutedForeground,
                     ),
                     SizedBox(width: d.gap),
@@ -207,7 +207,7 @@ class AppShell extends StatelessWidget {
                         style: d.body.copyWith(
                           fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                           color: selected
-                              ? d.sidebarPrimaryForeground
+                              ? d.authLight
                               : d.sidebarForeground,
                         ),
                       ),
@@ -217,7 +217,7 @@ class AppShell extends StatelessWidget {
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: d.sidebarPrimaryForeground,
+                          color: d.authLight,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -232,7 +232,7 @@ class AppShell extends StatelessWidget {
                       size: 20,
                       weight: 300,
                       color: selected
-                          ? d.sidebarAccentForeground
+                          ? d.authDark
                           : d.mutedForeground,
                     ),
                     const SizedBox(height: 3),
@@ -245,7 +245,7 @@ class AppShell extends StatelessWidget {
                       style: d.badge.copyWith(
                         fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                         color: selected
-                            ? d.sidebarAccentForeground
+                            ? d.authDark
                             : d.mutedForeground,
                       ),
                     ),
@@ -355,8 +355,8 @@ class AppShell extends StatelessWidget {
                       child: Container(
                         constraints: const BoxConstraints(minHeight: 64),
                         decoration: BoxDecoration(
-                          color: d.card.withValues(alpha: 0.80),
-                          border: Border(bottom: BorderSide(color: d.border)),
+                          color: d.card.withValues(alpha: 0.92),
+                          border: Border(bottom: BorderSide(color: d.authDark.withValues(alpha: 0.08))),
                         ),
                         padding: EdgeInsets.symmetric(
                           horizontal: d.md,
@@ -393,9 +393,14 @@ class AppShell extends StatelessWidget {
                                     title,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: sizeClass == AppWindowClass.compact
-                                        ? d.compactPageTitle
-                                        : d.pageTitle,
+                                    style: (sizeClass == AppWindowClass.compact
+                                            ? d.compactPageTitle
+                                            : d.pageTitle)
+                                        .copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: d.foreground,
+                                      letterSpacing: -0.3,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -427,7 +432,7 @@ class AppShell extends StatelessWidget {
                 constraints: const BoxConstraints(minHeight: 56), // h-14
                 decoration: BoxDecoration(
                   color: d.card,
-                  border: Border(top: BorderSide(color: d.border)),
+                  border: Border(top: BorderSide(color: d.authDark.withValues(alpha: 0.08))),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,

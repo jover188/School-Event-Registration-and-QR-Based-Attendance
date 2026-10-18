@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_spinner.dart';
 import '../../../core/widgets/status_badge.dart';
 
 /// Camera-free presentation widget for QR attendance scan results and errors.
@@ -51,19 +53,21 @@ class ScanResultContent extends StatelessWidget {
           decoration: BoxDecoration(
             color: d.card,
             borderRadius: BorderRadius.circular(d.radiusCard),
-            border: Border.all(color: d.border),
+            border: Border.all(
+              color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: d.authDark.withValues(alpha: 0.04),
+                offset: const Offset(0, 2),
+                blurRadius: 8,
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: d.primary,
-                ),
-              ),
+              const AppSpinner(size: 32),
               SizedBox(height: d.md),
               Text(
                 'Recording attendance…',
@@ -92,7 +96,14 @@ class ScanResultContent extends StatelessWidget {
           decoration: BoxDecoration(
             color: d.card,
             borderRadius: BorderRadius.circular(d.radiusCard),
-            border: Border.all(color: d.destructive.withValues(alpha: 0.4)),
+            border: Border.all(color: d.destructive.withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: d.authDark.withValues(alpha: 0.04),
+                offset: const Offset(0, 2),
+                blurRadius: 8,
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -107,9 +118,9 @@ class ScanResultContent extends StatelessWidget {
                       borderRadius: BorderRadius.circular(d.radiusControl),
                     ),
                     child: Icon(
-                      Icons.error_outline,
+                      LucideIcons.alertCircle,
                       color: d.destructive,
-                      size: 24,
+                      size: 22,
                     ),
                   ),
                   SizedBox(width: d.gap),
@@ -137,7 +148,8 @@ class ScanResultContent extends StatelessWidget {
               AppButton(
                 key: const ValueKey<String>('scan-error-retry-button'),
                 label: 'Scan Next QR Code',
-                icon: Icons.qr_code_scanner,
+                pill: true,
+                icon: LucideIcons.scanLine,
                 onPressed: onScanNext,
               ),
               if (onOpenAttendance != null) ...[
@@ -145,7 +157,8 @@ class ScanResultContent extends StatelessWidget {
                 AppButton(
                   label: 'View attendance',
                   variant: AppButtonVariant.outline,
-                  icon: Icons.fact_check_outlined,
+                  pill: true,
+                  icon: LucideIcons.clipboardCheck,
                   onPressed: onOpenAttendance,
                 ),
               ],
@@ -161,7 +174,16 @@ class ScanResultContent extends StatelessWidget {
         decoration: BoxDecoration(
           color: d.card,
           borderRadius: BorderRadius.circular(d.radiusCard),
-          border: Border.all(color: d.border),
+          border: Border.all(
+            color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: d.authDark.withValues(alpha: 0.04),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -228,7 +250,16 @@ class ScanResultContent extends StatelessWidget {
         decoration: BoxDecoration(
           color: d.card,
           borderRadius: BorderRadius.circular(d.radiusCard),
-          border: Border.all(color: d.border),
+          border: Border.all(
+            color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: d.authDark.withValues(alpha: 0.04),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -287,8 +318,13 @@ class ScanResultContent extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(d.gap),
               decoration: BoxDecoration(
-                color: d.muted,
+                color: d.isDark ? d.muted : const Color(0xFFFBFBFA),
                 borderRadius: BorderRadius.circular(d.radiusControl),
+                border: Border.all(
+                  color: d.isDark
+                      ? d.border
+                      : d.authDark.withValues(alpha: 0.08),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,7 +350,8 @@ class ScanResultContent extends StatelessWidget {
             AppButton(
               key: const ValueKey<String>('scan-next-button'),
               label: 'Scan Next QR Code',
-              icon: Icons.qr_code_scanner,
+              pill: true,
+              icon: LucideIcons.scanLine,
               onPressed: onScanNext,
             ),
           ],

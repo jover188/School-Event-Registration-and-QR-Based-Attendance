@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -401,7 +403,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
       builder: (ctx) {
         final d = ctx.design;
         return AlertDialog(
-          title: Text('$upperFormat Export Ready'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(d.radiusCard),
+            side: BorderSide(
+              color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+            ),
+          ),
+          title: Row(
+            children: [
+              Icon(LucideIcons.fileCheck, size: 20, color: d.primary),
+              SizedBox(width: d.sm),
+              Expanded(child: Text('$upperFormat Export Ready')),
+            ],
+          ),
           content: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: SingleChildScrollView(
@@ -433,6 +447,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           actions: [
             AppButton(
+              pill: true,
               variant: AppButtonVariant.primary,
               label: 'Close',
               onPressed: () => Navigator.of(ctx).pop(),
@@ -459,8 +474,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
           key: const ValueKey<String>('report-event-picker'),
           initialValue: selectedEventValue,
           isExpanded: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Select Event',
+            prefixIcon: Icon(
+              LucideIcons.calendar,
+              size: 18,
+              color: d.mutedForeground,
+            ),
           ),
           items: _availableEvents
               .map(
@@ -490,9 +510,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
           keyboardType: TextInputType.number,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _generateReport(),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Event ID',
             hintText: 'Enter numeric event ID',
+            prefixIcon: Icon(
+              LucideIcons.hash,
+              size: 18,
+              color: d.mutedForeground,
+            ),
           ),
         ),
       if (config.needsStudent)
@@ -503,9 +528,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
           keyboardType: TextInputType.number,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _generateReport(),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Student Record ID',
             hintText: 'Enter numeric student ID (e.g. 1)',
+            prefixIcon: Icon(
+              LucideIcons.user,
+              size: 18,
+              color: d.mutedForeground,
+            ),
           ),
         ),
       TextField(
@@ -513,9 +543,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
         controller: _departmentController,
         focusNode: _departmentFocus,
         textInputAction: TextInputAction.next,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Department (Optional)',
           hintText: 'e.g. CCS',
+          prefixIcon: Icon(
+            LucideIcons.building,
+            size: 18,
+            color: d.mutedForeground,
+          ),
         ),
       ),
       TextField(
@@ -523,9 +558,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
         controller: _yearLevelController,
         focusNode: _yearLevelFocus,
         textInputAction: TextInputAction.next,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Year Level (Optional)',
           hintText: 'e.g. 3rd Year',
+          prefixIcon: Icon(
+            LucideIcons.graduationCap,
+            size: 18,
+            color: d.mutedForeground,
+          ),
         ),
       ),
       TextField(
@@ -533,9 +573,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
         controller: _dateFromController,
         focusNode: _dateFromFocus,
         textInputAction: TextInputAction.next,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Date From (YYYY-MM-DD)',
           hintText: '2026-01-01',
+          prefixIcon: Icon(
+            LucideIcons.calendarDays,
+            size: 18,
+            color: d.mutedForeground,
+          ),
         ),
       ),
       TextField(
@@ -544,9 +589,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
         focusNode: _dateToFocus,
         textInputAction: TextInputAction.done,
         onSubmitted: (_) => _generateReport(),
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Date To (YYYY-MM-DD)',
           hintText: '2026-12-31',
+          prefixIcon: Icon(
+            LucideIcons.calendarDays,
+            size: 18,
+            color: d.mutedForeground,
+          ),
         ),
       ),
     ];
@@ -557,7 +607,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       actions: [
         IconButton(
           tooltip: 'Refresh Report',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(LucideIcons.refreshCw, size: 18),
           onPressed: _isLoadingReport ? null : _generateReport,
         ),
       ],
@@ -577,7 +627,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 decoration: BoxDecoration(
                   color: d.card,
                   borderRadius: BorderRadius.circular(d.radiusCard),
-                  border: Border.all(color: d.border),
+                  border: Border.all(
+                    color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: d.authDark.withValues(alpha: 0.04),
+                      offset: const Offset(0, 2),
+                      blurRadius: 8,
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -586,8 +645,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       key: const ValueKey<String>('report-type-dropdown'),
                       initialValue: _selectedReportType,
                       isExpanded: true,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Report Type',
+                        prefixIcon: Icon(
+                          LucideIcons.fileText,
+                          size: 18,
+                          color: d.mutedForeground,
+                        ),
                       ),
                       items: _reportTypes
                           .map(
@@ -619,9 +683,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       alignment: Alignment.centerLeft,
                       child: AppButton(
                         key: const ValueKey<String>('generate-report-button'),
+                        pill: true,
                         onPressed: _isLoadingReport ? null : _generateReport,
                         isLoading: _isLoadingReport,
-                        icon: Icons.play_arrow_outlined,
+                        icon: LucideIcons.play,
                         label: 'Generate Report',
                       ),
                     ),
@@ -645,7 +710,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               if (_isLoadingReport)
                 Padding(
                   padding: EdgeInsets.all(d.xl),
-                  child: const Center(child: CircularProgressIndicator()),
+                  child: Center(
+                    child: AppSpinner(color: d.authDark, size: 28),
+                  ),
                 )
               else if (_errorMessage != null)
                 ErrorStateView(
@@ -692,7 +759,16 @@ class _ReportExportButtonsCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: d.card,
           borderRadius: BorderRadius.circular(d.radiusCard),
-          border: Border.all(color: d.border),
+          border: Border.all(
+            color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: d.authDark.withValues(alpha: 0.04),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -716,24 +792,27 @@ class _ReportExportButtonsCard extends StatelessWidget {
               children: [
                 AppButton(
                   key: const ValueKey<String>('export-csv-button'),
+                  pill: true,
                   variant: AppButtonVariant.outline,
                   onPressed: isExporting ? null : onExportCsv,
-                  icon: Icons.table_rows_outlined,
+                  icon: LucideIcons.fileSpreadsheet,
                   label: 'Export CSV',
                 ),
                 AppButton(
                   key: const ValueKey<String>('export-excel-button'),
+                  pill: true,
                   variant: AppButtonVariant.outline,
                   onPressed: isExporting ? null : onExportExcel,
-                  icon: Icons.grid_on_outlined,
+                  icon: LucideIcons.table,
                   label: 'Export XLSX',
                 ),
                 if (_supportsPdf)
                   AppButton(
                     key: const ValueKey<String>('export-pdf-button'),
+                    pill: true,
                     variant: AppButtonVariant.outline,
                     onPressed: isExporting ? null : onExportPdf,
-                    icon: Icons.picture_as_pdf_outlined,
+                    icon: LucideIcons.fileText,
                     label: 'Export PDF',
                   ),
               ],
@@ -759,7 +838,7 @@ class _ReportPayloadViewer extends StatelessWidget {
     final d = context.design;
     if (payload == null) {
       return const EmptyStateView(
-        icon: Icons.description_outlined,
+        icon: LucideIcons.fileText,
         title: 'No report data loaded.',
         message: 'Choose parameters above and tap Generate Report.',
       );
@@ -788,7 +867,7 @@ class _ReportPayloadViewer extends StatelessWidget {
 
       if (summaryMap.isEmpty && recordsList.isEmpty) {
         return const EmptyStateView(
-          icon: Icons.inbox_outlined,
+          icon: LucideIcons.inbox,
           title: 'No summary metrics available.',
         );
       }
@@ -806,7 +885,7 @@ class _ReportPayloadViewer extends StatelessWidget {
                   StatMetricCard(
                     label: entry.key.replaceAll('_', ' ').toUpperCase(),
                     value: entry.value?.toString() ?? 'N/A',
-                    icon: Icons.query_stats_outlined,
+                    icon: LucideIcons.trendingUp,
                     color: d.primary,
                   ),
               ],
@@ -835,7 +914,7 @@ class _ReportPayloadViewer extends StatelessWidget {
       final list = (payload as List).whereType<Map<String, dynamic>>().toList();
       if (list.isEmpty) {
         return const EmptyStateView(
-          icon: Icons.inbox_outlined,
+          icon: LucideIcons.inbox,
           title: 'No records found for this report.',
           message: 'Try selecting another event or adjusting your filters.',
         );
@@ -865,7 +944,16 @@ class _ReportPayloadViewer extends StatelessWidget {
           decoration: BoxDecoration(
             color: d.card,
             borderRadius: BorderRadius.circular(d.radiusCard),
-            border: Border.all(color: d.border),
+            border: Border.all(
+              color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: d.authDark.withValues(alpha: 0.04),
+                offset: const Offset(0, 2),
+                blurRadius: 8,
+              ),
+            ],
           ),
           child: Text(payload.toString(), style: d.body, softWrap: true),
         ),
@@ -898,7 +986,16 @@ class _ReportRowItemCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: d.card,
           borderRadius: BorderRadius.circular(d.radiusCard),
-          border: Border.all(color: d.border),
+          border: Border.all(
+            color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: d.authDark.withValues(alpha: 0.04),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -906,10 +1003,10 @@ class _ReportRowItemCard extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(d.sm),
               decoration: BoxDecoration(
-                color: d.selection,
+                color: d.isDark ? d.muted : d.authSurface,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.person_outline, color: d.primary, size: 20),
+              child: Icon(LucideIcons.userCheck, color: d.primary, size: 20),
             ),
             SizedBox(width: d.sm),
             Expanded(
@@ -956,7 +1053,16 @@ class _ReportRowItemCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {

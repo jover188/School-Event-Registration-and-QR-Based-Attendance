@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
@@ -6,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_pressable.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/stat_metric_card.dart';
@@ -228,7 +230,7 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
       actions: [
         IconButton(
           tooltip: 'Refresh Registrations',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(LucideIcons.refreshCw, size: 20),
           onPressed: _isLoading ? null : _fetchRegistrations,
         ),
       ],
@@ -255,7 +257,7 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
                   child: Row(
                     children: [
                       Icon(
-                        Icons.visibility_outlined,
+                        LucideIcons.eye,
                         size: 18,
                         color: d.primary,
                       ),
@@ -281,25 +283,25 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
                   StatMetricCard(
                     label: 'Total',
                     value: '${_summary['total'] ?? 0}',
-                    icon: Icons.people_alt_outlined,
+                    icon: LucideIcons.users,
                     color: d.primary,
                   ),
                   StatMetricCard(
                     label: 'Registered',
                     value: '${_summary['registered'] ?? 0}',
-                    icon: Icons.check_circle_outline,
+                    icon: LucideIcons.circleCheck,
                     color: d.success,
                   ),
                   StatMetricCard(
                     label: 'Waiting List',
                     value: '${_summary['waiting_list'] ?? 0}',
-                    icon: Icons.queue_rounded,
+                    icon: LucideIcons.hourglass,
                     color: d.waiting,
                   ),
                   StatMetricCard(
                     label: 'Walk-In',
                     value: '${_summary['walk_in'] ?? 0}',
-                    icon: Icons.directions_walk,
+                    icon: LucideIcons.footprints,
                     color: d.information,
                   ),
                 ],
@@ -312,11 +314,11 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   hintText: 'Search student name, ID, or course',
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const Icon(LucideIcons.search, size: 18),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           tooltip: 'Clear Search',
-                          icon: const Icon(Icons.clear),
+                          icon: const Icon(LucideIcons.x, size: 18),
                           onPressed: () {
                             _searchController.clear();
                             setState(() {});
@@ -339,7 +341,7 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
               if (_isLoading && _registrations.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 48),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: AppSpinner()),
                 )
               else if (_errorMessage != null && _registrations.isEmpty)
                 ErrorStateView(
@@ -348,7 +350,7 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
                 )
               else if (visibleRegistrations.isEmpty)
                 EmptyStateView(
-                  icon: Icons.how_to_reg_outlined,
+                  icon: LucideIcons.userX,
                   title: 'No registrations found.',
                   message:
                       'No student registrations match the selected filter.',
@@ -401,24 +403,39 @@ class _RegistrationStatusFilterBar extends StatelessWidget {
             selected: selectedStatus == filter.value,
             onPressed: () => onSelectStatus(filter.value),
             child: Container(
-              constraints: const BoxConstraints(minHeight: 40),
+              constraints: const BoxConstraints(minHeight: 36),
               padding: EdgeInsets.symmetric(
                 horizontal: d.gap,
                 vertical: d.xs + 2,
               ),
               decoration: BoxDecoration(
-                color: selectedStatus == filter.value ? d.selection : d.card,
+                color: selectedStatus == filter.value
+                    ? (d.isDark ? d.authDark : Colors.black)
+                    : d.card,
                 borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(
-                  color:
-                      selectedStatus == filter.value ? d.primary : d.border,
+                  color: selectedStatus == filter.value
+                      ? (d.isDark ? d.border : Colors.black)
+                      : (d.isDark
+                          ? d.border
+                          : d.authDark.withValues(alpha: 0.08)),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: d.authDark.withValues(alpha: 0.03),
+                    offset: const Offset(0, 1),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
               child: Text(
                 filter.label,
                 style: d.badge.copyWith(
+                  fontWeight: selectedStatus == filter.value
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                   color: selectedStatus == filter.value
-                      ? d.primary
+                      ? Colors.white
                       : d.foreground,
                 ),
               ),
@@ -472,7 +489,16 @@ class _RegistrationItemCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -525,7 +551,8 @@ class _RegistrationItemCard extends StatelessWidget {
               child: AppButton(
                 key: ValueKey<String>('cancel-registration-$regId'),
                 variant: AppButtonVariant.destructive,
-                icon: Icons.person_remove_outlined,
+                pill: true,
+                icon: LucideIcons.userX,
                 label: 'Cancel Registration',
                 onPressed: onCancel,
               ),

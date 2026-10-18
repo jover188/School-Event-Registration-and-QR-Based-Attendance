@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
@@ -84,18 +86,24 @@ class _MyAttendanceHistoryScreenState extends State<MyAttendanceHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return AppPageScaffold(
       title: 'Attendance History',
       embedded: widget.embedded,
       actions: [
         IconButton(
           tooltip: 'Refresh Attendance History',
-          icon: const Icon(Icons.refresh),
+          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
           onPressed: _isLoading ? null : _fetchHistory,
         ),
       ],
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: AppSpinner(
+                size: 28,
+                color: d.authDark,
+              ),
+            )
           : _errorMessage != null && _records.isEmpty
               ? ErrorStateView(
                   message: _errorMessage!,
@@ -103,7 +111,7 @@ class _MyAttendanceHistoryScreenState extends State<MyAttendanceHistoryScreen> {
                 )
               : _records.isEmpty
                   ? EmptyStateView(
-                      icon: Icons.fact_check_outlined,
+                      icon: LucideIcons.clipboardCheck,
                       title: 'No attendance records yet',
                       message:
                           'Present your permanent student QR code at campus events to record check-ins and check-outs.',
@@ -153,7 +161,16 @@ class _AttendanceHistoryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,8 +194,8 @@ class _AttendanceHistoryCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                Icons.location_on_outlined,
-                size: 16,
+                LucideIcons.mapPin,
+                size: 15,
                 color: d.mutedForeground,
               ),
               SizedBox(width: d.xs),
@@ -191,7 +208,10 @@ class _AttendanceHistoryCard extends StatelessWidget {
               ),
             ],
           ),
-          Divider(height: d.lg, color: d.border),
+          Divider(
+            height: d.lg,
+            color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+          ),
           ResponsiveGrid(
             minItemWidth: 160,
             maxColumns: 2,

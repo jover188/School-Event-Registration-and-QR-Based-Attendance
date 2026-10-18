@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -389,14 +391,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                             key: const ValueKey<String>(
                               'create-staff-user-fab',
                             ),
+                            pill: true,
                             onPressed: _openCreateStaffDialog,
-                            icon: Icons.person_add_alt_1,
+                            icon: LucideIcons.userPlus,
                             label: 'Create Staff User',
                           ),
                         AppButton(
+                          pill: true,
                           variant: AppButtonVariant.outline,
                           onPressed: _isLoading ? null : _fetchUsers,
-                          icon: Icons.refresh,
+                          icon: LucideIcons.refreshCw,
                           label: 'Refresh',
                         ),
                       ],
@@ -413,10 +417,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       labelText:
                           'Search Users by Email, Name, or Student ID',
                       hintText: 'Type email, name, or student ID',
-                      prefixIcon: const Icon(Icons.search),
+                      prefixIcon: Icon(
+                        LucideIcons.search,
+                        size: 18,
+                        color: d.mutedForeground,
+                      ),
                       suffixIcon: IconButton(
                         tooltip: 'Search Users',
-                        icon: const Icon(Icons.arrow_forward),
+                        icon: const Icon(LucideIcons.arrowRight, size: 18),
                         onPressed: _fetchUsers,
                       ),
                     ),
@@ -445,7 +453,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   child: Center(
                     child: Semantics(
                       label: 'Loading user accounts',
-                      child: const CircularProgressIndicator(),
+                      child: AppSpinner(color: d.authDark, size: 28),
                     ),
                   ),
                 ),
@@ -460,7 +468,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             else if (_users.isEmpty)
               SliverToBoxAdapter(
                 child: EmptyStateView(
-                  icon: Icons.people_outline,
+                  icon: LucideIcons.users,
                   title: 'No users match the selected filters.',
                   actionLabel: 'Refresh',
                   onAction: _fetchUsers,
@@ -599,7 +607,16 @@ class _AdminUserCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -642,32 +659,35 @@ class _AdminUserCard extends StatelessWidget {
               if (!qrInspectMode) ...[
                 AppButton(
                   key: ValueKey<String>('toggle-user-status-$userId'),
+                  pill: true,
                   variant: status == 'active'
                       ? AppButtonVariant.outline
                       : AppButtonVariant.primary,
                   onPressed: onToggleStatus,
                   icon: status == 'active'
-                      ? Icons.person_off_outlined
-                      : Icons.check_circle_outline,
+                      ? LucideIcons.userX
+                      : LucideIcons.userCheck,
                   label: status == 'active' ? 'Deactivate' : 'Activate',
                 ),
                 AppButton(
                   key: ValueKey<String>('reset-user-password-$userId'),
+                  pill: true,
                   variant: AppButtonVariant.outline,
                   onPressed: onResetPassword,
-                  icon: Icons.lock_reset_outlined,
+                  icon: LucideIcons.keyRound,
                   label: 'Reset Password',
                 ),
               ],
               if (studentId != null && studentId > 0)
                 AppButton(
                   key: ValueKey<String>('inspect-student-qr-$studentId'),
+                  pill: true,
                   variant: AppButtonVariant.primary,
                   onPressed: () => onInspectQr(
                     studentId,
                     studentName.isEmpty ? email : studentName,
                   ),
-                  icon: Icons.qr_code_2_outlined,
+                  icon: LucideIcons.qrCode,
                   label: 'Inspect QR',
                 ),
             ],
@@ -691,8 +711,26 @@ class _ConfirmUserStatusDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final d = context.design;
     return AlertDialog(
-      title: Text(
-        '${isDeactivating ? 'Deactivate' : 'Activate'} User Account?',
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        side: BorderSide(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+      ),
+      title: Row(
+        children: [
+          Icon(
+            isDeactivating ? LucideIcons.userX : LucideIcons.userCheck,
+            size: 20,
+            color: isDeactivating ? d.destructive : d.success,
+          ),
+          SizedBox(width: d.sm),
+          Expanded(
+            child: Text(
+              '${isDeactivating ? 'Deactivate' : 'Activate'} User Account?',
+            ),
+          ),
+        ],
       ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
@@ -718,12 +756,14 @@ class _ConfirmUserStatusDialog extends StatelessWidget {
           alignment: WrapAlignment.end,
           children: [
             AppButton(
+              pill: true,
               variant: AppButtonVariant.ghost,
               onPressed: () => Navigator.pop(context, false),
               label: 'Cancel',
             ),
             AppButton(
               key: const ValueKey<String>('confirm-user-status-button'),
+              pill: true,
               variant: isDeactivating
                   ? AppButtonVariant.destructive
                   : AppButtonVariant.primary,
@@ -791,7 +831,19 @@ class _CreateStaffUserDialogState extends State<_CreateStaffUserDialog> {
   Widget build(BuildContext context) {
     final d = context.design;
     return AlertDialog(
-      title: const Text('Create Staff Account'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        side: BorderSide(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+      ),
+      title: Row(
+        children: [
+          Icon(LucideIcons.userPlus, size: 20, color: d.primary),
+          SizedBox(width: d.sm),
+          const Expanded(child: Text('Create Staff Account')),
+        ],
+      ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
         child: FocusTraversalGroup(
@@ -808,8 +860,13 @@ class _CreateStaffUserDialogState extends State<_CreateStaffUserDialog> {
                       key: const ValueKey<String>('staff-role-dropdown'),
                       isExpanded: true,
                       initialValue: _selectedRoleId,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Account Role',
+                        prefixIcon: Icon(
+                          LucideIcons.shield,
+                          size: 18,
+                          color: d.mutedForeground,
+                        ),
                       ),
                       items: const [
                         DropdownMenuItem(
@@ -848,10 +905,14 @@ class _CreateStaffUserDialogState extends State<_CreateStaffUserDialog> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.email],
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Official Email Address',
                         hintText: 'organizer@school.edu.ph',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        prefixIcon: Icon(
+                          LucideIcons.mail,
+                          size: 18,
+                          color: d.mutedForeground,
+                        ),
                       ),
                       validator: (value) {
                         final trimmed = value?.trim() ?? '';
@@ -871,10 +932,14 @@ class _CreateStaffUserDialogState extends State<_CreateStaffUserDialog> {
                       textInputAction: TextInputAction.done,
                       autofillHints: const [AutofillHints.newPassword],
                       onFieldSubmitted: (_) => _submit(),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Initial Password',
                         hintText: 'Minimum 8 characters',
-                        prefixIcon: Icon(Icons.lock_outline),
+                        prefixIcon: Icon(
+                          LucideIcons.lock,
+                          size: 18,
+                          color: d.mutedForeground,
+                        ),
                       ),
                       validator: (value) {
                         if (value == null || value.length < 8) {
@@ -897,12 +962,14 @@ class _CreateStaffUserDialogState extends State<_CreateStaffUserDialog> {
           alignment: WrapAlignment.end,
           children: [
             AppButton(
+              pill: true,
               variant: AppButtonVariant.ghost,
               onPressed: () => Navigator.pop(context),
               label: 'Cancel',
             ),
             AppButton(
               key: const ValueKey<String>('confirm-create-staff-button'),
+              pill: true,
               onPressed: _submit,
               label: 'Create User',
             ),
@@ -952,7 +1019,19 @@ class _ResetUserPasswordDialogState extends State<_ResetUserPasswordDialog> {
   Widget build(BuildContext context) {
     final d = context.design;
     return AlertDialog(
-      title: const Text('Reset User Password'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        side: BorderSide(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+      ),
+      title: Row(
+        children: [
+          Icon(LucideIcons.keyRound, size: 20, color: d.primary),
+          SizedBox(width: d.sm),
+          const Expanded(child: Text('Reset User Password')),
+        ],
+      ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
         child: FocusTraversalGroup(
@@ -979,10 +1058,14 @@ class _ResetUserPasswordDialogState extends State<_ResetUserPasswordDialog> {
                       textInputAction: TextInputAction.done,
                       autofillHints: const [AutofillHints.newPassword],
                       onFieldSubmitted: (_) => _submit(),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'New Password',
                         hintText: 'Minimum 8 characters',
-                        prefixIcon: Icon(Icons.lock_reset_outlined),
+                        prefixIcon: Icon(
+                          LucideIcons.lock,
+                          size: 18,
+                          color: d.mutedForeground,
+                        ),
                       ),
                       validator: (value) {
                         if (value == null || value.length < 8) {
@@ -1005,12 +1088,14 @@ class _ResetUserPasswordDialogState extends State<_ResetUserPasswordDialog> {
           alignment: WrapAlignment.end,
           children: [
             AppButton(
+              pill: true,
               variant: AppButtonVariant.ghost,
               onPressed: () => Navigator.pop(context),
               label: 'Cancel',
             ),
             AppButton(
               key: const ValueKey<String>('confirm-reset-password-button'),
+              pill: true,
               onPressed: _submit,
               label: 'Reset Password',
             ),

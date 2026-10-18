@@ -33,7 +33,14 @@ class StatMetricCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -42,16 +49,18 @@ class StatMetricCard extends StatelessWidget {
             padding: EdgeInsets.all(d.sm),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(d.sm),
+              borderRadius: BorderRadius.circular(d.radiusControl),
             ),
-            child: Icon(icon, size: 18, weight: 300, color: color),
+            child: Icon(icon, size: 20, weight: 300, color: color),
           ),
           SizedBox(height: d.sm),
           Text(
             value,
             style: d.sectionTitle.copyWith(
+              fontSize: 22,
               fontWeight: FontWeight.w700,
               color: d.foreground,
+              letterSpacing: -0.3,
             ),
             textAlign: TextAlign.center,
           ),

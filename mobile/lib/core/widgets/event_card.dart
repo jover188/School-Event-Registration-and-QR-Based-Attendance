@@ -74,21 +74,21 @@ class EventCard extends StatelessWidget {
                   vertical: d.xs + 2,
                 ),
                 decoration: BoxDecoration(
-                  color: d.selection,
+                  color: d.authSurface,
                   borderRadius: BorderRadius.circular(d.radiusControl),
-                  border: Border.all(color: d.primary.withValues(alpha: 0.18)),
+                  border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       monthLabel,
-                      style: d.badge.copyWith(color: d.primary),
+                      style: d.badge.copyWith(color: d.authDark),
                     ),
                     Text(
                       dayLabel,
                       style: d.cardTitle.copyWith(
-                        color: d.primary,
+                        color: d.authDark,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -200,7 +200,14 @@ class EventCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -208,7 +215,7 @@ class EventCard extends StatelessWidget {
         children: [
           interactiveMainInfo,
           if (trailingAction != null) ...[
-            Divider(height: 1, color: d.border),
+            Divider(height: 1, color: d.authDark.withValues(alpha: 0.08)),
             Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: d.md,

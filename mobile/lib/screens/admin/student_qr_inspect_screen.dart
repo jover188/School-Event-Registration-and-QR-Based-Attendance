@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -210,7 +212,7 @@ class _StudentQrInspectScreenState extends State<StudentQrInspectScreen> {
           ? Center(
               child: Semantics(
                 label: 'Loading student QR details',
-                child: const CircularProgressIndicator(),
+                child: AppSpinner(color: d.authDark, size: 28),
               ),
             )
           : _errorMessage != null && _qrData.isEmpty
@@ -240,13 +242,28 @@ class _StudentQrInspectScreenState extends State<StudentQrInspectScreen> {
                       SizedBox(height: d.gap),
                       if (_qrHistory.isEmpty)
                         Container(
+                          padding: EdgeInsets.symmetric(
+                            vertical: d.lg,
+                            horizontal: d.md,
+                          ),
                           decoration: BoxDecoration(
                             color: d.card,
                             borderRadius: BorderRadius.circular(d.radiusCard),
-                            border: Border.all(color: d.border),
+                            border: Border.all(
+                              color: d.isDark
+                                  ? d.border
+                                  : d.authDark.withValues(alpha: 0.08),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: d.authDark.withValues(alpha: 0.04),
+                                offset: const Offset(0, 2),
+                                blurRadius: 8,
+                              ),
+                            ],
                           ),
                           child: const EmptyStateView(
-                            icon: Icons.qr_code_2_outlined,
+                            icon: LucideIcons.qrCode,
                             title: 'No QR token history found.',
                           ),
                         )
@@ -294,7 +311,16 @@ class _ActiveQrInspectorCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -336,7 +362,11 @@ class _ActiveQrInspectorCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(d.radiusControl),
-                      border: Border.all(color: d.border),
+                      border: Border.all(
+                        color: d.isDark
+                            ? d.border
+                            : d.authDark.withValues(alpha: 0.08),
+                      ),
                     ),
                     alignment: Alignment.center,
                     child: QrImageView(
@@ -394,15 +424,17 @@ class _ActiveQrInspectorCard extends StatelessWidget {
               if (onRefresh != null)
                 AppButton(
                   variant: AppButtonVariant.outline,
-                  icon: Icons.refresh,
+                  pill: true,
+                  icon: LucideIcons.refreshCw,
                   label: 'Refresh Status',
                   onPressed: onRefresh,
                 ),
               AppButton(
                 key: const ValueKey<String>('force-reissue-qr-button'),
                 variant: AppButtonVariant.destructive,
+                pill: true,
                 isLoading: isReissuing,
-                icon: Icons.autorenew_rounded,
+                icon: LucideIcons.refreshCw,
                 label: 'Force Reissue QR Code',
                 onPressed: onForceReissue,
               ),
@@ -423,7 +455,16 @@ class _ForceReissueQrDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final d = context.design;
     return AlertDialog(
-      title: const Text('Force Reissue Permanent QR?'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(d.radiusCard),
+      ),
+      title: Row(
+        children: [
+          Icon(LucideIcons.alertTriangle, size: 20, color: d.destructive),
+          SizedBox(width: d.sm),
+          const Expanded(child: Text('Force Reissue Permanent QR?')),
+        ],
+      ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
         child: SingleChildScrollView(
@@ -447,12 +488,14 @@ class _ForceReissueQrDialog extends StatelessWidget {
           children: [
             AppButton(
               variant: AppButtonVariant.ghost,
+              pill: true,
               onPressed: () => Navigator.pop(context, false),
               label: 'Cancel',
             ),
             AppButton(
               key: const ValueKey<String>('confirm-force-reissue-button'),
               variant: AppButtonVariant.destructive,
+              pill: true,
               onPressed: () => Navigator.pop(context, true),
               label: 'Revoke & Reissue',
             ),
@@ -484,7 +527,16 @@ class _QrHistoryItemCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Wrap(
         spacing: d.sm,

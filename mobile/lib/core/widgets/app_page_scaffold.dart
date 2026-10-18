@@ -38,7 +38,7 @@ class AppPageScaffold extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: d.md, vertical: d.sm),
                 decoration: BoxDecoration(
                   color: d.card,
-                  border: Border(bottom: BorderSide(color: d.border)),
+                  border: Border(bottom: BorderSide(color: d.authDark.withValues(alpha: 0.08))),
                 ),
                 child: Wrap(
                   alignment: WrapAlignment.end,
@@ -66,7 +66,7 @@ class AppPageScaffold extends StatelessWidget {
         bottom: bottom ??
             PreferredSize(
               preferredSize: const Size.fromHeight(1),
-              child: Divider(height: 1, thickness: 1, color: d.border),
+              child: Divider(height: 1, thickness: 1, color: d.authDark.withValues(alpha: 0.08)),
             ),
       ),
       body: SafeArea(
@@ -78,7 +78,7 @@ class AppPageScaffold extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: d.md, vertical: d.sm),
                 decoration: BoxDecoration(
                   color: d.card,
-                  border: Border(bottom: BorderSide(color: d.border)),
+                  border: Border(bottom: BorderSide(color: d.authDark.withValues(alpha: 0.08))),
                 ),
                 child: Align(
                   alignment: Alignment.centerRight,

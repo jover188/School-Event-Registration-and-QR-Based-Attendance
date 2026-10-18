@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
@@ -167,7 +169,7 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
       actions: [
         IconButton(
           tooltip: 'Refresh Registrations',
-          icon: const Icon(Icons.refresh),
+          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
           onPressed: _isLoading ? null : _fetchRegistrations,
         ),
       ],
@@ -185,6 +187,21 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                   child: ChoiceChip(
                     label: Text(filter.label),
                     selected: isSelected,
+                    selectedColor: d.authDark,
+                    backgroundColor: d.card,
+                    labelStyle: d.badge.copyWith(
+                      color: isSelected ? d.authLight : d.foreground,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                    side: BorderSide(
+                      color: isSelected
+                          ? d.authDark
+                          : d.authDark.withValues(alpha: 0.08),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(d.radiusPill),
+                    ),
+                    showCheckmark: false,
                     onSelected: (_) {
                       setState(() => _selectedFilter = filter.value);
                     },
@@ -195,7 +212,12 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
           ),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? Center(
+                    child: AppSpinner(
+                      size: 28,
+                      color: d.authDark,
+                    ),
+                  )
                 : _errorMessage != null && _registrations.isEmpty
                     ? ErrorStateView(
                         message: _errorMessage!,
@@ -203,7 +225,7 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                       )
                     : items.isEmpty
                         ? EmptyStateView(
-                            icon: Icons.event_note_outlined,
+                            icon: LucideIcons.calendarX2,
                             title: 'No registrations found',
                             message: _selectedFilter == 'all'
                                 ? 'Browse campus events to register or join a waiting list.'
@@ -273,7 +295,14 @@ class _RegistrationItemCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,7 +316,7 @@ class _RegistrationItemCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: d.cardTitle,
+                style: d.cardTitle.copyWith(fontWeight: FontWeight.w600),
               ),
               StatusBadge(
                 status: status,
@@ -300,7 +329,7 @@ class _RegistrationItemCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                Icons.location_on_outlined,
+                LucideIcons.mapPin,
                 size: 16,
                 color: d.mutedForeground,
               ),
@@ -320,7 +349,7 @@ class _RegistrationItemCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.calendar_today_outlined,
+                  LucideIcons.calendar,
                   size: 16,
                   color: d.mutedForeground,
                 ),
@@ -338,12 +367,13 @@ class _RegistrationItemCard extends StatelessWidget {
             ),
           ],
           if (canCancel && eventId > 0) ...[
-            Divider(height: d.lg, color: d.border),
+            Divider(height: d.lg, color: d.authDark.withValues(alpha: 0.08)),
             Align(
               alignment: Alignment.centerRight,
               child: AppButton(
                 variant: AppButtonVariant.destructive,
-                icon: Icons.cancel_outlined,
+                pill: true,
+                icon: LucideIcons.xCircle,
                 onPressed: () => onCancel(eventId, title),
                 label: 'Cancel Registration',
               ),

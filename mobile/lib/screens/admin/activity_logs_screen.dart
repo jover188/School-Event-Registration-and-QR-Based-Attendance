@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -143,9 +145,10 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
                     subtitle:
                         'Inspect state-changing operations across authentication, events, QR identity, and attendance',
                     trailing: AppButton(
+                      pill: true,
                       variant: AppButtonVariant.outline,
                       onPressed: _isLoading ? null : _fetchLogs,
-                      icon: Icons.refresh,
+                      icon: LucideIcons.refreshCw,
                       label: 'Refresh',
                     ),
                   ),
@@ -162,10 +165,14 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
                       labelText: 'Filter by Action Key',
                       hintText:
                           'e.g. login_success, event_created, attendance_recorded',
-                      prefixIcon: const Icon(Icons.manage_search_outlined),
+                      prefixIcon: Icon(
+                        LucideIcons.search,
+                        size: 18,
+                        color: d.mutedForeground,
+                      ),
                       suffixIcon: IconButton(
                         tooltip: 'Search Action Logs',
-                        icon: const Icon(Icons.arrow_forward),
+                        icon: const Icon(LucideIcons.arrowRight, size: 18),
                         onPressed: _fetchLogs,
                       ),
                     ),
@@ -189,7 +196,7 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
                   child: Center(
                     child: Semantics(
                       label: 'Loading system activity logs',
-                      child: const CircularProgressIndicator(),
+                      child: AppSpinner(color: d.authDark, size: 28),
                     ),
                   ),
                 ),
@@ -204,7 +211,7 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
             else if (_logs.isEmpty)
               SliverToBoxAdapter(
                 child: EmptyStateView(
-                  icon: Icons.history_edu_outlined,
+                  icon: LucideIcons.scrollText,
                   title: 'No audit log entries found.',
                   message:
                       'System activity logs matching the selected module will appear here.',
@@ -328,7 +335,16 @@ class _ActivityLogCardState extends State<_ActivityLogCard> {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,9 +386,11 @@ class _ActivityLogCardState extends State<_ActivityLogCard> {
               width: double.infinity,
               padding: EdgeInsets.all(d.sm),
               decoration: BoxDecoration(
-                color: d.muted,
+                color: d.isDark ? d.muted : d.authSurface,
                 borderRadius: BorderRadius.circular(d.radiusControl),
-                border: Border.all(color: d.border),
+                border: Border.all(
+                  color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,6 +405,7 @@ class _ActivityLogCardState extends State<_ActivityLogCard> {
                   if (isLongMetadata) ...[
                     SizedBox(height: d.xs),
                     AppButton(
+                      pill: true,
                       variant: AppButtonVariant.ghost,
                       label: _expanded ? 'Show Less' : 'Expand Full Metadata',
                       onPressed: () => setState(() => _expanded = !_expanded),

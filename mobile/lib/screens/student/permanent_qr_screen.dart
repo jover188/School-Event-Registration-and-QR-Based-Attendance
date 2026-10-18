@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
 
@@ -171,12 +173,17 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
       actions: [
         IconButton(
           tooltip: 'Refresh QR Code',
-          icon: const Icon(Icons.refresh),
+          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
           onPressed: (_isLoading || _isReissuing) ? null : _fetchQrData,
         ),
       ],
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: AppSpinner(
+                size: 28,
+                color: d.authDark,
+              ),
+            )
           : _errorMessage != null && _qrToken == null
               ? ErrorStateView(
                   message: _errorMessage!,
@@ -196,13 +203,20 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
                             decoration: BoxDecoration(
                               color: d.card,
                               borderRadius: BorderRadius.circular(d.radiusCard),
-                              border: Border.all(color: d.border),
+                              border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: d.authDark.withValues(alpha: 0.04),
+                                  offset: const Offset(0, 2),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
                             child: Column(
                               children: [
                                 Text(
                                   _studentName ?? 'Student',
-                                  style: d.sectionTitle,
+                                  style: d.sectionTitle.copyWith(fontWeight: FontWeight.w700),
                                   textAlign: TextAlign.center,
                                 ),
                                 SizedBox(height: d.xs),
@@ -222,9 +236,9 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
                                         decoration: BoxDecoration(
                                           color: Colors.white,
                                           borderRadius: BorderRadius.circular(
-                                            d.radiusControl,
+                                            d.radiusCard,
                                           ),
-                                          border: Border.all(color: d.border),
+                                          border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
                                         ),
                                         child: QrImageView(
                                           data: _qrToken!,
@@ -269,7 +283,14 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
                             decoration: BoxDecoration(
                               color: d.card,
                               borderRadius: BorderRadius.circular(d.radiusCard),
-                              border: Border.all(color: d.border),
+                              border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: d.authDark.withValues(alpha: 0.04),
+                                  offset: const Offset(0, 2),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -277,7 +298,8 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
                                 AppButton(
                                   key: const ValueKey('reissue-qr-button'),
                                   variant: AppButtonVariant.destructive,
-                                  icon: Icons.refresh,
+                                  pill: true,
+                                  icon: LucideIcons.refreshCw,
                                   isLoading: _isReissuing,
                                   onPressed: _confirmReissue,
                                   label: 'Reissue Permanent QR Code',

@@ -7,6 +7,7 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -368,7 +369,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return Center(
         child: Semantics(
           label: 'Loading administrator overview',
-          child: const CircularProgressIndicator(),
+          child: AppSpinner(color: d.authDark, size: 28),
         ),
       );
     }
@@ -414,9 +415,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         style: d.supporting.copyWith(color: d.warning),
                       ),
                       AppButton(
+                        pill: true,
                         variant: AppButtonVariant.outline,
                         label: 'Retry',
-                        icon: Icons.refresh,
+                        icon: LucideIcons.refreshCw,
                         onPressed: _fetchAdminData,
                       ),
                     ],
@@ -451,14 +453,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   StatMetricCard(
                     label: 'Pending Approvals',
                     value: '$_pendingCount',
-                    icon: Icons.pending_actions_outlined,
+                    icon: LucideIcons.hourglass,
                     color: d.warning,
                     onTap: () => _selectDestination('reviews'),
                   ),
                   StatMetricCard(
                     label: 'Total Users',
                     value: '${_stats['total_users'] ?? 0}',
-                    icon: Icons.people_outline,
+                    icon: LucideIcons.users,
                     color: d.primary,
                     onTap: () => _selectDestination('users'),
                   ),
@@ -466,7 +468,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     label: 'Students',
                     value:
                         '${_stats['total_students'] ?? roleBreakdown['student'] ?? 0}',
-                    icon: Icons.school_outlined,
+                    icon: LucideIcons.graduationCap,
                     color: d.information,
                     onTap: () => _selectDestination('qr-records'),
                   ),
@@ -474,7 +476,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     label: 'Active QR Codes',
                     value:
                         '${_stats['active_permanent_qrs'] ?? _stats['active_qrs'] ?? 0}',
-                    icon: Icons.qr_code_2_outlined,
+                    icon: LucideIcons.qrCode,
                     color: d.success,
                     onTap: () => _selectDestination('qr-records'),
                   ),
@@ -518,7 +520,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return Center(
         child: Semantics(
           label: 'Loading event publishing review queue',
-          child: const CircularProgressIndicator(),
+          child: AppSpinner(color: d.authDark, size: 28),
         ),
       );
     }
@@ -551,10 +553,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   decoration: BoxDecoration(
                     color: d.card,
                     borderRadius: BorderRadius.circular(d.radiusCard),
-                    border: Border.all(color: d.border),
+                    border: Border.all(
+                      color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: d.authDark.withValues(alpha: 0.04),
+                        offset: const Offset(0, 2),
+                        blurRadius: 8,
+                      ),
+                    ],
                   ),
                   child: const EmptyStateView(
-                    icon: Icons.verified_outlined,
+                    icon: LucideIcons.badgeCheck,
                     title: 'No events currently pending review.',
                     message:
                         'All submitted organizer events have been processed.',
@@ -597,7 +608,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       onDestinationSelected: _selectDestination,
       actions: [
         IconButton(
-          icon: const Icon(Icons.notifications_outlined),
+          icon: const Icon(LucideIcons.bell, size: 20),
           tooltip: 'Notifications',
           onPressed: () {
             Navigator.push(
@@ -607,14 +618,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(LucideIcons.refreshCw, size: 18),
           tooltip: 'Refresh Console',
           onPressed: _isLoading ? null : _fetchAdminData,
         ),
         PopupMenuButton<String>(
           key: const ValueKey<String>('admin-account-menu'),
           tooltip: 'Account & Profile Menu',
-          icon: const Icon(Icons.person_outline),
+          icon: const Icon(LucideIcons.user, size: 20),
           onSelected: (value) {
             switch (value) {
               case 'profile':
@@ -711,50 +722,57 @@ class _AdminQuickActionsGrid extends StatelessWidget {
       children: [
         AppButton(
           key: const ValueKey<String>('admin-nav-create-event'),
+          pill: true,
           onPressed: onCreateEvent,
-          icon: Icons.add_circle_outline,
+          icon: LucideIcons.calendarPlus,
           label: 'Create Event',
         ),
         AppButton(
           key: const ValueKey<String>('admin-nav-broadcast'),
+          pill: true,
           variant: AppButtonVariant.outline,
           onPressed: onBroadcastAnnouncement,
-          icon: Icons.campaign_outlined,
+          icon: LucideIcons.megaphone,
           label: 'Broadcast Announcement',
         ),
         AppButton(
           key: const ValueKey<String>('admin-nav-reviews'),
+          pill: true,
           variant: AppButtonVariant.outline,
           onPressed: onOpenReviews,
-          icon: Icons.rule_folder_outlined,
+          icon: LucideIcons.folderCheck,
           label: 'Publishing Reviews ($pendingReviewsCount)',
         ),
         AppButton(
           key: const ValueKey<String>('admin-nav-users'),
+          pill: true,
           variant: AppButtonVariant.outline,
           onPressed: onOpenUsers,
-          icon: Icons.manage_accounts_outlined,
+          icon: LucideIcons.users,
           label: 'User Management',
         ),
         AppButton(
           key: const ValueKey<String>('admin-nav-qr-records'),
+          pill: true,
           variant: AppButtonVariant.outline,
           onPressed: onOpenQrRecords,
-          icon: Icons.qr_code_scanner_outlined,
+          icon: LucideIcons.scanLine,
           label: 'QR Records',
         ),
         AppButton(
           key: const ValueKey<String>('admin-nav-reports'),
+          pill: true,
           variant: AppButtonVariant.outline,
           onPressed: onOpenReports,
-          icon: Icons.analytics_outlined,
+          icon: LucideIcons.chartBar,
           label: 'Reports & Exports',
         ),
         AppButton(
           key: const ValueKey<String>('admin-nav-logs'),
+          pill: true,
           variant: AppButtonVariant.outline,
           onPressed: onOpenLogs,
-          icon: Icons.history_edu_outlined,
+          icon: LucideIcons.scrollText,
           label: 'Activity Logs',
         ),
       ],
@@ -780,7 +798,16 @@ class _BreakdownSectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Wrap(
         spacing: d.md,
@@ -790,9 +817,11 @@ class _BreakdownSectionCard extends StatelessWidget {
             Container(
               padding: EdgeInsets.symmetric(horizontal: d.gap, vertical: d.sm),
               decoration: BoxDecoration(
-                color: d.muted,
+                color: d.isDark ? d.muted : d.authSurface,
                 borderRadius: BorderRadius.circular(d.radiusControl),
-                border: Border.all(color: d.border),
+                border: Border.all(
+                  color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+                ),
               ),
               child: Wrap(
                 spacing: d.sm,
@@ -847,7 +876,16 @@ class _PendingApprovalEventCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -881,15 +919,17 @@ class _PendingApprovalEventCard extends StatelessWidget {
             children: [
               AppButton(
                 key: ValueKey<String>('reject-event-$eventId'),
+                pill: true,
                 variant: AppButtonVariant.destructive,
-                icon: Icons.close_rounded,
+                icon: LucideIcons.x,
                 label: 'Reject',
                 onPressed: onReject,
               ),
               AppButton(
                 key: ValueKey<String>('approve-event-$eventId'),
+                pill: true,
                 variant: AppButtonVariant.primary,
-                icon: Icons.check_circle_outline,
+                icon: LucideIcons.check,
                 label: 'Approve & Publish',
                 onPressed: onApprove,
               ),
@@ -931,7 +971,23 @@ class _ReviewEventApprovalDialogState
     final d = context.design;
     final isApprove = widget.action == 'approved';
     return AlertDialog(
-      title: Text('${isApprove ? 'Approve' : 'Reject'} Event?'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        side: BorderSide(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+      ),
+      title: Row(
+        children: [
+          Icon(
+            isApprove ? LucideIcons.badgeCheck : LucideIcons.alertCircle,
+            size: 20,
+            color: isApprove ? d.success : d.destructive,
+          ),
+          SizedBox(width: d.sm),
+          Expanded(child: Text('${isApprove ? 'Approve' : 'Reject'} Event?')),
+        ],
+      ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
         child: SingleChildScrollView(
@@ -948,9 +1004,14 @@ class _ReviewEventApprovalDialogState
                 key: const ValueKey<String>('review-remarks-field'),
                 controller: _remarksController,
                 maxLines: 3,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Remarks (Optional)',
                   hintText: 'Add review notes for the organizer',
+                  prefixIcon: Icon(
+                    LucideIcons.messageSquare,
+                    size: 18,
+                    color: d.mutedForeground,
+                  ),
                 ),
               ),
             ],
@@ -964,12 +1025,14 @@ class _ReviewEventApprovalDialogState
           alignment: WrapAlignment.end,
           children: [
             AppButton(
+              pill: true,
               variant: AppButtonVariant.ghost,
               onPressed: () => Navigator.pop(context),
               label: 'Cancel',
             ),
             AppButton(
               key: ValueKey<String>('confirm-review-${widget.action}'),
+              pill: true,
               variant: isApprove
                   ? AppButtonVariant.primary
                   : AppButtonVariant.destructive,
@@ -1038,7 +1101,19 @@ class _BroadcastAnnouncementDialogState
   Widget build(BuildContext context) {
     final d = context.design;
     return AlertDialog(
-      title: const Text('Broadcast System Announcement'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        side: BorderSide(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+      ),
+      title: Row(
+        children: [
+          Icon(LucideIcons.megaphone, size: 20, color: d.primary),
+          SizedBox(width: d.sm),
+          const Expanded(child: Text('Broadcast System Announcement')),
+        ],
+      ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
         child: FocusTraversalGroup(
@@ -1055,8 +1130,13 @@ class _BroadcastAnnouncementDialogState
                       key: const ValueKey<String>('announcement-target-role'),
                       isExpanded: true,
                       initialValue: _targetRole,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Target Audience Role',
+                        prefixIcon: Icon(
+                          LucideIcons.users,
+                          size: 18,
+                          color: d.mutedForeground,
+                        ),
                       ),
                       items: const [
                         DropdownMenuItem(
@@ -1102,9 +1182,14 @@ class _BroadcastAnnouncementDialogState
                       textInputAction: TextInputAction.next,
                       keyboardType: TextInputType.text,
                       autofillHints: const [AutofillHints.name],
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Announcement Title',
                         hintText: 'e.g. Campus Maintenance Schedule',
+                        prefixIcon: Icon(
+                          LucideIcons.heading,
+                          size: 18,
+                          color: d.mutedForeground,
+                        ),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -1123,9 +1208,14 @@ class _BroadcastAnnouncementDialogState
                       keyboardType: TextInputType.multiline,
                       autofillHints: const [AutofillHints.name],
                       onFieldSubmitted: (_) => _submit(),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Announcement Message',
                         hintText: 'Enter announcement body text',
+                        prefixIcon: Icon(
+                          LucideIcons.messageSquare,
+                          size: 18,
+                          color: d.mutedForeground,
+                        ),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -1148,12 +1238,14 @@ class _BroadcastAnnouncementDialogState
           alignment: WrapAlignment.end,
           children: [
             AppButton(
+              pill: true,
               variant: AppButtonVariant.ghost,
               onPressed: () => Navigator.pop(context),
               label: 'Cancel',
             ),
             AppButton(
               key: const ValueKey<String>('send-broadcast-button'),
+              pill: true,
               onPressed: _submit,
               label: 'Send Broadcast',
             ),

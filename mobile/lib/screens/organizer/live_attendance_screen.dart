@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
@@ -6,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_pressable.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/stat_metric_card.dart';
@@ -300,12 +302,12 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
         if (widget.canCorrect)
           IconButton(
             tooltip: 'Mark Student Attendance',
-            icon: const Icon(Icons.person_add_alt_1_outlined),
+            icon: const Icon(LucideIcons.userPlus, size: 20),
             onPressed: _openMarkAttendanceDialog,
           ),
         IconButton(
           tooltip: 'Refresh Attendance',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(LucideIcons.refreshCw, size: 20),
           onPressed: _isLoading ? null : _fetchAttendance,
         ),
       ],
@@ -315,7 +317,7 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
               onPressed: _openMarkAttendanceDialog,
               backgroundColor: d.primary,
               foregroundColor: d.primaryForeground,
-              icon: const Icon(Icons.fact_check_outlined),
+              icon: const Icon(LucideIcons.clipboardCheck, size: 20),
               label: const Text('Mark Attendance'),
             )
           : null,
@@ -343,7 +345,7 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
                   child: Row(
                     children: [
                       Icon(
-                        Icons.visibility_outlined,
+                        LucideIcons.eye,
                         size: 18,
                         color: d.primary,
                       ),
@@ -377,10 +379,10 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
                 },
                 decoration: InputDecoration(
                   hintText: 'Search student name, ID, or course',
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const Icon(LucideIcons.search, size: 18),
                   suffixIcon: IconButton(
                     tooltip: 'Search Attendance',
-                    icon: const Icon(Icons.arrow_forward),
+                    icon: const Icon(LucideIcons.arrowRight, size: 18),
                     onPressed: () {
                       if (_hasFixtures) {
                         setState(() {});
@@ -405,7 +407,7 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
               if (_isLoading && _attendances.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 48),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: AppSpinner()),
                 )
               else if (_errorMessage != null && _attendances.isEmpty)
                 ErrorStateView(
@@ -414,7 +416,7 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
                 )
               else if (visibleAttendances.isEmpty)
                 EmptyStateView(
-                  icon: Icons.fact_check_outlined,
+                  icon: LucideIcons.clipboardList,
                   title: 'No attendance records found.',
                   message:
                       'Checked-in students and attendance records will appear here.',
@@ -451,31 +453,31 @@ class _AttendanceSummaryMetricsGrid extends StatelessWidget {
         StatMetricCard(
           label: 'Checked In',
           value: '${summary['total_checked_in'] ?? 0}',
-          icon: Icons.how_to_reg_outlined,
+          icon: LucideIcons.userCheck,
           color: d.primary,
         ),
         StatMetricCard(
           label: 'Present',
           value: '${summary['present'] ?? 0}',
-          icon: Icons.check_circle_outline,
+          icon: LucideIcons.circleCheck,
           color: d.success,
         ),
         StatMetricCard(
           label: 'Late',
           value: '${summary['late'] ?? 0}',
-          icon: Icons.schedule,
+          icon: LucideIcons.clock,
           color: d.warning,
         ),
         StatMetricCard(
           label: 'Walk-In',
           value: '${summary['walk_in'] ?? 0}',
-          icon: Icons.directions_walk,
+          icon: LucideIcons.footprints,
           color: d.information,
         ),
         StatMetricCard(
           label: 'Excused',
           value: '${summary['excused'] ?? 0}',
-          icon: Icons.assignment_turned_in_outlined,
+          icon: LucideIcons.fileCheck,
           color: d.excused,
         ),
       ],
@@ -515,24 +517,39 @@ class _AttendanceStatusFilterBar extends StatelessWidget {
             selected: selectedStatus == filter.value,
             onPressed: () => onSelectStatus(filter.value),
             child: Container(
-              constraints: const BoxConstraints(minHeight: 40),
+              constraints: const BoxConstraints(minHeight: 36),
               padding: EdgeInsets.symmetric(
                 horizontal: d.gap,
                 vertical: d.xs + 2,
               ),
               decoration: BoxDecoration(
-                color: selectedStatus == filter.value ? d.selection : d.card,
+                color: selectedStatus == filter.value
+                    ? (d.isDark ? d.authDark : Colors.black)
+                    : d.card,
                 borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(
-                  color:
-                      selectedStatus == filter.value ? d.primary : d.border,
+                  color: selectedStatus == filter.value
+                      ? (d.isDark ? d.border : Colors.black)
+                      : (d.isDark
+                          ? d.border
+                          : d.authDark.withValues(alpha: 0.08)),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: d.authDark.withValues(alpha: 0.03),
+                    offset: const Offset(0, 1),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
               child: Text(
                 filter.label,
                 style: d.badge.copyWith(
+                  fontWeight: selectedStatus == filter.value
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                   color: selectedStatus == filter.value
-                      ? d.primary
+                      ? Colors.white
                       : d.foreground,
                 ),
               ),
@@ -573,7 +590,16 @@ class _AttendanceRecordCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -621,7 +647,8 @@ class _AttendanceRecordCard extends StatelessWidget {
               child: AppButton(
                 key: ValueKey<String>('correct-attendance-$recordId'),
                 variant: AppButtonVariant.outline,
-                icon: Icons.edit_note_outlined,
+                pill: true,
+                icon: LucideIcons.pencilLine,
                 label: 'Correct Attendance Status',
                 onPressed: onCorrect,
               ),
@@ -695,6 +722,13 @@ class _CorrectAttendanceDialogState extends State<_CorrectAttendanceDialog> {
   Widget build(BuildContext context) {
     final d = context.design;
     return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(d.radiusOverlay),
+        side: BorderSide(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+      ),
+      backgroundColor: d.card,
       title: Text('Correct Attendance: ${widget.studentName}'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
@@ -782,6 +816,11 @@ class _CorrectAttendanceDialogState extends State<_CorrectAttendanceDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: d.authDark,
+            foregroundColor: d.isDark ? Colors.black : Colors.white,
+            shape: const StadiumBorder(),
+          ),
           onPressed: _submit,
           child: const Text('Save Correction'),
         ),
@@ -852,6 +891,13 @@ class _MarkAttendanceDialogState extends State<_MarkAttendanceDialog> {
   Widget build(BuildContext context) {
     final d = context.design;
     return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(d.radiusOverlay),
+        side: BorderSide(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+      ),
+      backgroundColor: d.card,
       title: const Text('Mark Student Attendance'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
@@ -883,7 +929,7 @@ class _MarkAttendanceDialogState extends State<_MarkAttendanceDialog> {
                       autofillHints: const [AutofillHints.username],
                       decoration: const InputDecoration(
                         hintText: 'e.g. 1',
-                        prefixIcon: Icon(Icons.badge_outlined),
+                        prefixIcon: Icon(LucideIcons.idCard, size: 18),
                         helperText: ' ',
                         errorMaxLines: 2,
                       ),
@@ -967,6 +1013,11 @@ class _MarkAttendanceDialogState extends State<_MarkAttendanceDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: d.authDark,
+            foregroundColor: d.isDark ? Colors.black : Colors.white,
+            shape: const StadiumBorder(),
+          ),
           onPressed: _submit,
           child: const Text('Mark Attendance'),
         ),

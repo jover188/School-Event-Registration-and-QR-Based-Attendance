@@ -7,6 +7,7 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../auth/account_input.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -246,7 +247,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(child: AppSpinner(color: d.authDark, size: 28))
             : _errorMessage != null
                 ? ErrorStateView(
                     message: _errorMessage!,
@@ -258,33 +259,131 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // Account Identity Summary Card
-                        Card(
-                          child: Padding(
-                            padding: EdgeInsets.all(d.md),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: d.selection,
-                                        borderRadius: BorderRadius.circular(
-                                          d.radiusControl,
+                        Container(
+                          padding: EdgeInsets.all(d.md),
+                          decoration: BoxDecoration(
+                            color: d.card,
+                            borderRadius: BorderRadius.circular(d.radiusCard),
+                            border: Border.all(
+                              color: d.isDark
+                                  ? d.border
+                                  : d.authDark.withValues(alpha: 0.08),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: d.authDark.withValues(alpha: 0.04),
+                                offset: const Offset(0, 2),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: d.selection,
+                                      borderRadius: BorderRadius.circular(
+                                        d.radiusControl,
+                                      ),
+                                      border: Border.all(
+                                        color: d.primary.withValues(
+                                          alpha: 0.18,
                                         ),
-                                        border: Border.all(
-                                          color: d.primary.withValues(
-                                            alpha: 0.18,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      LucideIcons.user,
+                                      size: 22,
+                                      color: d.primary,
+                                    ),
+                                  ),
+                                  SizedBox(width: d.md),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _email,
+                                          style: d.sectionTitle,
+                                        ),
+                                        if (_hasStudentProfile &&
+                                            _studentIdNumber.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Student ID: $_studentIdNumber (Immutable)',
+                                            style: d.supporting,
                                           ),
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        LucideIcons.user,
-                                        size: 22,
-                                        color: d.primary,
-                                      ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Divider(height: d.lg, color: d.border),
+                              Wrap(
+                                spacing: d.sm,
+                                runSpacing: d.sm,
+                                children: [
+                                  StatusBadge(
+                                    status: _role,
+                                    label: 'ROLE: ${_role.toUpperCase()}',
+                                  ),
+                                  StatusBadge(
+                                    status: _status,
+                                    label: 'STATUS: ${_status.toUpperCase()}',
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: d.md),
+
+                        // Notification Preferences Link Card
+                        Container(
+                          decoration: BoxDecoration(
+                            color: d.card,
+                            borderRadius: BorderRadius.circular(d.radiusCard),
+                            border: Border.all(
+                              color: d.isDark
+                                  ? d.border
+                                  : d.authDark.withValues(alpha: 0.08),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: d.authDark.withValues(alpha: 0.04),
+                                offset: const Offset(0, 2),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(d.radiusCard),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const NotificationPreferencesScreen(),
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: EdgeInsets.all(d.md),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      LucideIcons.bell,
+                                      size: 20,
+                                      color: d.primary,
                                     ),
                                     SizedBox(width: d.md),
                                     Expanded(
@@ -293,73 +392,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            _email,
-                                            style: d.sectionTitle,
+                                            'Notification Preferences',
+                                            style: d.cardTitle,
                                           ),
-                                          if (_hasStudentProfile &&
-                                              _studentIdNumber.isNotEmpty) ...[
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              'Student ID: $_studentIdNumber (Immutable)',
-                                              style: d.supporting,
-                                            ),
-                                          ],
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Manage event reminders and mandatory campus alerts',
+                                            style: d.supporting,
+                                          ),
                                         ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                                Divider(height: d.lg, color: d.border),
-                                Wrap(
-                                  spacing: d.sm,
-                                  runSpacing: d.sm,
-                                  children: [
-                                    StatusBadge(
-                                      status: _role,
-                                      label: 'ROLE: ${_role.toUpperCase()}',
-                                    ),
-                                    StatusBadge(
-                                      status: _status,
-                                      label: 'STATUS: ${_status.toUpperCase()}',
+                                    Icon(
+                                      LucideIcons.chevronRight,
+                                      size: 18,
+                                      color: d.mutedForeground,
                                     ),
                                   ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                        SizedBox(height: d.md),
-
-                        // Notification Preferences Link Card
-                        Card(
-                          child: ListTile(
-                            leading: Icon(
-                              LucideIcons.bell,
-                              size: 20,
-                              color: d.primary,
-                            ),
-                            title: Text(
-                              'Notification Preferences',
-                              style: d.cardTitle,
-                            ),
-                            subtitle: Text(
-                              'Manage event reminders and mandatory campus alerts',
-                              style: d.supporting,
-                            ),
-                            trailing: Icon(
-                              LucideIcons.chevronRight,
-                              size: 18,
-                              color: d.mutedForeground,
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const NotificationPreferencesScreen(),
-                                ),
-                              );
-                            },
                           ),
                         ),
                         SizedBox(height: d.lg),
@@ -372,10 +424,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 'Student ID and school email are permanently bound to your identity.',
                           ),
                           SizedBox(height: d.gap),
-                          Card(
-                            child: Padding(
-                              padding: EdgeInsets.all(d.md),
-                              child: FocusTraversalGroup(
+                          Container(
+                            padding: EdgeInsets.all(d.md),
+                            decoration: BoxDecoration(
+                              color: d.card,
+                              borderRadius: BorderRadius.circular(d.radiusCard),
+                              border: Border.all(
+                                color: d.isDark
+                                    ? d.border
+                                    : d.authDark.withValues(alpha: 0.08),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: d.authDark.withValues(alpha: 0.04),
+                                  offset: const Offset(0, 2),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                            child: FocusTraversalGroup(
                                 child: AutofillGroup(
                                   child: Form(
                                     key: _profileFormKey,
@@ -466,8 +533,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               ),
                                               initialValue: _selectedYearLevel,
                                               isExpanded: true,
-                                              decoration: const InputDecoration(
+                                              decoration: InputDecoration(
                                                 labelText: 'Year Level *',
+                                                filled: true,
+                                                fillColor: d.isDark
+                                                    ? d.muted
+                                                    : d.card,
+                                                contentPadding:
+                                                    EdgeInsets.symmetric(
+                                                  horizontal: d.md,
+                                                  vertical: d.sm,
+                                                ),
+                                                border: OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                    d.radiusCard,
+                                                  ),
+                                                  borderSide: BorderSide(
+                                                    color: d.isDark
+                                                        ? d.border
+                                                        : d.authDark.withValues(
+                                                            alpha: 0.08,
+                                                          ),
+                                                  ),
+                                                ),
+                                                enabledBorder:
+                                                    OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                    d.radiusCard,
+                                                  ),
+                                                  borderSide: BorderSide(
+                                                    color: d.isDark
+                                                        ? d.border
+                                                        : d.authDark.withValues(
+                                                            alpha: 0.08,
+                                                          ),
+                                                  ),
+                                                ),
+                                                focusedBorder:
+                                                    OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                    d.radiusCard,
+                                                  ),
+                                                  borderSide: BorderSide(
+                                                    color: d.authDark,
+                                                    width: 1.5,
+                                                  ),
+                                                ),
                                               ),
                                               items: _yearLevels
                                                   .map(
@@ -552,6 +666,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           key: const ValueKey<String>(
                                             'save-profile-button',
                                           ),
+                                          pill: true,
                                           onPressed: _isSavingProfile
                                               ? null
                                               : _saveProfile,
@@ -564,7 +679,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                             ),
-                          ),
                           SizedBox(height: d.lg),
                         ],
 
@@ -575,10 +689,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               'Requires your current password and a strong 8+ character password.',
                         ),
                         SizedBox(height: d.gap),
-                        Card(
-                          child: Padding(
-                            padding: EdgeInsets.all(d.md),
-                            child: FocusTraversalGroup(
+                        Container(
+                          padding: EdgeInsets.all(d.md),
+                          decoration: BoxDecoration(
+                            color: d.card,
+                            borderRadius: BorderRadius.circular(d.radiusCard),
+                            border: Border.all(
+                              color: d.isDark
+                                  ? d.border
+                                  : d.authDark.withValues(alpha: 0.08),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: d.authDark.withValues(alpha: 0.04),
+                                offset: const Offset(0, 2),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: FocusTraversalGroup(
                               child: AutofillGroup(
                                 child: Form(
                                   key: _passwordFormKey,
@@ -713,6 +842,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         key: const ValueKey<String>(
                                           'update-password-button',
                                         ),
+                                        pill: true,
                                         onPressed: _isSavingPassword
                                             ? null
                                             : _changePassword,
@@ -725,7 +855,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
-                        ),
                         SizedBox(height: d.xl),
                       ],
                     ),

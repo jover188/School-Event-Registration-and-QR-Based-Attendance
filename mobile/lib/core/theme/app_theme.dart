@@ -132,7 +132,6 @@ abstract final class AppTheme {
   static ThemeData get darkTheme => _buildMaterialTheme(AppDesignTokens.dark, Brightness.dark);
 
   static ThemeData _buildMaterialTheme(AppDesignTokens d, Brightness brightness) {
-    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.radiusControl));
     final colorScheme = brightness == Brightness.light
         ? ColorScheme.light(
             primary: d.primary,
@@ -208,14 +207,14 @@ abstract final class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(d.radiusCard),
-          side: BorderSide(color: d.border),
+          side: BorderSide(color: d.authDark.withValues(alpha: 0.08)),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: d.popover,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(d.radiusOverlay),
-          side: BorderSide(color: d.border),
+          side: BorderSide(color: d.authDark.withValues(alpha: 0.08)),
         ),
         titleTextStyle: d.sectionTitle.copyWith(color: d.popoverForeground),
         contentTextStyle: d.body.copyWith(color: d.popoverForeground),
@@ -229,27 +228,27 @@ abstract final class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: d.primary,
-          foregroundColor: d.primaryForeground,
+          backgroundColor: d.authDark,
+          foregroundColor: d.authLight,
           elevation: 0,
           minimumSize: Size(d.minimumTarget, d.minimumTarget),
-          shape: shape,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.radiusPill)),
           textStyle: d.body.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: d.foreground,
-          side: BorderSide(color: d.border),
+          side: BorderSide(color: d.authDark.withValues(alpha: 0.12)),
           minimumSize: Size(d.minimumTarget, d.minimumTarget),
-          shape: shape,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.radiusPill)),
           textStyle: d.body.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           minimumSize: Size(d.minimumTarget, d.minimumTarget),
-          foregroundColor: d.primary,
+          foregroundColor: d.authDark,
           textStyle: d.body.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
@@ -265,19 +264,23 @@ abstract final class AppTheme {
         fillColor: d.card,
         errorMaxLines: 4,
         contentPadding: EdgeInsets.symmetric(horizontal: d.md, vertical: 14),
-        hintStyle: d.supporting,
-        labelStyle: d.supporting,
+        hintStyle: d.supporting.copyWith(color: d.authDark.withValues(alpha: 0.48)),
+        labelStyle: d.supporting.copyWith(color: d.authDark.withValues(alpha: 0.62)),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(d.radiusControl),
-          borderSide: BorderSide(color: d.input),
+          borderRadius: BorderRadius.circular(d.radiusCard),
+          borderSide: BorderSide(color: d.authDark.withValues(alpha: 0.08)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(d.radiusControl),
-          borderSide: BorderSide(color: d.input),
+          borderRadius: BorderRadius.circular(d.radiusCard),
+          borderSide: BorderSide(color: d.authDark.withValues(alpha: 0.08)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(d.radiusControl),
-          borderSide: BorderSide(color: d.ring, width: 1.5),
+          borderRadius: BorderRadius.circular(d.radiusCard),
+          borderSide: BorderSide(color: d.authDark, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(d.radiusCard),
+          borderSide: BorderSide(color: d.destructive, width: 1.5),
         ),
       ),
       dividerTheme: DividerThemeData(color: d.border, thickness: 1, space: d.md),

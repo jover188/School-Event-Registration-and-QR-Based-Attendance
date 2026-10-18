@@ -2,12 +2,14 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_pressable.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/event_model.dart';
 import 'live_attendance_screen.dart';
@@ -230,7 +232,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Wrap(
         alignment: WrapAlignment.spaceBetween,
@@ -266,7 +277,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -281,9 +301,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   borderRadius: BorderRadius.circular(d.radiusControl),
                 ),
                 child: Icon(
-                  Icons.lock_clock_outlined,
+                  LucideIcons.lock,
                   color: d.warning,
-                  size: 24,
+                  size: 22,
                 ),
               ),
               SizedBox(width: d.gap),
@@ -311,7 +331,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           AppButton(
             key: const ValueKey<String>('scanner-view-attendance-button'),
             label: 'View attendance',
-            icon: Icons.fact_check_outlined,
+            pill: true,
+            icon: LucideIcons.clipboardCheck,
             onPressed: _openAttendance,
           ),
         ],
@@ -326,7 +347,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -341,9 +371,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   borderRadius: BorderRadius.circular(d.radiusControl),
                 ),
                 child: Icon(
-                  Icons.videocam_off_outlined,
+                  LucideIcons.videoOff,
                   color: d.information,
-                  size: 24,
+                  size: 22,
                 ),
               ),
               SizedBox(width: d.gap),
@@ -364,7 +394,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           AppButton(
             key: const ValueKey<String>('scanner-view-attendance-button'),
             label: 'View attendance',
-            icon: Icons.fact_check_outlined,
+            pill: true,
+            icon: LucideIcons.clipboardCheck,
             onPressed: _openAttendance,
           ),
         ],
@@ -416,7 +447,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   Container(
                     color: Colors.black54,
                     alignment: Alignment.center,
-                    child: const CircularProgressIndicator(color: Colors.white),
+                    child: const AppSpinner(color: Colors.white),
                   ),
               ],
             );
@@ -448,18 +479,18 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         if (_shouldMountCamera && _scannerController != null) ...[
           IconButton(
             tooltip: 'Toggle Flash',
-            icon: const Icon(Icons.flash_on_outlined),
+            icon: const Icon(LucideIcons.zap, size: 20),
             onPressed: () => _scannerController?.toggleTorch(),
           ),
           IconButton(
             tooltip: 'Switch Camera',
-            icon: const Icon(Icons.flip_camera_ios_outlined),
+            icon: const Icon(LucideIcons.switchCamera, size: 20),
             onPressed: () => _scannerController?.switchCamera(),
           ),
         ],
         IconButton(
           tooltip: 'Attendance Records',
-          icon: const Icon(Icons.fact_check_outlined),
+          icon: const Icon(LucideIcons.clipboardCheck, size: 20),
           onPressed: _openAttendance,
         ),
       ],
@@ -572,9 +603,9 @@ class _ModeToggleOption extends StatelessWidget {
           children: [
             Icon(
               selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              size: 18,
+                  ? LucideIcons.circleDot
+                  : LucideIcons.circle,
+              size: 16,
               color: selected ? activeColor : d.mutedForeground,
             ),
             SizedBox(width: d.sm),

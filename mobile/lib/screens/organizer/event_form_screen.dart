@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
@@ -397,7 +398,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      prefixIcon: Icon(prefixIcon),
+      prefixIcon: Icon(prefixIcon, size: 18),
       suffixIcon: suffixIcon,
       helperText: helperText ?? ' ',
       helperMaxLines: 3,
@@ -457,7 +458,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           },
                           decoration: _inputDecoration(
                             hintText: 'e.g. Annual IT Cybersecurity Symposium',
-                            prefixIcon: Icons.event_note_outlined,
+                            prefixIcon: LucideIcons.fileText,
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -494,7 +495,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           decoration: _inputDecoration(
                             hintText:
                                 'Describe the agenda, speakers, and target participants',
-                            prefixIcon: Icons.description_outlined,
+                            prefixIcon: LucideIcons.alignLeft,
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -524,7 +525,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           },
                           decoration: _inputDecoration(
                             hintText: 'e.g. University Main Auditorium',
-                            prefixIcon: Icons.location_on_outlined,
+                            prefixIcon: LucideIcons.mapPin,
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -568,10 +569,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           },
                           decoration: _inputDecoration(
                             hintText: '2026-11-15',
-                            prefixIcon: Icons.calendar_today_outlined,
+                            prefixIcon: LucideIcons.calendar,
                             suffixIcon: IconButton(
                               tooltip: 'Pick Event Date',
-                              icon: const Icon(Icons.date_range_outlined),
+                              icon: const Icon(LucideIcons.calendarDays, size: 18),
                               onPressed: _pickEventDate,
                             ),
                           ),
@@ -616,10 +617,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               },
                               decoration: _inputDecoration(
                                 hintText: '09:00:00',
-                                prefixIcon: Icons.access_time_outlined,
+                                prefixIcon: LucideIcons.clock,
                                 suffixIcon: IconButton(
                                   tooltip: 'Pick Start Time',
-                                  icon: const Icon(Icons.schedule_outlined),
+                                  icon: const Icon(LucideIcons.clock, size: 18),
                                   onPressed: () => _pickTime(
                                     _startTimeController,
                                     'start_time',
@@ -661,10 +662,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               },
                               decoration: _inputDecoration(
                                 hintText: '12:00:00',
-                                prefixIcon: Icons.access_time_filled,
+                                prefixIcon: LucideIcons.clock,
                                 suffixIcon: IconButton(
                                   tooltip: 'Pick End Time',
-                                  icon: const Icon(Icons.schedule_outlined),
+                                  icon: const Icon(LucideIcons.clock, size: 18),
                                   onPressed: () =>
                                       _pickTime(_endTimeController, 'end_time'),
                                 ),
@@ -713,7 +714,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               },
                               decoration: _inputDecoration(
                                 hintText: '2026-11-01 08:00:00',
-                                prefixIcon: Icons.how_to_reg_outlined,
+                                prefixIcon: LucideIcons.calendarPlus,
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
@@ -747,7 +748,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               },
                               decoration: _inputDecoration(
                                 hintText: '2026-11-14 23:59:59',
-                                prefixIcon: Icons.event_available_outlined,
+                                prefixIcon: LucideIcons.calendarCheck,
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
@@ -790,7 +791,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                                   _fieldServerErrors['max_participants'],
                               decoration: _inputDecoration(
                                 hintText: 'Empty = Unlimited',
-                                prefixIcon: Icons.group_outlined,
+                                prefixIcon: LucideIcons.users,
                                 helperText: 'Leave blank for unlimited slots',
                               ),
                               validator: (value) {
@@ -820,7 +821,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               onFieldSubmitted: (_) => _saveEvent(),
                               decoration: _inputDecoration(
                                 hintText: '15',
-                                prefixIcon: Icons.timer_outlined,
+                                prefixIcon: LucideIcons.timer,
                                 helperText: '0–120 minutes after start',
                               ),
                               validator: (value) {
@@ -843,9 +844,13 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       SizedBox(height: d.sm),
                       Container(
                         decoration: BoxDecoration(
-                          color: d.muted,
+                          color: d.isDark ? d.muted : const Color(0xFFFBFBFA),
                           borderRadius: BorderRadius.circular(d.radiusControl),
-                          border: Border.all(color: d.border),
+                          border: Border.all(
+                            color: d.isDark
+                                ? d.border
+                                : d.authDark.withValues(alpha: 0.08),
+                          ),
                         ),
                         child: Material(
                           type: MaterialType.transparency,
@@ -876,10 +881,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
                   // Action Buttons
                   AppButton(
                     key: const ValueKey<String>('save-event-button'),
+                    pill: true,
                     onPressed:
                         _isSaving || _isSubmittingAction ? null : _saveEvent,
                     isLoading: _isSaving,
-                    icon: _isEditing ? Icons.save_outlined : Icons.add,
+                    icon: _isEditing ? LucideIcons.save : LucideIcons.plus,
                     label: _isEditing
                         ? 'Save Event Changes'
                         : 'Create Event Draft',
@@ -889,11 +895,12 @@ class _EventFormScreenState extends State<EventFormScreen> {
                     AppButton(
                       key: const ValueKey<String>('submit-approval-button'),
                       variant: AppButtonVariant.outline,
+                      pill: true,
                       onPressed: _isSaving || _isSubmittingAction
                           ? null
                           : _submitForApproval,
                       isLoading: _isSubmittingAction,
-                      icon: Icons.send_outlined,
+                      icon: LucideIcons.send,
                       label: 'Submit for Admin Approval',
                     ),
                   ],
@@ -904,11 +911,12 @@ class _EventFormScreenState extends State<EventFormScreen> {
                         'request-cancellation-button',
                       ),
                       variant: AppButtonVariant.destructive,
+                      pill: true,
                       onPressed: _isSaving || _isSubmittingAction
                           ? null
                           : _requestCancellation,
                       isLoading: _isSubmittingAction,
-                      icon: Icons.cancel_schedule_send_outlined,
+                      icon: LucideIcons.ban,
                       label: 'Request Event Cancellation',
                     ),
                   ],
@@ -939,7 +947,16 @@ class _FormSectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -998,7 +1015,16 @@ class _EventStatusBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Wrap(
         alignment: WrapAlignment.spaceBetween,
@@ -1054,6 +1080,13 @@ class _RequestCancellationDialogState
   Widget build(BuildContext context) {
     final d = context.design;
     return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(d.radiusOverlay),
+        side: BorderSide(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+      ),
+      backgroundColor: d.card,
       title: const Text('Request Event Cancellation'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
@@ -1115,7 +1148,11 @@ class _RequestCancellationDialogState
           child: const Text('Back'),
         ),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.absent),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: d.destructive,
+            foregroundColor: Colors.white,
+            shape: const StadiumBorder(),
+          ),
           onPressed: _submit,
           child: const Text('Submit Request'),
         ),

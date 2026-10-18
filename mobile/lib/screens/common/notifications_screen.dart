@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_pressable.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
@@ -121,13 +123,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         if (unread > 0)
           AppButton(
             variant: AppButtonVariant.ghost,
-            icon: Icons.done_all,
+            pill: true,
+            icon: LucideIcons.checkCheck,
             onPressed: _markAllRead,
             label: 'Mark All Read',
           ),
         IconButton(
           tooltip: 'Notification Preferences',
-          icon: const Icon(Icons.settings_outlined),
+          icon: const Icon(LucideIcons.settings, size: 20),
           onPressed: () {
             Navigator.push(
               context,
@@ -146,7 +149,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             decoration: BoxDecoration(
               color: d.card,
               borderRadius: BorderRadius.circular(d.radiusCard),
-              border: Border.all(color: d.border),
+              border: Border.all(
+                color: d.isDark
+                    ? d.border
+                    : d.authDark.withValues(alpha: 0.08),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: d.authDark.withValues(alpha: 0.04),
+                  offset: const Offset(0, 2),
+                  blurRadius: 8,
+                ),
+              ],
             ),
             child: Wrap(
               alignment: WrapAlignment.spaceBetween,
@@ -183,7 +197,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           SizedBox(height: d.md),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? Center(child: AppSpinner(color: d.authDark, size: 28))
                 : _errorMessage != null && _notifications.isEmpty
                     ? ErrorStateView(
                         message: _errorMessage!,
@@ -191,7 +205,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       )
                     : _notifications.isEmpty
                         ? EmptyStateView(
-                            icon: Icons.notifications_none_rounded,
+                            icon: LucideIcons.bell,
                             title: 'No notifications yet',
                             message:
                                 'Attendance receipts, event updates, and reminders will appear here.',
@@ -234,11 +248,11 @@ class _NotificationTile extends StatelessWidget {
 
   IconData _iconForType(String type) {
     return switch (type) {
-      'attendance_recorded' => Icons.verified_user_outlined,
-      'event_cancellation' => Icons.cancel_outlined,
-      'waiting_list_promoted' => Icons.trending_up,
-      'registration_confirmed' => Icons.event_available_outlined,
-      _ => Icons.notifications_outlined,
+      'attendance_recorded' => LucideIcons.shieldCheck,
+      'event_cancellation' => LucideIcons.calendarX,
+      'waiting_list_promoted' => LucideIcons.arrowUpRight,
+      'registration_confirmed' => LucideIcons.calendarCheck,
+      _ => LucideIcons.bell,
     };
   }
 
@@ -253,11 +267,22 @@ class _NotificationTile extends StatelessWidget {
     final tileContent = Container(
       padding: EdgeInsets.all(d.md),
       decoration: BoxDecoration(
-        color: isRead ? d.card : d.selection,
+        color: isRead
+            ? d.card
+            : (d.isDark ? d.selection : const Color(0xFFFBFBFA)),
         borderRadius: BorderRadius.circular(d.radiusCard),
         border: Border.all(
-          color: isRead ? d.border : d.primary.withValues(alpha: 0.35),
+          color: isRead
+              ? (d.isDark ? d.border : d.authDark.withValues(alpha: 0.08))
+              : d.primary.withValues(alpha: 0.25),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

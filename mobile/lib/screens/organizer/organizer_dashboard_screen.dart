@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/event_card.dart';
@@ -215,7 +216,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   Widget _buildOverviewTab(BuildContext context) {
     final d = context.design;
     if (_isLoading && _myEvents.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppSpinner());
     }
     if (_errorMessage != null && _myEvents.isEmpty) {
       return ErrorStateView(
@@ -254,7 +255,8 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                 trailing: AppButton(
                   key: const ValueKey<String>('organizer-create-event-fab'),
                   label: 'Create Event',
-                  icon: Icons.add,
+                  pill: true,
+                  icon: LucideIcons.plus,
                   onPressed: _openCreateEvent,
                 ),
               ),
@@ -266,25 +268,25 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                   StatMetricCard(
                     label: 'Total Events',
                     value: '$totalCount',
-                    icon: Icons.event_note_outlined,
+                    icon: LucideIcons.calendarDays,
                     color: d.primary,
                   ),
                   StatMetricCard(
                     label: 'Published',
                     value: '$publishedCount',
-                    icon: Icons.public,
+                    icon: LucideIcons.globe,
                     color: d.success,
                   ),
                   StatMetricCard(
                     label: 'Ongoing',
                     value: '$ongoingCount',
-                    icon: Icons.sensors,
+                    icon: LucideIcons.radio,
                     color: d.information,
                   ),
                   StatMetricCard(
                     label: 'Draft & Pending',
                     value: '$draftOrPendingCount',
-                    icon: Icons.hourglass_top_rounded,
+                    icon: LucideIcons.hourglass,
                     color: d.warning,
                   ),
                 ],
@@ -301,7 +303,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
               SizedBox(height: d.md),
               if (priorityEvents.isEmpty)
                 EmptyStateView(
-                  icon: Icons.event_busy_outlined,
+                  icon: LucideIcons.calendarX,
                   title: 'No events found.',
                   message:
                       'Create a new event draft or refresh your dashboard.',
@@ -327,7 +329,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   Widget _buildMyEventsTab(BuildContext context) {
     final d = context.design;
     if (_isLoading && _myEvents.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppSpinner());
     }
     if (_errorMessage != null && _myEvents.isEmpty) {
       return ErrorStateView(
@@ -352,7 +354,8 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                     'Filter by lifecycle state, edit details, or manage attendance',
                 trailing: AppButton(
                   label: 'Create Event',
-                  icon: Icons.add,
+                  pill: true,
+                  icon: LucideIcons.plus,
                   onPressed: _openCreateEvent,
                 ),
               ),
@@ -364,11 +367,11 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   hintText: 'Search owned events by title or venue',
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const Icon(LucideIcons.search, size: 18),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           tooltip: 'Clear Search',
-                          icon: const Icon(Icons.clear),
+                          icon: const Icon(LucideIcons.x, size: 18),
                           onPressed: () {
                             _searchController.clear();
                             setState(() {});
@@ -386,7 +389,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
               SizedBox(height: d.md),
               if (events.isEmpty)
                 EmptyStateView(
-                  icon: Icons.event_busy_outlined,
+                  icon: LucideIcons.calendarX,
                   title: 'No matching events.',
                   message: _myEvents.isEmpty
                       ? 'Create your first school event draft to get started.'
@@ -426,7 +429,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
           setState(() => _selectedDestinationId = id),
       actions: [
         IconButton(
-          icon: const Icon(Icons.notifications_outlined),
+          icon: const Icon(LucideIcons.bell, size: 20),
           tooltip: 'Notifications',
           onPressed: () {
             Navigator.push(
@@ -436,7 +439,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.person_outline),
+          icon: const Icon(LucideIcons.user, size: 20),
           tooltip: 'My Profile',
           onPressed: () {
             Navigator.push(
@@ -446,12 +449,12 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(LucideIcons.refreshCw, size: 20),
           tooltip: 'Refresh Dashboard',
           onPressed: _isLoading ? null : _fetchDashboardData,
         ),
         IconButton(
-          icon: const Icon(Icons.logout),
+          icon: const Icon(LucideIcons.logOut, size: 20),
           tooltip: 'Logout',
           onPressed: _logout,
         ),
@@ -501,24 +504,39 @@ class _EventStatusFilterChips extends StatelessWidget {
             selected: selectedStatus == filter.value,
             onPressed: () => onSelect(filter.value),
             child: Container(
-              constraints: const BoxConstraints(minHeight: 40),
+              constraints: const BoxConstraints(minHeight: 36),
               padding: EdgeInsets.symmetric(
                 horizontal: d.gap,
                 vertical: d.xs + 2,
               ),
               decoration: BoxDecoration(
-                color: selectedStatus == filter.value ? d.selection : d.card,
+                color: selectedStatus == filter.value
+                    ? (d.isDark ? d.authDark : Colors.black)
+                    : d.card,
                 borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(
-                  color:
-                      selectedStatus == filter.value ? d.primary : d.border,
+                  color: selectedStatus == filter.value
+                      ? (d.isDark ? d.border : Colors.black)
+                      : (d.isDark
+                          ? d.border
+                          : d.authDark.withValues(alpha: 0.08)),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: d.authDark.withValues(alpha: 0.03),
+                    offset: const Offset(0, 1),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
               child: Text(
                 filter.label,
                 style: d.badge.copyWith(
+                  fontWeight: selectedStatus == filter.value
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                   color: selectedStatus == filter.value
-                      ? d.primary
+                      ? Colors.white
                       : d.foreground,
                 ),
               ),
@@ -563,7 +581,8 @@ class _OrganizerEventManagementCard extends StatelessWidget {
             trailingAction: AppButton(
               key: ValueKey<String>('open-scanner-${event.id}'),
               label: 'Open Scanner',
-              icon: Icons.qr_code_scanner,
+              pill: true,
+              icon: LucideIcons.scanLine,
               onPressed: canScan ? onScanQr : null,
             ),
           ),
@@ -582,21 +601,24 @@ class _OrganizerEventManagementCard extends StatelessWidget {
               AppButton(
                 key: ValueKey<String>('edit-event-${event.id}'),
                 variant: AppButtonVariant.outline,
-                icon: Icons.edit_outlined,
+                pill: true,
+                icon: LucideIcons.pencil,
                 label: event.status == 'draft' ? 'Edit / Submit' : 'Edit Event',
                 onPressed: onEdit,
               ),
               AppButton(
                 key: ValueKey<String>('event-registrations-${event.id}'),
                 variant: AppButtonVariant.outline,
-                icon: Icons.people_alt_outlined,
+                pill: true,
+                icon: LucideIcons.users,
                 label: 'Registrations',
                 onPressed: onRegistrations,
               ),
               AppButton(
                 key: ValueKey<String>('event-attendance-${event.id}'),
                 variant: AppButtonVariant.outline,
-                icon: Icons.fact_check_outlined,
+                pill: true,
+                icon: LucideIcons.clipboardCheck,
                 label: 'Attendance',
                 onPressed: onAttendance,
               ),

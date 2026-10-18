@@ -7,6 +7,7 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -217,7 +218,9 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
       decoration: BoxDecoration(
         color: d.selection,
         borderRadius: BorderRadius.circular(d.radiusControl),
-        border: Border.all(color: d.primary.withValues(alpha: 0.22)),
+        border: Border.all(
+          color: d.isDark ? d.border : d.primary.withValues(alpha: 0.18),
+        ),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -226,7 +229,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
           final messageRow = Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline, color: d.primary, size: 20),
+              Icon(LucideIcons.info, color: d.primary, size: 20),
               SizedBox(width: d.sm),
               Expanded(
                 child: Text(
@@ -245,7 +248,8 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
           final actionBtn = AppButton(
             key: const ValueKey<String>('overview-open-reports-button'),
             variant: AppButtonVariant.ghost,
-            icon: Icons.assessment_outlined,
+            pill: true,
+            icon: LucideIcons.barChart2,
             label: 'Open Reports',
             onPressed: () => _openReports(),
           );
@@ -276,7 +280,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
   Widget _buildOverviewDestination(BuildContext context) {
     final d = context.design;
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: AppSpinner(color: d.authDark, size: 28));
     }
     if (_errorMessage != null && _metrics.isEmpty && _recentEvents.isEmpty) {
       return ErrorStateView(
@@ -318,8 +322,9 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
                       ),
                       AppButton(
                         variant: AppButtonVariant.outline,
+                        pill: true,
                         label: 'Retry',
-                        icon: Icons.refresh,
+                        icon: LucideIcons.refreshCw,
                         onPressed: _fetchData,
                       ),
                     ],
@@ -334,25 +339,25 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
                   StatMetricCard(
                     label: 'Overall Turnout',
                     value: '${_metrics['overall_turnout_rate'] ?? '0%'}',
-                    icon: Icons.pie_chart_outline,
+                    icon: LucideIcons.pieChart,
                     color: d.success,
                   ),
                   StatMetricCard(
                     label: 'Total Events',
                     value: '${_metrics['total_events'] ?? 0}',
-                    icon: Icons.event_note_outlined,
+                    icon: LucideIcons.calendar,
                     color: d.primary,
                   ),
                   StatMetricCard(
                     label: 'Total Registered',
                     value: '${_metrics['total_registrations'] ?? 0}',
-                    icon: Icons.how_to_reg_outlined,
+                    icon: LucideIcons.users,
                     color: d.information,
                   ),
                   StatMetricCard(
                     label: 'Total Attended',
                     value: '${_metrics['total_attendances'] ?? 0}',
-                    icon: Icons.verified_user_outlined,
+                    icon: LucideIcons.userCheck,
                     color: d.warning,
                   ),
                 ],
@@ -370,7 +375,18 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
                   decoration: BoxDecoration(
                     color: d.card,
                     borderRadius: BorderRadius.circular(d.radiusCard),
-                    border: Border.all(color: d.border),
+                    border: Border.all(
+                      color: d.isDark
+                          ? d.border
+                          : d.authDark.withValues(alpha: 0.08),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: d.authDark.withValues(alpha: 0.04),
+                        offset: const Offset(0, 2),
+                        blurRadius: 8,
+                      ),
+                    ],
                   ),
                   child: Column(
                     children: [
@@ -411,7 +427,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
               SizedBox(height: d.sm),
               if (previewEvents.isEmpty)
                 const EmptyStateView(
-                  icon: Icons.analytics_outlined,
+                  icon: LucideIcons.barChart3,
                   title: 'No recent events recorded.',
                 )
               else
@@ -439,7 +455,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
   Widget _buildEventsDestination(BuildContext context) {
     final d = context.design;
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: AppSpinner(color: d.authDark, size: 28));
     }
     if (_errorMessage != null && _metrics.isEmpty && _recentEvents.isEmpty) {
       return ErrorStateView(
@@ -478,11 +494,40 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
                   decoration: InputDecoration(
                     labelText: 'Search events by title, venue, or date',
                     hintText: 'Filter institutional events…',
-                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: d.isDark ? d.muted : d.card,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: d.md,
+                      vertical: d.sm,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(d.radiusCard),
+                      borderSide: BorderSide(
+                        color: d.isDark
+                            ? d.border
+                            : d.authDark.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(d.radiusCard),
+                      borderSide: BorderSide(
+                        color: d.isDark
+                            ? d.border
+                            : d.authDark.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(d.radiusCard),
+                      borderSide: BorderSide(
+                        color: d.authDark,
+                        width: 1.5,
+                      ),
+                    ),
+                    prefixIcon: const Icon(LucideIcons.search, size: 18),
                     suffixIcon: _eventSearchQuery.isNotEmpty
                         ? IconButton(
                             tooltip: 'Clear search',
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(LucideIcons.x, size: 16),
                             onPressed: () {
                               _eventSearchController.clear();
                               setState(() => _eventSearchQuery = '');
@@ -495,7 +540,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
               SizedBox(height: d.md),
               if (events.isEmpty)
                 EmptyStateView(
-                  icon: Icons.event_busy_outlined,
+                  icon: LucideIcons.calendarX,
                   title: _eventSearchQuery.trim().isEmpty
                       ? 'No institutional events available.'
                       : 'No events match your search.',
@@ -544,7 +589,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
       },
       actions: [
         IconButton(
-          icon: const Icon(Icons.notifications_outlined),
+          icon: const Icon(LucideIcons.bell, size: 20),
           tooltip: 'Notifications',
           onPressed: () {
             Navigator.push(
@@ -554,7 +599,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.person_outline),
+          icon: const Icon(LucideIcons.user, size: 20),
           tooltip: 'My Profile',
           onPressed: () {
             Navigator.push(
@@ -564,12 +609,12 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(LucideIcons.refreshCw, size: 20),
           tooltip: 'Refresh Metrics',
           onPressed: _isLoading ? null : _fetchData,
         ),
         IconButton(
-          icon: const Icon(Icons.logout),
+          icon: const Icon(LucideIcons.logOut, size: 20),
           tooltip: 'Logout',
           onPressed: _logout,
         ),
@@ -697,7 +742,16 @@ class _ManagementEventReadOnlyCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(
+          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -746,19 +800,22 @@ class _ManagementEventReadOnlyCard extends StatelessWidget {
                   children: [
                     AppButton(
                       variant: AppButtonVariant.outline,
-                      icon: Icons.people_outline,
+                      pill: true,
+                      icon: LucideIcons.users,
                       label: 'Registrations (RO)',
                       onPressed: () => onViewRegistrations(eventId, title),
                     ),
                     AppButton(
                       variant: AppButtonVariant.outline,
-                      icon: Icons.visibility_outlined,
+                      pill: true,
+                      icon: LucideIcons.eye,
                       label: 'Attendance (RO)',
                       onPressed: () => onViewAttendance(eventId, title),
                     ),
                     AppButton(
                       variant: AppButtonVariant.ghost,
-                      icon: Icons.analytics_outlined,
+                      pill: true,
+                      icon: LucideIcons.barChart2,
                       label: 'Reports',
                       onPressed: () => onOpenReports(eventId),
                     ),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/status_badge.dart';
@@ -213,7 +215,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           decoration: BoxDecoration(
             color: d.card,
             borderRadius: BorderRadius.circular(d.radiusCard),
-            border: Border.all(color: d.border),
+            border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+            boxShadow: [
+              BoxShadow(
+                color: d.authDark.withValues(alpha: 0.04),
+                offset: const Offset(0, 2),
+                blurRadius: 8,
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,25 +235,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 children: [
                   Text(
                     event.title,
-                    style: d.sectionTitle,
+                    style: d.sectionTitle.copyWith(fontWeight: FontWeight.w700),
                   ),
                   StatusBadge(status: event.status),
                 ],
               ),
               SizedBox(height: d.gap),
               _EventInfoRow(
-                icon: Icons.location_on_outlined,
+                icon: LucideIcons.mapPin,
                 text: event.venue,
               ),
               SizedBox(height: d.sm),
               _EventInfoRow(
-                icon: Icons.calendar_today_outlined,
+                icon: LucideIcons.calendar,
                 text:
                     '${event.eventDate} • ${event.startTime} - ${event.endTime}',
               ),
               SizedBox(height: d.sm),
               _EventInfoRow(
-                icon: Icons.timer_outlined,
+                icon: LucideIcons.clock,
                 text:
                     'Late grace period: ${event.lateGracePeriodMinutes} minutes',
               ),
@@ -257,7 +266,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           decoration: BoxDecoration(
             color: d.card,
             borderRadius: BorderRadius.circular(d.radiusCard),
-            border: Border.all(color: d.border),
+            border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+            boxShadow: [
+              BoxShadow(
+                color: d.authDark.withValues(alpha: 0.04),
+                offset: const Offset(0, 2),
+                blurRadius: 8,
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,7 +287,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               if (event.walkInAllowed) ...[
                 SizedBox(height: d.gap),
                 _EventInfoRow(
-                  icon: Icons.check_circle_outline,
+                  icon: LucideIcons.circleCheck,
                   iconColor: d.success,
                   text: 'Walk-in attendees permitted at venue',
                 ),
@@ -297,7 +313,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border),
+        border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: d.authDark.withValues(alpha: 0.04),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -324,7 +347,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             style: d.supporting,
           ),
           if (event.userRegistrationStatus != null) ...[
-            Divider(height: d.lg, color: d.border),
+            Divider(height: d.lg, color: d.authDark.withValues(alpha: 0.08)),
             Text('Your Participation Status', style: d.supporting),
             SizedBox(height: d.xs),
             Align(
@@ -348,12 +371,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               style: d.supporting,
             ),
           ],
-          Divider(height: d.lg, color: d.border),
+          Divider(height: d.lg, color: d.authDark.withValues(alpha: 0.08)),
           if (event.isRegistered || event.isWaitingList) ...[
             AppButton(
               key: const ValueKey('cancel-registration-button'),
               variant: AppButtonVariant.destructive,
-              icon: Icons.cancel_outlined,
+              pill: true,
+              icon: LucideIcons.xCircle,
               isLoading: _isSubmitting,
               onPressed: (isCancelled || isCompleted)
                   ? null
@@ -369,7 +393,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             const AppButton(
               key: ValueKey('register-event-button'),
               variant: AppButtonVariant.outline,
-              icon: Icons.block,
+              pill: true,
+              icon: LucideIcons.ban,
               onPressed: null,
               label: 'Event Cancelled',
             ),
@@ -382,7 +407,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             const AppButton(
               key: ValueKey('register-event-button'),
               variant: AppButtonVariant.outline,
-              icon: Icons.task_alt,
+              pill: true,
+              icon: LucideIcons.checkCheck,
               onPressed: null,
               label: 'Event Completed',
             ),
@@ -397,7 +423,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             AppButton(
               key: const ValueKey('register-event-button'),
               variant: AppButtonVariant.primary,
-              icon: isFull ? Icons.queue_rounded : Icons.how_to_reg,
+              pill: true,
+              icon: isFull ? LucideIcons.listOrdered : LucideIcons.userCheck,
               isLoading: _isSubmitting,
               onPressed: _handleRegister,
               label: isFull ? 'Join Waiting List' : 'Register for Event',
@@ -418,12 +445,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       actions: [
         IconButton(
           tooltip: 'Refresh Event Details',
-          icon: const Icon(Icons.refresh),
+          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
           onPressed: (_isLoading || _isSubmitting) ? null : _refreshEventDetails,
         ),
       ],
       body: _isLoading && event == null
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: AppSpinner(
+                size: 28,
+                color: d.authDark,
+              ),
+            )
           : _errorMessage != null && event == null
               ? ErrorStateView(
                   message: _errorMessage!,
