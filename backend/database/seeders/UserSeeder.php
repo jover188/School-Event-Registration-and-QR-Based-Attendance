@@ -14,10 +14,14 @@ class UserSeeder extends Seeder
 {
     /**
      * Run the database seeds.
+     *
+     * Simulates pre-provisioned institutional accounts and student records
+     * synchronized from the school's registrar/enrollment database when live
+     * school APIs are unavailable.
      */
     public function run(): void
     {
-        // 1. Initial Administrator
+        // 1. System Administrator
         $admin = User::updateOrCreate(
             ['email' => 'admin@school.edu'],
             [
@@ -29,7 +33,7 @@ class UserSeeder extends Seeder
         );
         NotificationPreference::firstOrCreate(['user_id' => $admin->id]);
 
-        // 2. Demo Event Organizer
+        // 2. Event Organizers / Staff
         $organizer = User::updateOrCreate(
             ['email' => 'organizer@school.edu'],
             [
@@ -41,7 +45,18 @@ class UserSeeder extends Seeder
         );
         NotificationPreference::firstOrCreate(['user_id' => $organizer->id]);
 
-        // 3. Demo School Management
+        $coOrganizer = User::updateOrCreate(
+            ['email' => 'cs.council@school.edu'],
+            [
+                'role_id' => 2,
+                'password' => Hash::make('Organizer@12345'),
+                'status' => 'active',
+                'email_verified_at' => now(),
+            ]
+        );
+        NotificationPreference::firstOrCreate(['user_id' => $coOrganizer->id]);
+
+        // 3. School Management (Strictly Read-Only)
         $management = User::updateOrCreate(
             ['email' => 'management@school.edu'],
             [
@@ -53,7 +68,7 @@ class UserSeeder extends Seeder
         );
         NotificationPreference::firstOrCreate(['user_id' => $management->id]);
 
-        // 4. Demo Student
+        // 4. Primary Demo Student (20260001)
         $studentUser = User::updateOrCreate(
             ['email' => 'student@school.edu'],
             [
@@ -81,16 +96,28 @@ class UserSeeder extends Seeder
             ]
         );
 
-        // Generate permanent 64-character hexadecimal QR token for demo student 1
+        // Historical revoked QR token for demo student 20260001 (for Admin QR audit trail)
+        StudentQR::updateOrCreate(
+            [
+                'student_id' => $studentProfile->id,
+                'qr_token' => '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff',
+            ],
+            [
+                'status' => 'revoked',
+                'revoked_at' => now()->subDays(30),
+            ]
+        );
+
+        // Active permanent 64-character hexadecimal QR token for demo student 20260001
         StudentQR::firstOrCreate(
             ['student_id' => $studentProfile->id, 'status' => 'active'],
             [
-                'qr_token' => bin2hex(random_bytes(32)), // 64 hex characters
+                'qr_token' => 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
                 'status' => 'active',
             ]
         );
 
-        // 5. Additional Institutional Pre-Seeded Students (Demonstrating school database sync/middleware capability)
+        // 5. Mock Institutional Student Directory (Simulated School Registrar Sync)
         $students = [
             [
                 'email' => 'maria.santos@school.edu',
@@ -102,7 +129,9 @@ class UserSeeder extends Seeder
                 'year_level' => '2nd Year',
                 'section' => 'IT-2B',
                 'department' => 'College of Computer Studies',
-                'contact' => '+639181234567',
+                'contact' => '+639181234561',
+                'status' => 'active',
+                'qr_token' => 'b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9001',
             ],
             [
                 'email' => 'crisostomo.ibarra@school.edu',
@@ -114,7 +143,107 @@ class UserSeeder extends Seeder
                 'year_level' => '4th Year',
                 'section' => 'CE-4A',
                 'department' => 'College of Engineering',
-                'contact' => '+639191234567',
+                'contact' => '+639191234562',
+                'status' => 'active',
+                'qr_token' => 'c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f900202',
+            ],
+            [
+                'email' => 'elias.piloto@school.edu',
+                'id_number' => '20269003',
+                'first_name' => 'Elias',
+                'middle_name' => 'Salome',
+                'last_name' => 'Piloto',
+                'course' => 'BS Computer Engineering',
+                'year_level' => '3rd Year',
+                'section' => 'CPE-3A',
+                'department' => 'College of Engineering',
+                'contact' => '+639171234563',
+                'status' => 'active',
+                'qr_token' => 'd4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90030303',
+            ],
+            [
+                'email' => 'sisa.mercado@school.edu',
+                'id_number' => '20269004',
+                'first_name' => 'Narcisa',
+                'middle_name' => 'Basilio',
+                'last_name' => 'Mercado',
+                'course' => 'BS Accountancy',
+                'year_level' => '4th Year',
+                'section' => 'BSA-4A',
+                'department' => 'College of Business and Accountancy',
+                'contact' => '+639171234564',
+                'status' => 'active',
+                'qr_token' => 'e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9004040404',
+            ],
+            [
+                'email' => 'basilio.cruz@school.edu',
+                'id_number' => '20269005',
+                'first_name' => 'Basilio',
+                'middle_name' => 'Sisa',
+                'last_name' => 'Cruz',
+                'course' => 'BS Nursing',
+                'year_level' => '2nd Year',
+                'section' => 'BSN-2A',
+                'department' => 'College of Allied Health',
+                'contact' => '+639171234565',
+                'status' => 'active',
+                'qr_token' => 'f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f900505050505',
+            ],
+            [
+                'email' => 'isagani.florentino@school.edu',
+                'id_number' => '20269006',
+                'first_name' => 'Isagani',
+                'middle_name' => 'Makaraig',
+                'last_name' => 'Florentino',
+                'course' => 'BS Information Systems',
+                'year_level' => '1st Year',
+                'section' => 'BSIS-1A',
+                'department' => 'College of Computer Studies',
+                'contact' => '+639171234566',
+                'status' => 'active',
+                'qr_token' => '0718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90060606060606',
+            ],
+            [
+                'email' => 'paulita.gomez@school.edu',
+                'id_number' => '20269007',
+                'first_name' => 'Paulita',
+                'middle_name' => 'Victorina',
+                'last_name' => 'Gomez',
+                'course' => 'BS Business Administration',
+                'year_level' => '3rd Year',
+                'section' => 'BSBA-3B',
+                'department' => 'College of Business and Accountancy',
+                'contact' => '+639171234568',
+                'status' => 'active',
+                'qr_token' => '18293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9007070707070707',
+            ],
+            [
+                'email' => 'simoun.almario@school.edu',
+                'id_number' => '20269008',
+                'first_name' => 'Simoun',
+                'middle_name' => 'Ibarra',
+                'last_name' => 'Almario',
+                'course' => 'BS Computer Science',
+                'year_level' => '4th Year',
+                'section' => 'CS-4A',
+                'department' => 'College of Computer Studies',
+                'contact' => '+639171234569',
+                'status' => 'active',
+                'qr_token' => '293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f900808080808080808',
+            ],
+            [
+                'email' => 'juli.cabesang@school.edu',
+                'id_number' => '20269009',
+                'first_name' => 'Juliana',
+                'middle_name' => 'Tales',
+                'last_name' => 'Cabesang',
+                'course' => 'BS Secondary Education',
+                'year_level' => '1st Year',
+                'section' => 'BSED-1A',
+                'department' => 'College of Education',
+                'contact' => '+639171234570',
+                'status' => 'pending',
+                'qr_token' => '3a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90090909090909090909',
             ],
         ];
 
@@ -124,8 +253,8 @@ class UserSeeder extends Seeder
                 [
                     'role_id' => 3,
                     'password' => Hash::make('Student@12345'),
-                    'status' => 'active',
-                    'email_verified_at' => now(),
+                    'status' => $data['status'],
+                    'email_verified_at' => $data['status'] === 'active' ? now() : null,
                 ]
             );
             NotificationPreference::firstOrCreate(['user_id' => $u->id]);
@@ -149,7 +278,7 @@ class UserSeeder extends Seeder
             StudentQR::firstOrCreate(
                 ['student_id' => $sp->id, 'status' => 'active'],
                 [
-                    'qr_token' => bin2hex(random_bytes(32)),
+                    'qr_token' => $data['qr_token'] ?? bin2hex(random_bytes(32)),
                     'status' => 'active',
                 ]
             );
@@ -165,7 +294,8 @@ class UserSeeder extends Seeder
                 'metadata' => [
                     'version' => '1.1',
                     'action' => 'seed_initial_users',
-                ],
+                    'source' => 'mock_school_directory_seeder',
+                    ],
                 'ip_address' => '127.0.0.1',
                 'user_agent' => 'Console/Seeder',
             ]

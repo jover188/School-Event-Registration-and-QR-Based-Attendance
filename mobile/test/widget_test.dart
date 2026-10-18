@@ -13,9 +13,9 @@ import 'package:school_event_attendance/core/widgets/status_badge.dart';
 import 'package:school_event_attendance/models/attendance_model.dart';
 import 'package:school_event_attendance/models/event_model.dart';
 import 'package:school_event_attendance/models/user_model.dart';
-import 'package:school_event_attendance/screens/auth/forgot_password_screen.dart';
 import 'package:school_event_attendance/screens/auth/login_screen.dart';
 import 'package:school_event_attendance/screens/organizer/event_form_screen.dart';
+import 'support/app_test_host.dart';
 
 void main() {
   group('Model Parsing Tests', () {
@@ -123,8 +123,6 @@ void main() {
     test('ApiConstants defines complete v1 route paths', () {
       expect(ApiConstants.login, '/auth/login');
       expect(ApiConstants.verifyEmail, '/auth/verify-email');
-      expect(ApiConstants.forgotPassword, '/auth/forgot-password');
-      expect(ApiConstants.resetPassword, '/auth/reset-password');
       expect(ApiConstants.adminStudentQr(5), '/admin/students/5/qr');
       expect(
         ApiConstants.adminReissueStudentQr(5),
@@ -278,35 +276,27 @@ void main() {
     });
   });
 
-  testWidgets('LoginScreen renders school attendance header and form inputs',
+  testWidgets('LoginScreen renders branded header and form inputs',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: const LoginScreen(),
+      const AppTestHost(
+        child: LoginScreen(),
       ),
     );
 
-    expect(find.text('School Event Attendance'), findsOneWidget);
-    expect(find.text('QR-Based Attendance & Event System'), findsOneWidget);
-    expect(find.text('Log In'), findsOneWidget);
-    expect(find.text('Forgot Password?'), findsOneWidget);
-    expect(find.textContaining('pre-provisioned'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('attendify-login-logo')),
+      findsOneWidget,
+    );
+    expect(find.text('Welcome back! Log in to continue.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-title')), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-submit-button')), findsOneWidget);
+    expect(find.text('ID or email'), findsOneWidget);
+    expect(find.text('Forgot Password?'), findsNothing);
+    expect(find.text('Forgot password?'), findsNothing);
+    expect(find.byKey(const ValueKey('forgot-password-action')), findsNothing);
+    expect(find.textContaining('pre-provisioned'), findsNothing);
     expect(find.text('Register Here'), findsNothing);
-  });
-
-  testWidgets('ForgotPasswordScreen renders password recovery and verification tabs',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: const ForgotPasswordScreen(),
-      ),
-    );
-
-    expect(find.text('Reset Password'), findsWidgets);
-    expect(find.text('Verify Email'), findsWidgets);
-    expect(find.text('Send Reset Code'), findsOneWidget);
   });
 
   testWidgets('EventFormScreen renders create and edit draft controls',
@@ -328,16 +318,15 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: EventFormScreen(event: draftEvent),
+      AppTestHost(
+        child: EventFormScreen(event: draftEvent),
       ),
     );
 
     expect(find.text('Edit Event'), findsOneWidget);
     expect(find.text('Draft Seminar'), findsOneWidget);
 
-    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.ensureVisible(find.text('Submit for Admin Approval'));
     await tester.pumpAndSettle();
 
     expect(find.text('Submit for Admin Approval'), findsOneWidget);

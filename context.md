@@ -12,7 +12,7 @@
 The **School Event Registration and QR-Based Attendance Management System** is a decoupled client-server platform built with a **Laravel 11 REST API backend**, **MySQL / MariaDB relational database**, and a **Flutter cross-platform application** (Android, iOS, Linux Desktop, Web).
 
 It replaces manual paper/spreadsheet event workflows with:
-- Student self-registration and login via either **numeric Student ID** (e.g., `20260001`) or **school email**.
+- Institutional account integration via the school **Student Information System (SIS)** (and pre-provisioned demo accounts via database seeders in development/demo environments) with login via either **numeric Student ID** (e.g., `20260001`) or **school email** (open self-registration and self-service forgot-password are omitted).
 - **Single active session enforcement** (logging in on a new device invalidates previous tokens).
 - **Permanent student QR codes** (`64-char hex`, containing zero PII) with self-service instant reissue/revocation.
 - **Event lifecycle governance** requiring Administrator approval before publishing or cancelling events.
@@ -58,7 +58,7 @@ School-Event-Registration-and-QR-Based-Attendance/
 │   │   └── Models/                                # 13 Eloquent domain models
 │   ├── database/
 │   │   ├── migrations/                            # 13 domain table migrations + Laravel system tables
-│   │   └── seeders/                               # RoleSeeder & UserSeeder
+│   │   └── seeders/                               # RoleSeeder, UserSeeder & DemoSchoolDataSeeder
 │   ├── resources/views/reports/                   # DomPDF Blade templates
 │   ├── routes/
 │   │   ├── api.php                                # All /api/v1/* routes
@@ -69,7 +69,7 @@ School-Event-Registration-and-QR-Based-Attendance/
     │   ├── core/
     │   │   ├── constants/api_constants.dart       # API base URL & endpoint path constants
     │   │   ├── network/api_client.dart            # HTTP client with Bearer auth & 401 session hook
-    │   │   └── theme/app_theme.dart               # Material 3 theme & status badge colors
+    │   │   └── theme/app_theme.dart               # AetherUI theme & status badge colors
     │   ├── models/                                # UserModel, StudentModel, EventModel, AttendanceModel
     │   ├── screens/                               # Auth, Student, Organizer, Management, and Admin screens
     │   └── main.dart                              # App entry point, role router & session termination modal
@@ -80,7 +80,7 @@ School-Event-Registration-and-QR-Based-Attendance/
 
 ## 4. Roles & Seeded Credentials
 
-The system enforces strict Role-Based Access Control (`CheckRole` middleware using role `slug`):
+The system enforces strict Role-Based Access Control (`CheckRole` middleware using role `slug`). Student and staff accounts are designed to integrate with the school SIS; for local development and demonstrations without live SIS access, accounts and sample domain data are pre-populated via `RoleSeeder`, `UserSeeder`, and `DemoSchoolDataSeeder`:
 
 | Role ID | Role Name | Slug | Access Summary | Demo Login | Demo Password |
 |---|---|---|---|---|---|
@@ -114,22 +114,22 @@ The system enforces strict Role-Based Access Control (`CheckRole` middleware usi
 ### Already Made (Completed)
 - **Specifications & Design**: Finalized SRS v1.1, System Architecture & ER/State/Sequence Diagrams, REST API Specification, and OpenAPI 3.0.3 schema.
 - **Backend Core (`backend/`)**:
-  - All 13 domain migrations, Eloquent models, relationships, and seeders (`RoleSeeder`, `UserSeeder`).
+  - All 13 domain migrations, Eloquent models, relationships, and seeders (`RoleSeeder`, `UserSeeder`, `DemoSchoolDataSeeder`).
   - `CheckRole` and `EnforceSingleSession` middleware.
-  - All 9 API v1 controllers (`AuthController`, `StudentQRController`, `EventController`, `RegistrationController`, `AttendanceController`, `NotificationController`, `DashboardController`, `ReportController`, `AdminController`) covering 49 routes (including `verify-email`, `forgot-password`, `reset-password`, staff registration cancellation, admin QR reissue, manual attendance marking, and admin announcements).
+  - All 9 API v1 controllers (`AuthController`, `StudentQRController`, `EventController`, `RegistrationController`, `AttendanceController`, `NotificationController`, `DashboardController`, `ReportController`, `AdminController`) covering 47 routes (including `verify-email`, staff registration cancellation, admin QR reissue, manual attendance marking, and admin announcements; self-service forgot/reset password omitted in favor of school SIS integration).
   - Centralized `NotificationService` enforcing mandatory vs. optional user notification preferences.
   - Scheduled console tasks (`event-reminder-24h`, `event-reminder-1h`, `purge-old-notifications`, `auto-close-events`) in `routes/console.php`.
   - Complete PDF (7 DomPDF Blade templates), Excel (7 `Maatwebsite\Excel` export classes), and CSV streaming exports for all 7 institutional report types with optional query filters.
-  - 43 automated feature/unit tests (193 assertions) passing on in-memory SQLite (`SchoolAttendanceWorkflowTest`, `AuthorizationPolicyTest`, `ReportExportTest`, `AuthAndStaffOperationsTest`, `NotificationServiceTest`).
+  - 44 automated feature/unit tests (226 assertions) passing on in-memory SQLite (`SchoolAttendanceWorkflowTest`, `AuthorizationPolicyTest`, `ReportExportTest`, `AuthAndStaffOperationsTest`, `NotificationServiceTest`, `DemoSchoolDataSeederTest`).
 - **Mobile Application (`mobile/`)**:
-  - Cross-platform Flutter structure (`linux`, `android`, `web`), centralized Material 3 design token system (`AppColors`, `AppSpacing`, `AppRadius`, `AppTypography`), and reusable widget component library (`StatusBadge`, `StatMetricCard`, `EmptyStateView`, `ErrorStateView`, `SectionHeader`, `EventCard`).
+  - Cross-platform Flutter structure (`linux`, `android`, `web`) with `ShadApp.custom` (`shadcn_ui`) + Material 3 integration and the **AetherUI** design system (`AppDesignTokens.light` & `AppDesignTokens.dark`: `'Inter'` typography, lightweight `LucideIcons`, Light Mode `#FAFAFA` background, `#FFFFFF` cards/popovers, `#09090B` foreground, `#18181B` primary, `#F4F4F5` secondary/muted/accent/sidebar, `#52525B` muted foreground, `#E4E4E7` borders/inputs, `#71717A` ring; Dark Mode `#09090B` background, `#121214` cards, `#18181B` popovers, `#FFFFFF` foreground/primary, `#27272A` secondary/muted/accent/borders/inputs, `#A1A1AA` muted foreground/ring, `#0F0F12` sidebar; `#14B8A6` Teal success, `#F59E0B` Amber warning, `#EF4444` Red destructive, `8px` (`0.5rem`) radius), `NoSplash.splashFactory`, custom `AppPressable` / `AppButton` controls, adaptive `AppShell` (`<600` slide-over off-canvas drawer with blurred backdrop + `56px` bottom nav, `600–1023` navigation rail, `1024+` `256px` sticky sidebar + blurred `64px` top header), `AppPageScaffold`, and responsive layout primitives (`AppResponsivePage`, `ResponsiveGrid`, `ResponsiveCardSliver`, `ResponsiveQrFrame`).
   - `ApiClient` with `FlutterSecureStorage` token persistence, Bearer token injection, `postMultipart`, `downloadBytes`, and 401 session termination listener.
-  - All 21 screens implemented and wired across all 4 roles:
-    - Auth: `LoginScreen`, `ForgotPasswordScreen`
+  - All 20 screens implemented, responsive across phone/tablet/desktop viewports (`320px` at `2x` text scale through `1440px`), and wired across all 4 roles:
+    - Auth: `LoginScreen` (`AccountInput`)
     - Common: `ProfileScreen`, `NotificationsScreen`, `NotificationPreferencesScreen`, `ReportsScreen`
     - Student: `StudentDashboardScreen`, `PermanentQrScreen`, `EventDetailScreen`, `MyRegistrationsScreen`, `MyAttendanceHistoryScreen`
-    - Organizer: `OrganizerDashboardScreen`, `QrScannerScreen`, `EventFormScreen`, `EventRegistrationsScreen`, `LiveAttendanceScreen`
+    - Organizer: `OrganizerDashboardScreen`, `QrScannerScreen` (`ScanResultContent`), `EventFormScreen`, `EventRegistrationsScreen`, `LiveAttendanceScreen`
     - Management: `ManagementDashboardScreen` (strictly Read-Only)
     - Admin: `AdminDashboardScreen`, `UserManagementScreen`, `ActivityLogsScreen`, `StudentQrInspectScreen`
-  - 13 Flutter unit and widget tests passing with `0` analyzer issues.
+  - 54 Flutter unit and widget tests passing across 13 test files with `0` analyzer issues and clean `flutter build web` compilation.
 

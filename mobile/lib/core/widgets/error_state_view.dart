@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../theme/app_theme.dart';
+import 'app_button.dart';
 
 /// Reusable error state view with retry button.
 class ErrorStateView extends StatelessWidget {
@@ -16,36 +18,42 @@ class ErrorStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(d.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: EdgeInsets.all(d.md),
               decoration: BoxDecoration(
-                color: AppColors.absent.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+                color: d.dangerBackground,
+                borderRadius: BorderRadius.circular(d.radiusCard),
+                border: Border.all(color: d.destructive.withValues(alpha: 0.2)),
               ),
-              child: const Icon(
-                Icons.error_outline_rounded,
-                size: 44,
-                color: AppColors.absent,
+              child: Icon(
+                LucideIcons.circleAlert,
+                size: 28,
+                weight: 300,
+                color: d.destructive,
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              message,
-              style: AppTypography.body.copyWith(color: AppColors.absent),
-              textAlign: TextAlign.center,
+            SizedBox(height: d.md),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                message,
+                style: d.body.copyWith(color: d.destructive),
+                textAlign: TextAlign.center,
+              ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            ElevatedButton.icon(
+            SizedBox(height: d.md),
+            AppButton(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: Text(retryLabel),
+              icon: LucideIcons.refreshCw,
+              label: retryLabel,
             ),
           ],
         ),
@@ -53,3 +61,4 @@ class ErrorStateView extends StatelessWidget {
     );
   }
 }
+

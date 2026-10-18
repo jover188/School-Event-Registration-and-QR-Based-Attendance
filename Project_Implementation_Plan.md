@@ -10,6 +10,13 @@
 
 **Spec:** [`School_Event_Attendance_SRS_v1.0.md`](./School_Event_Attendance_SRS_v1.0.md), [`System_Architecture_and_Database_Design.md`](./System_Architecture_and_Database_Design.md), [`REST_API_Specification.md`](./REST_API_Specification.md), [`openapi.yaml`](./openapi.yaml)
 
+## Responsive Mobile Redesign — 2026-10-17
+
+- [x] Review the [responsive shadcn design](./docs/superpowers/specs/2026-10-17-responsive-shadcn-mobile-design.md) covering all four roles on phones, tablets, and desktop/web.
+- [x] Execute the [eight-task UI refactor plan](./docs/superpowers/plans/2026-10-17-responsive-shadcn-mobile.md) after design review (verified in [`2026-10-17-responsive-shadcn-mobile-verification.md`](./docs/superpowers/reviews/2026-10-17-responsive-shadcn-mobile-verification.md)).
+- Palette: Indigo `#4338CA`, Pink `#EC4899`, Cyan `#22D3EE`, Background `#FDF4FF`, Text `#18181B`; uses the installed `shadcn_ui` package via `ShadApp.custom` + `AppDesignTokens` (`context.design`).
+- Status: Complete and verified (`flutter analyze` 0 issues, 56/56 widget & unit tests passing across all 21 screens and 4 roles).
+
 ## Global Constraints
 
 - **Permanent QR Token Format:** Cryptographically random 64-character hexadecimal string (`bin2hex(random_bytes(32))`) with zero personal student data (`QR-001`, `SEC-009`).
@@ -68,14 +75,14 @@
   - [x] `AppTheme` (`AppColors`, `AppSpacing`, `AppRadius`, `AppTypography`) — Centralized Material 3 design token system.
   - [x] Reusable Component Library (`mobile/lib/core/widgets/`): `StatusBadge`, `StatMetricCard`, `EmptyStateView`, `ErrorStateView`, `SectionHeader`, `EventCard`.
 - [x] **Data Models (`mobile/lib/models/`):** `UserModel`, `StudentModel`, `EventModel`, `AttendanceModel`.
-- [x] **Implemented & API-Wired Screens (`mobile/lib/screens/` — 21 screens total):**
-  - [x] `auth/login_screen.dart`, `auth/forgot_password_screen.dart` (self-registration removed in favor of institutional pre-provisioning)
+- [x] **Implemented & API-Wired Screens (`mobile/lib/screens/` — 20 screens total):**
+  - [x] `auth/login_screen.dart` (self-registration and self-service forgot-password removed in favor of school SIS integration and seeded demo accounts)
   - [x] `common/profile_screen.dart`, `common/notifications_screen.dart`, `common/notification_preferences_screen.dart`, `common/reports_screen.dart`
   - [x] `student/student_dashboard_screen.dart`, `student/permanent_qr_screen.dart`, `student/event_detail_screen.dart`, `student/my_registrations_screen.dart`, `student/my_attendance_history_screen.dart`
   - [x] `organizer/organizer_dashboard_screen.dart`, `organizer/qr_scanner_screen.dart`, `organizer/event_form_screen.dart`, `organizer/event_registrations_screen.dart`, `organizer/live_attendance_screen.dart`
   - [x] `management/management_dashboard_screen.dart` (strictly Read-Only)
   - [x] `admin/admin_dashboard_screen.dart`, `admin/user_management_screen.dart`, `admin/activity_logs_screen.dart`, `admin/student_qr_inspect_screen.dart`
-- [x] **Flutter Unit/Widget Tests (`mobile/test/widget_test.dart`):** 13 unit and widget tests covering models, design tokens, `ApiConstants`, `ApiClient` storage, reusable widgets, and screen rendering.
+- [x] **Flutter Unit/Widget Tests (`mobile/test/widget_test.dart`):** Unit and widget tests covering models, design tokens, `ApiConstants`, `ApiClient` storage, reusable widgets, and screen rendering.
 
 ---
 
@@ -115,7 +122,7 @@
 
 ---
 
-### Task 2: Backend Email Verification, Self-Service Password Reset & Staff Operational Endpoints
+### Task 2: Backend Email Verification & Staff Operational Endpoints
 
 **Files:**
 - Modify: `backend/routes/api.php`
@@ -128,8 +135,6 @@
 **Interfaces:**
 - Produces:
   - `POST /api/v1/auth/verify-email` (`{ email, token }`)
-  - `POST /api/v1/auth/forgot-password` (`{ email }`)
-  - `POST /api/v1/auth/reset-password` (`{ email, token, password, password_confirmation }`)
   - `DELETE /api/v1/events/{id}/registrations/{registrationId}` (Organizer/Admin cancel a student's registration with waiting list auto-promotion — `REG-009`)
   - `POST /api/v1/admin/students/{id}/qr/reissue` (Admin revoke & reissue student QR — `ADMIN-004`)
   - `POST /api/v1/events/{id}/attendance/mark` (Organizer/Admin create or correct attendance for an absent registered student — `ATT-011`)
@@ -173,14 +178,13 @@
 - Create: `mobile/lib/screens/common/profile_screen.dart`
 - Create: `mobile/lib/screens/common/notifications_screen.dart`
 - Create: `mobile/lib/screens/common/notification_preferences_screen.dart`
-- Create: `mobile/lib/screens/auth/forgot_password_screen.dart`
 - Modify: `mobile/lib/screens/student/student_dashboard_screen.dart`
 
 - [x] **Step 1: Upgrade `ApiClient` to use `FlutterSecureStorage` with fallback to `SharedPreferences` in tests**
-- [x] **Step 2: Implement `ProfileScreen` (view/edit profile fields, change password form) and `ForgotPasswordScreen`**
+- [x] **Step 2: Implement `ProfileScreen` (view/edit profile fields, change password form)**
 - [x] **Step 3: Implement `NotificationsScreen` (list notifications, mark read, mark all read) and `NotificationPreferencesScreen` (toggle 6 optional switches; show mandatory lock on critical alerts)**
 - [x] **Step 4: Wire AppBar icons in `StudentDashboardScreen` (and other dashboards) to open `NotificationsScreen` and `ProfileScreen`**
-- [x] **Step 5: Run Flutter analyzer and tests (`0` issues, `14/14` passing)**
+- [x] **Step 5: Run Flutter analyzer and tests (`0` issues, all passing)**
 
 ---
 
@@ -226,4 +230,3 @@
 - [x] **Step 2: Implement `UserManagementScreen`, `ActivityLogsScreen`, `StudentQrInspectScreen`, and Broadcast Announcement dialog on `AdminDashboardScreen`**
 - [x] **Step 3: Wire navigation from `ManagementDashboardScreen`, `OrganizerDashboardScreen`, and `AdminDashboardScreen`**
 - [x] **Step 4: Verify with `flutter analyze` and `flutter test`**
-

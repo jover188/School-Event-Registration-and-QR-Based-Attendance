@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
+import '../../core/navigation/app_destination.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/stat_metric_card.dart';
 import '../../core/widgets/status_badge.dart';
+import '../auth/account_input.dart';
 import '../auth/login_screen.dart';
+import '../common/notification_preferences_screen.dart';
 import '../common/notifications_screen.dart';
 import '../common/profile_screen.dart';
 import '../common/reports_screen.dart';
@@ -16,22 +23,163 @@ import 'activity_logs_screen.dart';
 import 'user_management_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({super.key});
+  final Map<String, dynamic>? initialCounts;
+  final Map<String, dynamic>? initialUsersByRole;
+  final Map<String, dynamic>? initialEventsByStatus;
+  final List<dynamic>? initialPendingEvents;
+  final String? initialErrorMessage;
+  final List<Map<String, dynamic>>? initialUsers;
+  final List<dynamic>? initialLogs;
+  final String initialDestinationId;
+
+  const AdminDashboardScreen({
+    super.key,
+    this.initialCounts,
+    this.initialUsersByRole,
+    this.initialEventsByStatus,
+    this.initialPendingEvents,
+    this.initialErrorMessage,
+    this.initialUsers,
+    this.initialLogs,
+    this.initialDestinationId = 'overview',
+  });
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  static const List<AppDestination> _destinations = [
+    AppDestination(
+      id: 'overview',
+      label: 'Overview',
+      icon: LucideIcons.layoutDashboard,
+      essential: true,
+    ),
+    AppDestination(
+      id: 'reviews',
+      label: 'Reviews',
+      icon: LucideIcons.folderCheck,
+      essential: true,
+    ),
+    AppDestination(
+      id: 'users',
+      label: 'Users',
+      icon: LucideIcons.users,
+    ),
+    AppDestination(
+      id: 'qr-records',
+      label: 'QR Records',
+      icon: LucideIcons.scanLine,
+      compactPrimary: false,
+    ),
+    AppDestination(
+      id: 'reports',
+      label: 'Reports',
+      icon: LucideIcons.chartBar,
+      compactPrimary: false,
+    ),
+    AppDestination(
+      id: 'activity',
+      label: 'Activity',
+      icon: LucideIcons.scrollText,
+      compactPrimary: false,
+    ),
+  ];
+
+  late String _selectedDestinationId = widget.initialDestinationId;
   bool _isLoading = true;
   String? _errorMessage;
   Map<String, dynamic> _stats = {};
+  Map<String, dynamic> _usersByRole = {};
+  Map<String, dynamic> _eventsByStatus = {};
   List<dynamic> _pendingEvents = [];
+
+  bool get _hasInitialFixtures =>
+      widget.initialCounts != null ||
+      widget.initialUsersByRole != null ||
+      widget.initialEventsByStatus != null ||
+      widget.initialPendingEvents != null ||
+      widget.initialErrorMessage != null;
 
   @override
   void initState() {
     super.initState();
-    _fetchAdminData();
+    if (_hasInitialFixtures) {
+      _isLoading = false;
+      _errorMessage = widget.initialErrorMessage;
+      _stats = Map<String, dynamic>.from(widget.initialCounts ?? const {});
+      _usersByRole = Map<String, dynamic>.from(
+        widget.initialUsersByRole ??
+            (widget.initialCounts?['users_by_role'] as Map?) ??
+            const {},
+      );
+      _eventsByStatus = Map<String, dynamic>.from(
+        widget.initialEventsByStatus ??
+            (widget.initialCounts?['events_by_status'] as Map?) ??
+            const {},
+      );
+      _pendingEvents =
+          List<dynamic>.from(widget.initialPendingEvents ?? const []);
+    } else {
+      _fetchAdminData();
+    }
+  }
+
+  int get _pendingCount {
+    final fromStats = (_stats['pending_event_approvals'] as num?)?.toInt() ??
+        (_stats['pending_approvals'] as num?)?.toInt();
+    return fromStats ?? _pendingEvents.length;
+  }
+
+  Map<String, dynamic> get _effectiveUsersByRole {
+    if (_usersByRole.isNotEmpty) return _usersByRole;
+    final derived = <String, dynamic>{};
+    if (_stats['total_students'] != null) {
+      derived['student'] = _stats['total_students'];
+    }
+    if (_stats['total_organizers'] != null) {
+      derived['organizer'] = _stats['total_organizers'];
+    }
+    if (_stats['total_admins'] != null) {
+      derived['administrator'] = _stats['total_admins'];
+    }
+    if (_stats['total_management'] != null) {
+      derived['management'] = _stats['total_management'];
+    }
+    return derived;
+  }
+
+  Map<String, dynamic> get _effectiveEventsByStatus {
+    if (_eventsByStatus.isNotEmpty) return _eventsByStatus;
+    final derived = <String, dynamic>{};
+    if (_stats['pending_event_approvals'] != null ||
+        _pendingEvents.isNotEmpty) {
+      derived['pending_approval'] = _pendingCount;
+    }
+    if (_stats['published_events'] != null) {
+      derived['published'] = _stats['published_events'];
+    }
+    if (_stats['ongoing_events'] != null) {
+      derived['ongoing'] = _stats['ongoing_events'];
+    }
+    if (_stats['completed_events'] != null) {
+      derived['completed'] = _stats['completed_events'];
+    }
+    return derived;
+  }
+
+  String get _shellTitle => switch (_selectedDestinationId) {
+        'reviews' => 'Publishing Reviews',
+        'users' => 'User Management',
+        'qr-records' => 'QR Records',
+        'reports' => 'Reports',
+        'activity' => 'Activity',
+        _ => 'Administrator Console',
+      };
+
+  void _selectDestination(String id) {
+    setState(() => _selectedDestinationId = id);
   }
 
   Future<void> _fetchAdminData() async {
@@ -47,10 +195,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     setState(() => _isLoading = false);
 
     if (response.success && response.data is Map<String, dynamic>) {
+      final data = response.data as Map<String, dynamic>;
       setState(() {
-        _stats = (response.data['stats'] as Map<String, dynamic>?) ?? {};
-        _pendingEvents =
-            (response.data['pending_approval_events'] as List?) ?? [];
+        _stats = (data['stats'] as Map<String, dynamic>?) ??
+            (data['counts'] as Map<String, dynamic>?) ??
+            {};
+        _usersByRole = (data['users_by_role'] as Map<String, dynamic>?) ??
+            (_stats['users_by_role'] as Map<String, dynamic>?) ??
+            {};
+        _eventsByStatus = (data['events_by_status'] as Map<String, dynamic>?) ??
+            (_stats['events_by_status'] as Map<String, dynamic>?) ??
+            {};
+        _pendingEvents = (data['pending_approval_events'] as List?) ?? [];
       });
     } else {
       setState(() {
@@ -60,13 +216,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  Future<void> _reviewEvent(int eventId, String action) async {
+  Future<void> _reviewEvent(Map<String, dynamic> event, String action) async {
+    final eventId = (event['id'] as num?)?.toInt();
+    if (eventId == null) return;
+    final eventTitle = event['title']?.toString() ?? 'Event #$eventId';
+
     final remarks = await showDialog<String>(
       context: context,
-      builder: (_) => _ReviewEventApprovalDialog(action: action),
+      builder: (_) => _ReviewEventApprovalDialog(
+        action: action,
+        eventTitle: eventTitle,
+      ),
     );
 
     if (remarks == null || !mounted) return;
+
+    if (_hasInitialFixtures) {
+      setState(() {
+        _pendingEvents.removeWhere(
+          (item) => item is Map && (item['id'] as num?)?.toInt() == eventId,
+        );
+        if (_stats.containsKey('pending_event_approvals')) {
+          _stats['pending_event_approvals'] = _pendingEvents.length;
+        }
+      });
+      final d = context.design;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: action == 'approved' ? d.success : d.mutedForeground,
+          content: Text(
+            remarks.isEmpty
+                ? 'Event publishing has been $action.'
+                : 'Event publishing has been $action: $remarks',
+          ),
+        ),
+      );
+      return;
+    }
 
     final response = await ApiClient().post(
       ApiConstants.adminReviewEvent(eventId),
@@ -78,20 +264,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     if (!mounted) return;
 
+    final d = context.design;
     if (response.success) {
       _fetchAdminData();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: action == 'approved'
-              ? AppColors.present
-              : AppColors.textSecondary,
+          backgroundColor: action == 'approved' ? d.success : d.mutedForeground,
           content: Text('Event publishing has been $action.'),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.absent,
+          backgroundColor: d.destructive,
           content: Text(response.message ?? 'Failed to review event.'),
         ),
       );
@@ -107,6 +292,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     if (payload == null || !mounted) return;
 
+    if (_hasInitialFixtures) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.design.success,
+          content: Text(
+            'Announcement "${payload.title}" queued for ${payload.targetRole}.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final response = await ApiClient().post(
       ApiConstants.adminAnnouncements,
       {
@@ -118,10 +315,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     if (!mounted) return;
 
+    final d = context.design;
     if (response.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.present,
+          backgroundColor: d.success,
           content: Text(
             response.message ?? 'System announcement broadcast successfully.',
           ),
@@ -130,7 +328,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.absent,
+          backgroundColor: d.destructive,
           content: Text(
             response.message ?? 'Failed to broadcast announcement.',
           ),
@@ -144,7 +342,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context,
       MaterialPageRoute(builder: (_) => const EventFormScreen()),
     );
-    if (created == true && mounted) {
+    if (created == true && mounted && !_hasInitialFixtures) {
       _fetchAdminData();
     }
   }
@@ -159,190 +357,345 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Administrator Console'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.campaign_outlined),
-            tooltip: 'Broadcast Announcement',
-            onPressed: _openBroadcastAnnouncementDialog,
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            tooltip: 'Notifications',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'My Profile',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh Console',
-            onPressed: _isLoading ? null : _fetchAdminData,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: _logout,
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null && _stats.isEmpty
-                ? ErrorStateView(
-                    message: _errorMessage!,
-                    onRetry: _fetchAdminData,
-                  )
-                : RefreshIndicator(
-                    onRefresh: _fetchAdminData,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Stat row
-                          Row(
-                            children: [
-                              Expanded(
-                                child: StatMetricCard(
-                                  label: 'Pending Approvals',
-                                  value:
-                                      '${_stats['pending_event_approvals'] ?? 0}',
-                                  icon: Icons.pending_actions_outlined,
-                                  color: AppColors.late,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm + 4),
-                              Expanded(
-                                child: StatMetricCard(
-                                  label: 'Total Users',
-                                  value: '${_stats['total_users'] ?? 0}',
-                                  icon: Icons.people_outline,
-                                  color: AppColors.primary,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const UserManagementScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
+  Widget _buildOverviewTab(BuildContext context) {
+    final d = context.design;
+    final hasAnyData = _stats.isNotEmpty ||
+        _usersByRole.isNotEmpty ||
+        _eventsByStatus.isNotEmpty ||
+        _pendingEvents.isNotEmpty;
 
-                          // Quick Administrative Modules
-                          const SectionHeader(
-                            title: 'Administrative Modules',
-                            subtitle:
-                                'Manage accounts, inspect audit logs, export reports, and broadcast notices',
-                          ),
-                          const SizedBox(height: AppSpacing.sm + 4),
-                          _AdminQuickActionsGrid(
-                            onOpenUsers: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const UserManagementScreen(),
-                                ),
-                              );
-                            },
-                            onOpenLogs: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const ActivityLogsScreen(),
-                                ),
-                              );
-                            },
-                            onOpenReports: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const ReportsScreen(),
-                                ),
-                              );
-                            },
-                            onCreateEvent: _openCreateEvent,
-                            onBroadcastAnnouncement:
-                                _openBroadcastAnnouncementDialog,
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
+    if (_isLoading && !hasAnyData) {
+      return Center(
+        child: Semantics(
+          label: 'Loading administrator overview',
+          child: const CircularProgressIndicator(),
+        ),
+      );
+    }
 
-                          // Pending Approvals Queue
-                          const SectionHeader(
-                            title: 'Event Approval Queue',
-                            subtitle:
-                                'Review organizer submissions before campus-wide publication',
-                          ),
-                          const SizedBox(height: AppSpacing.sm + 4),
+    if (_errorMessage != null && !hasAnyData) {
+      return AppResponsivePage(
+        child: ErrorStateView(
+          message: _errorMessage!,
+          onRetry: _fetchAdminData,
+        ),
+      );
+    }
 
-                          if (_pendingEvents.isEmpty)
-                            const Card(
-                              child: EmptyStateView(
-                                icon: Icons.verified_outlined,
-                                title: 'No events currently pending review.',
-                                message:
-                                    'All submitted organizer events have been processed.',
-                              ),
-                            )
-                          else
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _pendingEvents.length,
-                              itemBuilder: (ctx, i) {
-                                final event =
-                                    _pendingEvents[i] as Map<String, dynamic>;
-                                final eventId = (event['id'] as num).toInt();
-                                return _PendingApprovalEventCard(
-                                  event: event,
-                                  onApprove: () =>
-                                      _reviewEvent(eventId, 'approved'),
-                                  onReject: () =>
-                                      _reviewEvent(eventId, 'rejected'),
-                                );
-                              },
-                            ),
-                        ],
-                      ),
+    final roleBreakdown = _effectiveUsersByRole;
+    final eventBreakdown = _effectiveEventsByStatus;
+
+    return RefreshIndicator(
+      onRefresh: _fetchAdminData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: AppResponsivePage(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_errorMessage != null) ...[
+                Container(
+                  padding: EdgeInsets.all(d.md),
+                  decoration: BoxDecoration(
+                    color: d.warningBackground,
+                    borderRadius: BorderRadius.circular(d.radiusCard),
+                    border: Border.all(
+                      color: d.warning.withValues(alpha: 0.35),
                     ),
                   ),
+                  child: Wrap(
+                    spacing: d.sm,
+                    runSpacing: d.sm,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: WrapAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _errorMessage!,
+                        style: d.supporting.copyWith(color: d.warning),
+                      ),
+                      AppButton(
+                        variant: AppButtonVariant.outline,
+                        label: 'Retry',
+                        icon: Icons.refresh,
+                        onPressed: _fetchAdminData,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: d.md),
+              ],
+              const SectionHeader(
+                title: 'Administrative Operations',
+                subtitle:
+                    'Create campus events, broadcast notices, review submissions, and manage accounts',
+              ),
+              SizedBox(height: d.gap),
+              _AdminQuickActionsGrid(
+                pendingReviewsCount: _pendingCount,
+                onOpenReviews: () => _selectDestination('reviews'),
+                onOpenUsers: () => _selectDestination('users'),
+                onOpenQrRecords: () => _selectDestination('qr-records'),
+                onOpenLogs: () => _selectDestination('activity'),
+                onOpenReports: () => _selectDestination('reports'),
+                onCreateEvent: _openCreateEvent,
+                onBroadcastAnnouncement: _openBroadcastAnnouncementDialog,
+              ),
+              SizedBox(height: d.lg),
+              const SectionHeader(
+                title: 'System Metrics',
+                subtitle: 'Current platform activity and identity counts',
+              ),
+              SizedBox(height: d.gap),
+              ResponsiveGrid(
+                children: [
+                  StatMetricCard(
+                    label: 'Pending Approvals',
+                    value: '$_pendingCount',
+                    icon: Icons.pending_actions_outlined,
+                    color: d.warning,
+                    onTap: () => _selectDestination('reviews'),
+                  ),
+                  StatMetricCard(
+                    label: 'Total Users',
+                    value: '${_stats['total_users'] ?? 0}',
+                    icon: Icons.people_outline,
+                    color: d.primary,
+                    onTap: () => _selectDestination('users'),
+                  ),
+                  StatMetricCard(
+                    label: 'Students',
+                    value:
+                        '${_stats['total_students'] ?? roleBreakdown['student'] ?? 0}',
+                    icon: Icons.school_outlined,
+                    color: d.information,
+                    onTap: () => _selectDestination('qr-records'),
+                  ),
+                  StatMetricCard(
+                    label: 'Active QR Codes',
+                    value:
+                        '${_stats['active_permanent_qrs'] ?? _stats['active_qrs'] ?? 0}',
+                    icon: Icons.qr_code_2_outlined,
+                    color: d.success,
+                    onTap: () => _selectDestination('qr-records'),
+                  ),
+                ],
+              ),
+              if (roleBreakdown.isNotEmpty) ...[
+                SizedBox(height: d.lg),
+                const SectionHeader(
+                  title: 'Users by Role',
+                  subtitle: 'Distribution across fixed RBAC roles',
+                ),
+                SizedBox(height: d.gap),
+                _BreakdownSectionCard(
+                  entries: roleBreakdown,
+                  isStatusBadge: false,
+                ),
+              ],
+              if (eventBreakdown.isNotEmpty) ...[
+                SizedBox(height: d.lg),
+                const SectionHeader(
+                  title: 'Events by Status',
+                  subtitle: 'Campus event lifecycle breakdown',
+                ),
+                SizedBox(height: d.gap),
+                _BreakdownSectionCard(
+                  entries: eventBreakdown,
+                  isStatusBadge: true,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewsTab(BuildContext context) {
+    final d = context.design;
+
+    if (_isLoading && _pendingEvents.isEmpty) {
+      return Center(
+        child: Semantics(
+          label: 'Loading event publishing review queue',
+          child: const CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_errorMessage != null && _pendingEvents.isEmpty && _stats.isEmpty) {
+      return AppResponsivePage(
+        child: ErrorStateView(
+          message: _errorMessage!,
+          onRetry: _fetchAdminData,
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchAdminData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: AppResponsivePage(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeader(
+                title: 'Event Approval Queue',
+                subtitle:
+                    'Review organizer submissions before campus-wide publication (${_pendingEvents.length} pending)',
+              ),
+              SizedBox(height: d.gap),
+              if (_pendingEvents.isEmpty)
+                Container(
+                  decoration: BoxDecoration(
+                    color: d.card,
+                    borderRadius: BorderRadius.circular(d.radiusCard),
+                    border: Border.all(color: d.border),
+                  ),
+                  child: const EmptyStateView(
+                    icon: Icons.verified_outlined,
+                    title: 'No events currently pending review.',
+                    message:
+                        'All submitted organizer events have been processed.',
+                  ),
+                )
+              else
+                ResponsiveGrid(
+                  minItemWidth: 340,
+                  maxColumns: 2,
+                  spacing: d.md,
+                  children: [
+                    for (final rawEvent in _pendingEvents)
+                      if (rawEvent is Map)
+                        _PendingApprovalEventCard(
+                          event: Map<String, dynamic>.from(rawEvent),
+                          onApprove: () => _reviewEvent(
+                            Map<String, dynamic>.from(rawEvent),
+                            'approved',
+                          ),
+                          onReject: () => _reviewEvent(
+                            Map<String, dynamic>.from(rawEvent),
+                            'rejected',
+                          ),
+                        ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppShell(
+      title: _shellTitle,
+      destinations: _destinations,
+      selectedId: _selectedDestinationId,
+      onDestinationSelected: _selectDestination,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          tooltip: 'Notifications',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            );
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Refresh Console',
+          onPressed: _isLoading ? null : _fetchAdminData,
+        ),
+        PopupMenuButton<String>(
+          key: const ValueKey<String>('admin-account-menu'),
+          tooltip: 'Account & Profile Menu',
+          icon: const Icon(Icons.person_outline),
+          onSelected: (value) {
+            switch (value) {
+              case 'profile':
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              case 'preferences':
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationPreferencesScreen(),
+                  ),
+                );
+              case 'logout':
+                _logout();
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem<String>(
+              value: 'profile',
+              child: Text('My Profile'),
+            ),
+            PopupMenuItem<String>(
+              value: 'preferences',
+              child: Text('Notification Preferences'),
+            ),
+            PopupMenuItem<String>(
+              value: 'logout',
+              child: Text('Logout'),
+            ),
+          ],
+        ),
+      ],
+      body: AppDestinationStack(
+        selectedId: _selectedDestinationId,
+        builders: {
+          'overview': _buildOverviewTab,
+          'reviews': _buildReviewsTab,
+          'users': (_) => UserManagementScreen(
+                key: const ValueKey<String>('admin-embedded-users'),
+                embedded: true,
+                initialUsers: widget.initialUsers,
+              ),
+          'qr-records': (_) => UserManagementScreen(
+                key: const ValueKey<String>('admin-embedded-qr-records'),
+                embedded: true,
+                initialRoleFilter: 'student',
+                qrInspectMode: true,
+                initialUsers: widget.initialUsers,
+              ),
+          'reports': (_) => const ReportsScreen(
+                key: ValueKey<String>('admin-embedded-reports'),
+                embedded: true,
+              ),
+          'activity': (_) => ActivityLogsScreen(
+                key: const ValueKey<String>('admin-embedded-activity'),
+                embedded: true,
+                initialLogs: widget.initialLogs,
+              ),
+        },
       ),
     );
   }
 }
 
 class _AdminQuickActionsGrid extends StatelessWidget {
+  final int pendingReviewsCount;
+  final VoidCallback onOpenReviews;
   final VoidCallback onOpenUsers;
+  final VoidCallback onOpenQrRecords;
   final VoidCallback onOpenLogs;
   final VoidCallback onOpenReports;
   final VoidCallback onCreateEvent;
   final VoidCallback onBroadcastAnnouncement;
 
   const _AdminQuickActionsGrid({
+    required this.pendingReviewsCount,
+    required this.onOpenReviews,
     required this.onOpenUsers,
+    required this.onOpenQrRecords,
     required this.onOpenLogs,
     required this.onOpenReports,
     required this.onCreateEvent,
@@ -351,41 +704,115 @@ class _AdminQuickActionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
+      spacing: d.sm,
+      runSpacing: d.sm,
       children: [
-        OutlinedButton.icon(
-          key: const ValueKey<String>('admin-nav-users'),
-          onPressed: onOpenUsers,
-          icon: const Icon(Icons.manage_accounts_outlined),
-          label: const Text('User Management'),
-        ),
-        OutlinedButton.icon(
-          key: const ValueKey<String>('admin-nav-logs'),
-          onPressed: onOpenLogs,
-          icon: const Icon(Icons.history_edu_outlined),
-          label: const Text('Activity Logs'),
-        ),
-        OutlinedButton.icon(
-          key: const ValueKey<String>('admin-nav-reports'),
-          onPressed: onOpenReports,
-          icon: const Icon(Icons.analytics_outlined),
-          label: const Text('Reports & Exports'),
-        ),
-        OutlinedButton.icon(
+        AppButton(
           key: const ValueKey<String>('admin-nav-create-event'),
           onPressed: onCreateEvent,
-          icon: const Icon(Icons.add_circle_outline),
-          label: const Text('Create Event'),
+          icon: Icons.add_circle_outline,
+          label: 'Create Event',
         ),
-        ElevatedButton.icon(
+        AppButton(
           key: const ValueKey<String>('admin-nav-broadcast'),
+          variant: AppButtonVariant.outline,
           onPressed: onBroadcastAnnouncement,
-          icon: const Icon(Icons.campaign_outlined),
-          label: const Text('Broadcast Announcement'),
+          icon: Icons.campaign_outlined,
+          label: 'Broadcast Announcement',
+        ),
+        AppButton(
+          key: const ValueKey<String>('admin-nav-reviews'),
+          variant: AppButtonVariant.outline,
+          onPressed: onOpenReviews,
+          icon: Icons.rule_folder_outlined,
+          label: 'Publishing Reviews ($pendingReviewsCount)',
+        ),
+        AppButton(
+          key: const ValueKey<String>('admin-nav-users'),
+          variant: AppButtonVariant.outline,
+          onPressed: onOpenUsers,
+          icon: Icons.manage_accounts_outlined,
+          label: 'User Management',
+        ),
+        AppButton(
+          key: const ValueKey<String>('admin-nav-qr-records'),
+          variant: AppButtonVariant.outline,
+          onPressed: onOpenQrRecords,
+          icon: Icons.qr_code_scanner_outlined,
+          label: 'QR Records',
+        ),
+        AppButton(
+          key: const ValueKey<String>('admin-nav-reports'),
+          variant: AppButtonVariant.outline,
+          onPressed: onOpenReports,
+          icon: Icons.analytics_outlined,
+          label: 'Reports & Exports',
+        ),
+        AppButton(
+          key: const ValueKey<String>('admin-nav-logs'),
+          variant: AppButtonVariant.outline,
+          onPressed: onOpenLogs,
+          icon: Icons.history_edu_outlined,
+          label: 'Activity Logs',
         ),
       ],
+    );
+  }
+}
+
+class _BreakdownSectionCard extends StatelessWidget {
+  final Map<String, dynamic> entries;
+  final bool isStatusBadge;
+
+  const _BreakdownSectionCard({
+    required this.entries,
+    required this.isStatusBadge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
+      ),
+      child: Wrap(
+        spacing: d.md,
+        runSpacing: d.sm,
+        children: [
+          for (final entry in entries.entries)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: d.gap, vertical: d.sm),
+              decoration: BoxDecoration(
+                color: d.muted,
+                borderRadius: BorderRadius.circular(d.radiusControl),
+                border: Border.all(color: d.border),
+              ),
+              child: Wrap(
+                spacing: d.sm,
+                runSpacing: d.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  StatusBadge(
+                    status: isStatusBadge ? entry.key : 'completed',
+                    label: entry.key.replaceAll('_', ' ').toUpperCase(),
+                    showIcon: isStatusBadge,
+                  ),
+                  Text(
+                    '${entry.value}',
+                    style: d.cardTitle,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -403,65 +830,72 @@ class _PendingApprovalEventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm + 4),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    event['title']?.toString() ?? '',
-                    style: AppTypography.subtitle.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                StatusBadge(
-                  status: event['status']?.toString() ?? 'pending_approval',
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xs + 2),
-            Text(
-              'Venue: ${event['venue']} • Date: ${event['event_date']}',
-              style: AppTypography.bodyMuted,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Organizer: ${event['organizer']?['email'] ?? 'N/A'}',
-              style: AppTypography.caption,
-            ),
-            const Divider(height: AppSpacing.lg),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: onReject,
-                  child: const Text(
-                    'Reject',
-                    style: TextStyle(color: AppColors.absent),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.present,
-                  ),
-                  onPressed: onApprove,
-                  child: const Text('Approve & Publish'),
-                ),
-              ],
-            ),
-          ],
-        ),
+    final d = context.design;
+    final eventId = (event['id'] as num?)?.toInt() ?? 0;
+    final title = event['title']?.toString() ?? 'Untitled Event';
+    final status = event['status']?.toString() ?? 'pending_approval';
+    final venue = event['venue']?.toString() ?? 'TBA';
+    final eventDate = event['event_date']?.toString() ?? 'TBA';
+    final organizerMap = event['organizer'] is Map
+        ? Map<String, dynamic>.from(event['organizer'] as Map)
+        : null;
+    final organizerEmail =
+        organizerMap?['email']?.toString() ?? event['organizer_email']?.toString() ?? 'N/A';
+
+    return Container(
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Wrap(
+            spacing: d.sm,
+            runSpacing: d.xs,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(title, style: d.cardTitle),
+              StatusBadge(status: status),
+            ],
+          ),
+          SizedBox(height: d.sm),
+          Text(
+            'Venue: $venue • Date: $eventDate',
+            style: d.supporting.copyWith(color: d.foreground),
+          ),
+          SizedBox(height: d.xs),
+          Text(
+            'Organizer: $organizerEmail',
+            style: d.supporting,
+          ),
+          const Divider(),
+          Wrap(
+            spacing: d.sm,
+            runSpacing: d.sm,
+            alignment: WrapAlignment.end,
+            children: [
+              AppButton(
+                key: ValueKey<String>('reject-event-$eventId'),
+                variant: AppButtonVariant.destructive,
+                icon: Icons.close_rounded,
+                label: 'Reject',
+                onPressed: onReject,
+              ),
+              AppButton(
+                key: ValueKey<String>('approve-event-$eventId'),
+                variant: AppButtonVariant.primary,
+                icon: Icons.check_circle_outline,
+                label: 'Approve & Publish',
+                onPressed: onApprove,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -469,8 +903,12 @@ class _PendingApprovalEventCard extends StatelessWidget {
 
 class _ReviewEventApprovalDialog extends StatefulWidget {
   final String action;
+  final String eventTitle;
 
-  const _ReviewEventApprovalDialog({required this.action});
+  const _ReviewEventApprovalDialog({
+    required this.action,
+    required this.eventTitle,
+  });
 
   @override
   State<_ReviewEventApprovalDialog> createState() =>
@@ -490,35 +928,56 @@ class _ReviewEventApprovalDialogState
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     final isApprove = widget.action == 'approved';
     return AlertDialog(
       title: Text('${isApprove ? 'Approve' : 'Reject'} Event?'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Confirm ${widget.action} of event publishing.'),
-          const SizedBox(height: AppSpacing.sm + 4),
-          TextField(
-            controller: _remarksController,
-            decoration: const InputDecoration(
-              labelText: 'Remarks (Optional)',
-              hintText: 'Add review notes for the organizer',
-            ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Confirm ${widget.action} of "${widget.eventTitle}".',
+                style: d.body,
+              ),
+              SizedBox(height: d.gap),
+              AccountInput(
+                key: const ValueKey<String>('review-remarks-field'),
+                controller: _remarksController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Remarks (Optional)',
+                  hintText: 'Add review notes for the organizer',
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isApprove ? AppColors.present : AppColors.absent,
-          ),
-          onPressed: () =>
-              Navigator.pop(context, _remarksController.text.trim()),
-          child: Text(widget.action.toUpperCase()),
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.sm,
+          alignment: WrapAlignment.end,
+          children: [
+            AppButton(
+              variant: AppButtonVariant.ghost,
+              onPressed: () => Navigator.pop(context),
+              label: 'Cancel',
+            ),
+            AppButton(
+              key: ValueKey<String>('confirm-review-${widget.action}'),
+              variant: isApprove
+                  ? AppButtonVariant.primary
+                  : AppButtonVariant.destructive,
+              onPressed: () =>
+                  Navigator.pop(context, _remarksController.text.trim()),
+              label: widget.action.toUpperCase(),
+            ),
+          ],
         ),
       ],
     );
@@ -577,106 +1036,128 @@ class _BroadcastAnnouncementDialogState
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return AlertDialog(
       title: const Text('Broadcast System Announcement'),
-      content: FocusTraversalGroup(
-        child: AutofillGroup(
-          child: Form(
-            key: _formKey,
-            autovalidateMode: _autovalidateMode,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DropdownButtonFormField<String>(
-                    key: const ValueKey<String>('announcement-target-role'),
-                    initialValue: _targetRole,
-                    decoration: const InputDecoration(
-                      labelText: 'Target Audience Role',
-                      helperText: ' ',
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: FocusTraversalGroup(
+          child: AutofillGroup(
+            child: Form(
+              key: _formKey,
+              autovalidateMode: _autovalidateMode,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      key: const ValueKey<String>('announcement-target-role'),
+                      isExpanded: true,
+                      initialValue: _targetRole,
+                      decoration: const InputDecoration(
+                        labelText: 'Target Audience Role',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'all',
+                          child: Text(
+                            'All Active Users',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'student',
+                          child: Text(
+                            'Students Only',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'organizer',
+                          child: Text(
+                            'Event Organizers Only',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'management',
+                          child: Text(
+                            'School Management Only',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _targetRole = val);
+                        }
+                      },
                     ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'all',
-                        child: Text('All Active Users'),
+                    SizedBox(height: d.gap),
+                    AccountInput(
+                      key: const ValueKey<String>('announcement-title-field'),
+                      controller: _titleController,
+                      focusNode: _titleFocus,
+                      textInputAction: TextInputAction.next,
+                      keyboardType: TextInputType.text,
+                      autofillHints: const [AutofillHints.name],
+                      decoration: const InputDecoration(
+                        labelText: 'Announcement Title',
+                        hintText: 'e.g. Campus Maintenance Schedule',
                       ),
-                      DropdownMenuItem(
-                        value: 'student',
-                        child: Text('Students Only'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'organizer',
-                        child: Text('Event Organizers Only'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'management',
-                        child: Text('School Management Only'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _targetRole = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('announcement-title-field'),
-                    controller: _titleController,
-                    focusNode: _titleFocus,
-                    autofocus: true,
-                    textInputAction: TextInputAction.next,
-                    keyboardType: TextInputType.text,
-                    autofillHints: const [AutofillHints.name],
-                    decoration: const InputDecoration(
-                      labelText: 'Announcement Title',
-                      hintText: 'e.g. Campus Maintenance Schedule',
-                      helperText: ' ',
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Title is required.';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Title is required.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('announcement-message-field'),
-                    controller: _messageController,
-                    focusNode: _messageFocus,
-                    maxLines: 3,
-                    textInputAction: TextInputAction.done,
-                    keyboardType: TextInputType.multiline,
-                    autofillHints: const [AutofillHints.name],
-                    onFieldSubmitted: (_) => _submit(),
-                    decoration: const InputDecoration(
-                      labelText: 'Announcement Message',
-                      hintText: 'Enter announcement body text',
-                      helperText: ' ',
+                    SizedBox(height: d.gap),
+                    AccountInput(
+                      key: const ValueKey<String>('announcement-message-field'),
+                      controller: _messageController,
+                      focusNode: _messageFocus,
+                      maxLines: 3,
+                      textInputAction: TextInputAction.done,
+                      keyboardType: TextInputType.multiline,
+                      autofillHints: const [AutofillHints.name],
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: const InputDecoration(
+                        labelText: 'Announcement Message',
+                        hintText: 'Enter announcement body text',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Message body is required.';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Message body is required.';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _submit,
-          child: const Text('Send Broadcast'),
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.sm,
+          alignment: WrapAlignment.end,
+          children: [
+            AppButton(
+              variant: AppButtonVariant.ghost,
+              onPressed: () => Navigator.pop(context),
+              label: 'Cancel',
+            ),
+            AppButton(
+              key: const ValueKey<String>('send-broadcast-button'),
+              onPressed: _submit,
+              label: 'Send Broadcast',
+            ),
+          ],
         ),
       ],
     );

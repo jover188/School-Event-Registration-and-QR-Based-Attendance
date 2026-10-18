@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'app_pressable.dart';
 
 /// Reusable KPI / metric summary card with accessible container semantics.
 class StatMetricCard extends StatelessWidget {
@@ -22,77 +23,77 @@ class StatMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     final semanticSummary = subtitle != null
         ? '$label: $value, $subtitle'
         : '$label: $value';
 
     final content = Container(
-      padding: const EdgeInsets.symmetric(
-        vertical: AppSpacing.sm + 4,
-        horizontal: AppSpacing.sm + 2,
-      ),
+      padding: EdgeInsets.all(d.md),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: EdgeInsets.all(d.sm),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(d.sm),
             ),
-            child: Icon(icon, size: 18, color: color),
+            child: Icon(icon, size: 18, weight: 300, color: color),
           ),
-          const SizedBox(height: AppSpacing.xs + 2),
+          SizedBox(height: d.sm),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 18,
+            style: d.sectionTitle.copyWith(
               fontWeight: FontWeight.w700,
-              color: color,
+              color: d.foreground,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: d.xs),
           Text(
             label,
-            style: AppTypography.caption.copyWith(
-              color: AppColors.textSecondary,
-              fontSize: 11,
+            style: d.supporting.copyWith(
+              color: d.mutedForeground,
+              fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
+            softWrap: true,
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 2),
             Text(
               subtitle!,
-              style: AppTypography.caption.copyWith(fontSize: 10),
+              style: d.badge.copyWith(
+                color: d.mutedForeground,
+                fontWeight: FontWeight.w400,
+              ),
               textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
+              softWrap: true,
             ),
           ],
         ],
       ),
     );
 
+    if (onTap != null) {
+      return AppPressable(
+        semanticLabel: semanticSummary,
+        onPressed: onTap,
+        child: content,
+      );
+    }
+
     return Semantics(
       container: true,
-      button: onTap != null,
       label: semanticSummary,
-      child: onTap != null
-          ? InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              child: content,
-            )
-          : content,
+      child: content,
     );
   }
 }
+

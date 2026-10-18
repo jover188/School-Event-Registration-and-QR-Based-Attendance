@@ -62,7 +62,7 @@
 - [x] Cross-platform targets configured (`linux`, `android`, `web`) and building cleanly on Linux desktop
 - [x] `main.dart` — persistent login routing by role + global single-session termination dialog
 - [x] `api_client.dart` & `api_constants.dart` — Bearer token auth, multipart upload, 401 session callback
-- [x] `login_screen.dart` & `forgot_password_screen.dart` — wired to `/api/v1/auth/login`, `/api/v1/auth/forgot-password`, `/api/v1/auth/reset-password`, and `/api/v1/auth/verify-email` (self-registration removed in favor of institutional pre-provisioning)
+- [x] `login_screen.dart` — wired to `/api/v1/auth/login` (self-registration and self-service forgot-password removed in favor of school SIS integration and seeded demo accounts)
 - [x] `student_dashboard_screen.dart` — wired to `/api/v1/dashboard/student` and `/api/v1/events`
 - [x] `permanent_qr_screen.dart` — wired to `GET /api/v1/student/qr` and `POST /api/v1/student/qr/reissue` with `QrImageView`
 - [x] `event_detail_screen.dart` — wired to `GET /api/v1/events/{id}`, `POST /api/v1/events/{id}/register`, and `DELETE /api/v1/events/{id}/cancel-registration`
@@ -82,8 +82,8 @@
   - Add CSV streaming branches in `ReportController::export()` for `registration_summary`, `participation_summary`, and `organizer_summary`.
   - Include non-attending registered students as `status: "absent"` in `ReportController::eventAttendance()`.
   - Support `date_from`, `date_to`, `department`, `year_level`, and `status` filtering on report endpoints.
-- [x] **Email Verification & Self-Service Password Reset Endpoints:**
-  - Implement `POST /api/v1/auth/verify-email`, `POST /api/v1/auth/forgot-password`, and `POST /api/v1/auth/reset-password`.
+- [x] **Email Verification & Institutional SIS Account Provisioning (`DemoSchoolDataSeeder`):**
+  - Implement `POST /api/v1/auth/verify-email` and comprehensive demo dataset seeder (`DemoSchoolDataSeeder`) while omitting self-service forgot/reset password endpoints in favor of school SIS integration.
 - [x] **Staff & Admin Operational Endpoints:**
   - Allow Organizer/Admin to cancel a student's registration (`REG-009`), mark/correct attendance for absent registered students (`ATT-011`), reissue/revoke student QR as Admin (`ADMIN-004`), and broadcast Admin announcements (`NOTIF-002`).
 - [x] **FCM Push Notification Service (`NotificationService`):**

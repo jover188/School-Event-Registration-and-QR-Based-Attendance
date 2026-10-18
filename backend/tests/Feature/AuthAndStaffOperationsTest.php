@@ -67,39 +67,6 @@ class AuthAndStaffOperationsTest extends TestCase
         $loginAfter->assertStatus(200);
     }
 
-    public function test_forgot_password_and_reset_password_workflow(): void
-    {
-        $studentUser = User::where('role_id', 3)->first();
-        $email = $studentUser->email;
-
-        // 1. Request reset token
-        $forgotResp = $this->postJson('/api/v1/auth/forgot-password', [
-            'email' => $email,
-        ]);
-        $forgotResp->assertStatus(200)
-            ->assertJsonPath('success', true);
-
-        $plainToken = $forgotResp->json('data.reset_token');
-        $this->assertNotEmpty($plainToken);
-
-        // 2. Reset password with token
-        $resetResp = $this->postJson('/api/v1/auth/reset-password', [
-            'email' => $email,
-            'token' => $plainToken,
-            'password' => 'ResetPass@999',
-            'password_confirmation' => 'ResetPass@999',
-        ]);
-        $resetResp->assertStatus(200)
-            ->assertJsonPath('success', true);
-
-        // 3. Login with new password succeeds
-        $loginResp = $this->postJson('/api/v1/auth/login', [
-            'login' => $email,
-            'password' => 'ResetPass@999',
-        ]);
-        $loginResp->assertStatus(200);
-    }
-
     public function test_staff_can_cancel_registration_and_promote_waiting_list(): void
     {
         $orgLogin = $this->postJson('/api/v1/auth/login', [

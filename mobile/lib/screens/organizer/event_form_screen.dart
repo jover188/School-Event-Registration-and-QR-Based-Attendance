@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/event_model.dart';
@@ -180,14 +183,20 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
   }
 
-  Future<void> _pickTime(TextEditingController controller, String fieldKey) async {
+  Future<void> _pickTime(
+    TextEditingController controller,
+    String fieldKey,
+  ) async {
     final parts = controller.text.trim().split(':');
     final hour = parts.isNotEmpty ? (int.tryParse(parts[0]) ?? 9) : 9;
     final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
 
     final picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: hour.clamp(0, 23), minute: minute.clamp(0, 59)),
+      initialTime: TimeOfDay(
+        hour: hour.clamp(0, 23),
+        minute: minute.clamp(0, 59),
+      ),
     );
     if (picked != null && mounted) {
       final hh = picked.hour.toString().padLeft(2, '0');
@@ -380,241 +389,149 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
   }
 
+  InputDecoration _inputDecoration({
+    required String hintText,
+    required IconData prefixIcon,
+    String? helperText,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      prefixIcon: Icon(prefixIcon),
+      suffixIcon: suffixIcon,
+      helperText: helperText ?? ' ',
+      helperMaxLines: 3,
+      errorMaxLines: 3,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Event' : 'Create Event'),
-      ),
-      body: SafeArea(
-        child: FocusTraversalGroup(
-          child: AutofillGroup(
-            child: Form(
-              key: _formKey,
-              autovalidateMode: _autovalidateMode,
-              child: ListView(
-                padding: const EdgeInsets.all(AppSpacing.md),
+    final d = context.design;
+
+    return AppPageScaffold(
+      title: _isEditing ? 'Edit Event' : 'Create Event',
+      maxWidth: 720,
+      body: FocusTraversalGroup(
+        child: AutofillGroup(
+          child: Form(
+            key: _formKey,
+            autovalidateMode: _autovalidateMode,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom + d.xl,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (_isEditing) ...[
                     _EventStatusBanner(status: _currentStatus),
-                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(height: d.md),
                   ],
-                  const SectionHeader(
-                    title: 'Event Details',
-                    subtitle: 'Provide official event title, description, and venue',
-                  ),
-                  const SizedBox(height: AppSpacing.sm + 4),
-                  TextFormField(
-                    key: const ValueKey<String>('event-title-field'),
-                    controller: _titleController,
-                    focusNode: _titleFocus,
-                    autofocus: !_isEditing,
-                    textInputAction: TextInputAction.next,
-                    keyboardType: TextInputType.text,
-                    autofillHints: const [AutofillHints.name],
-                    forceErrorText: _fieldServerErrors['title'],
-                    onChanged: (_) {
-                      if (_fieldServerErrors.containsKey('title')) {
-                        setState(() => _fieldServerErrors.remove('title'));
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Event Title',
-                      hintText: 'e.g. Annual IT Cybersecurity Symposium',
-                      prefixIcon: Icon(Icons.event_note_outlined),
-                      helperText: ' ',
+
+                  // Section 1: Event Details
+                  _FormSectionCard(
+                    header: const SectionHeader(
+                      title: 'Event Details',
+                      subtitle:
+                          'Provide official event title, description, and venue',
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Event title is required.';
-                      }
-                      if (value.trim().length > 200) {
-                        return 'Title cannot exceed 200 characters.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('event-description-field'),
-                    controller: _descriptionController,
-                    focusNode: _descriptionFocus,
-                    maxLines: 3,
-                    textInputAction: TextInputAction.next,
-                    keyboardType: TextInputType.multiline,
-                    autofillHints: const [AutofillHints.name],
-                    forceErrorText: _fieldServerErrors['description'],
-                    onChanged: (_) {
-                      if (_fieldServerErrors.containsKey('description')) {
-                        setState(() => _fieldServerErrors.remove('description'));
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Event Description',
-                      hintText: 'Describe the agenda, speakers, and target participants',
-                      prefixIcon: Icon(Icons.description_outlined),
-                      helperText: ' ',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Event description is required.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('event-venue-field'),
-                    controller: _venueController,
-                    focusNode: _venueFocus,
-                    textInputAction: TextInputAction.next,
-                    keyboardType: TextInputType.streetAddress,
-                    autofillHints: const [AutofillHints.location],
-                    forceErrorText: _fieldServerErrors['venue'],
-                    onChanged: (_) {
-                      if (_fieldServerErrors.containsKey('venue')) {
-                        setState(() => _fieldServerErrors.remove('venue'));
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Venue',
-                      hintText: 'e.g. University Main Auditorium',
-                      prefixIcon: Icon(Icons.location_on_outlined),
-                      helperText: ' ',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Venue is required.';
-                      }
-                      if (value.trim().length > 200) {
-                        return 'Venue cannot exceed 200 characters.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  const SectionHeader(
-                    title: 'Schedule & Registration Window',
-                    subtitle: 'Configure event date, start/end times, and cutoff window',
-                  ),
-                  const SizedBox(height: AppSpacing.sm + 4),
-                  TextFormField(
-                    key: const ValueKey<String>('event-date-field'),
-                    controller: _eventDateController,
-                    focusNode: _eventDateFocus,
-                    textInputAction: TextInputAction.next,
-                    keyboardType: TextInputType.datetime,
-                    autofillHints: const [AutofillHints.birthday],
-                    forceErrorText: _fieldServerErrors['event_date'],
-                    onChanged: (_) {
-                      if (_fieldServerErrors.containsKey('event_date')) {
-                        setState(() => _fieldServerErrors.remove('event_date'));
-                      }
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Event Date (YYYY-MM-DD)',
-                      hintText: '2026-11-15',
-                      prefixIcon: const Icon(Icons.calendar_today_outlined),
-                      helperText: ' ',
-                      suffixIcon: IconButton(
-                        tooltip: 'Pick Event Date',
-                        icon: const Icon(Icons.date_range_outlined),
-                        onPressed: _pickEventDate,
-                      ),
-                    ),
-                    validator: (value) {
-                      final trimmed = value?.trim() ?? '';
-                      if (trimmed.isEmpty) {
-                        return 'Event date is required.';
-                      }
-                      if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) {
-                        return 'Use YYYY-MM-DD format.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
+                      _LabeledEventField(
+                        label: 'Event Title',
                         child: TextFormField(
-                          key: const ValueKey<String>('event-start-time-field'),
-                          controller: _startTimeController,
-                          focusNode: _startTimeFocus,
+                          key: const ValueKey<String>('event-title-field'),
+                          controller: _titleController,
+                          focusNode: _titleFocus,
+                          autofocus: !_isEditing,
                           textInputAction: TextInputAction.next,
-                          keyboardType: TextInputType.datetime,
+                          keyboardType: TextInputType.text,
                           autofillHints: const [AutofillHints.name],
-                          forceErrorText: _fieldServerErrors['start_time'],
+                          forceErrorText: _fieldServerErrors['title'],
                           onChanged: (_) {
-                            if (_fieldServerErrors.containsKey('start_time')) {
+                            if (_fieldServerErrors.containsKey('title')) {
                               setState(
-                                () => _fieldServerErrors.remove('start_time'),
+                                () => _fieldServerErrors.remove('title'),
                               );
                             }
                           },
-                          decoration: InputDecoration(
-                            labelText: 'Start Time (HH:MM:SS)',
-                            hintText: '09:00:00',
-                            prefixIcon: const Icon(Icons.access_time_outlined),
-                            helperText: ' ',
-                            suffixIcon: IconButton(
-                              tooltip: 'Pick Start Time',
-                              icon: const Icon(Icons.schedule_outlined),
-                              onPressed: () =>
-                                  _pickTime(_startTimeController, 'start_time'),
-                            ),
+                          decoration: _inputDecoration(
+                            hintText: 'e.g. Annual IT Cybersecurity Symposium',
+                            prefixIcon: Icons.event_note_outlined,
                           ),
                           validator: (value) {
-                            final trimmed = value?.trim() ?? '';
-                            if (trimmed.isEmpty) {
-                              return 'Start time required.';
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Event title is required.';
                             }
-                            if (!RegExp(r'^\d{2}:\d{2}(:\d{2})?$')
-                                .hasMatch(trimmed)) {
-                              return 'Use HH:MM:SS.';
+                            if (value.trim().length > 200) {
+                              return 'Title cannot exceed 200 characters.';
                             }
                             return null;
                           },
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
+                      SizedBox(height: d.xs),
+                      _LabeledEventField(
+                        label: 'Event Description',
                         child: TextFormField(
-                          key: const ValueKey<String>('event-end-time-field'),
-                          controller: _endTimeController,
-                          focusNode: _endTimeFocus,
+                          key: const ValueKey<String>(
+                            'event-description-field',
+                          ),
+                          controller: _descriptionController,
+                          focusNode: _descriptionFocus,
+                          maxLines: 3,
                           textInputAction: TextInputAction.next,
-                          keyboardType: TextInputType.datetime,
+                          keyboardType: TextInputType.multiline,
                           autofillHints: const [AutofillHints.name],
-                          forceErrorText: _fieldServerErrors['end_time'],
+                          forceErrorText: _fieldServerErrors['description'],
                           onChanged: (_) {
-                            if (_fieldServerErrors.containsKey('end_time')) {
+                            if (_fieldServerErrors.containsKey('description')) {
                               setState(
-                                () => _fieldServerErrors.remove('end_time'),
+                                () => _fieldServerErrors.remove('description'),
                               );
                             }
                           },
-                          decoration: InputDecoration(
-                            labelText: 'End Time (HH:MM:SS)',
-                            hintText: '12:00:00',
-                            prefixIcon: const Icon(Icons.access_time_filled),
-                            helperText: ' ',
-                            suffixIcon: IconButton(
-                              tooltip: 'Pick End Time',
-                              icon: const Icon(Icons.schedule_outlined),
-                              onPressed: () =>
-                                  _pickTime(_endTimeController, 'end_time'),
-                            ),
+                          decoration: _inputDecoration(
+                            hintText:
+                                'Describe the agenda, speakers, and target participants',
+                            prefixIcon: Icons.description_outlined,
                           ),
                           validator: (value) {
-                            final trimmed = value?.trim() ?? '';
-                            if (trimmed.isEmpty) {
-                              return 'End time required.';
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Event description is required.';
                             }
-                            if (!RegExp(r'^\d{2}:\d{2}(:\d{2})?$')
-                                .hasMatch(trimmed)) {
-                              return 'Use HH:MM:SS.';
+                            return null;
+                          },
+                        ),
+                      ),
+                      SizedBox(height: d.xs),
+                      _LabeledEventField(
+                        label: 'Venue',
+                        child: TextFormField(
+                          key: const ValueKey<String>('event-venue-field'),
+                          controller: _venueController,
+                          focusNode: _venueFocus,
+                          textInputAction: TextInputAction.next,
+                          keyboardType: TextInputType.streetAddress,
+                          autofillHints: const [AutofillHints.location],
+                          forceErrorText: _fieldServerErrors['venue'],
+                          onChanged: (_) {
+                            if (_fieldServerErrors.containsKey('venue')) {
+                              setState(
+                                () => _fieldServerErrors.remove('venue'),
+                              );
+                            }
+                          },
+                          decoration: _inputDecoration(
+                            hintText: 'e.g. University Main Auditorium',
+                            prefixIcon: Icons.location_on_outlined,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Venue is required.';
+                            }
+                            if (value.trim().length > 200) {
+                              return 'Venue cannot exceed 200 characters.';
                             }
                             return null;
                           },
@@ -622,205 +539,448 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('registration-start-field'),
-                    controller: _registrationStartController,
-                    focusNode: _registrationStartFocus,
-                    textInputAction: TextInputAction.next,
-                    keyboardType: TextInputType.datetime,
-                    autofillHints: const [AutofillHints.name],
-                    forceErrorText: _fieldServerErrors['registration_start'],
-                    onChanged: (_) {
-                      if (_fieldServerErrors.containsKey('registration_start')) {
-                        setState(
-                          () => _fieldServerErrors.remove('registration_start'),
-                        );
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Registration Start (YYYY-MM-DD HH:MM:SS)',
-                      hintText: '2026-11-01 08:00:00',
-                      prefixIcon: Icon(Icons.how_to_reg_outlined),
-                      helperText: ' ',
+                  SizedBox(height: d.md),
+
+                  // Section 2: Schedule & Registration Window
+                  _FormSectionCard(
+                    header: const SectionHeader(
+                      title: 'Schedule & Registration Window',
+                      subtitle:
+                          'Configure event date, start/end times, and cutoff window',
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Registration start timestamp is required.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('registration-end-field'),
-                    controller: _registrationEndController,
-                    focusNode: _registrationEndFocus,
-                    textInputAction: TextInputAction.next,
-                    keyboardType: TextInputType.datetime,
-                    autofillHints: const [AutofillHints.name],
-                    forceErrorText: _fieldServerErrors['registration_end'],
-                    onChanged: (_) {
-                      if (_fieldServerErrors.containsKey('registration_end')) {
-                        setState(
-                          () => _fieldServerErrors.remove('registration_end'),
-                        );
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Registration End (YYYY-MM-DD HH:MM:SS)',
-                      hintText: '2026-11-14 23:59:59',
-                      prefixIcon: Icon(Icons.event_available_outlined),
-                      helperText: ' ',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Registration cutoff timestamp is required.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  const SectionHeader(
-                    title: 'Capacity & Attendance Rules',
-                    subtitle: 'Configure participant cap, late grace period, and walk-in rules',
-                  ),
-                  const SizedBox(height: AppSpacing.sm + 4),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
+                      _LabeledEventField(
+                        label: 'Event Date (YYYY-MM-DD)',
                         child: TextFormField(
-                          key: const ValueKey<String>('max-participants-field'),
-                          controller: _maxParticipantsController,
-                          focusNode: _maxParticipantsFocus,
+                          key: const ValueKey<String>('event-date-field'),
+                          controller: _eventDateController,
+                          focusNode: _eventDateFocus,
                           textInputAction: TextInputAction.next,
-                          keyboardType: TextInputType.number,
-                          autofillHints: const [AutofillHints.name],
-                          forceErrorText: _fieldServerErrors['max_participants'],
-                          decoration: const InputDecoration(
-                            labelText: 'Max Participants (Optional)',
-                            hintText: 'Empty = Unlimited',
-                            prefixIcon: Icon(Icons.group_outlined),
-                            helperText: 'Leave blank for unlimited slots',
-                          ),
-                          validator: (value) {
-                            final trimmed = value?.trim() ?? '';
-                            if (trimmed.isEmpty) return null;
-                            final parsed = int.tryParse(trimmed);
-                            if (parsed == null || parsed < 1) {
-                              return 'Enter a whole number ≥ 1.';
+                          keyboardType: TextInputType.datetime,
+                          autofillHints: const [AutofillHints.birthday],
+                          forceErrorText: _fieldServerErrors['event_date'],
+                          onChanged: (_) {
+                            if (_fieldServerErrors.containsKey('event_date')) {
+                              setState(
+                                () => _fieldServerErrors.remove('event_date'),
+                              );
                             }
-                            return null;
                           },
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: TextFormField(
-                          key: const ValueKey<String>('late-grace-period-field'),
-                          controller: _lateGraceController,
-                          focusNode: _lateGraceFocus,
-                          textInputAction: TextInputAction.done,
-                          keyboardType: TextInputType.number,
-                          autofillHints: const [AutofillHints.name],
-                          forceErrorText:
-                              _fieldServerErrors['late_grace_period_minutes'],
-                          onFieldSubmitted: (_) => _saveEvent(),
-                          decoration: const InputDecoration(
-                            labelText: 'Late Grace Period (Mins)',
-                            hintText: '15',
-                            prefixIcon: Icon(Icons.timer_outlined),
-                            helperText: '0–120 minutes after start',
+                          decoration: _inputDecoration(
+                            hintText: '2026-11-15',
+                            prefixIcon: Icons.calendar_today_outlined,
+                            suffixIcon: IconButton(
+                              tooltip: 'Pick Event Date',
+                              icon: const Icon(Icons.date_range_outlined),
+                              onPressed: _pickEventDate,
+                            ),
                           ),
                           validator: (value) {
                             final trimmed = value?.trim() ?? '';
                             if (trimmed.isEmpty) {
-                              return 'Required.';
+                              return 'Event date is required.';
                             }
-                            final parsed = int.tryParse(trimmed);
-                            if (parsed == null || parsed < 0 || parsed > 120) {
-                              return 'Enter 0 to 120.';
+                            if (!RegExp(r'^\d{4}-\d{2}-\d{2}$')
+                                .hasMatch(trimmed)) {
+                              return 'Use YYYY-MM-DD format.';
                             }
                             return null;
                           },
                         ),
                       ),
+                      SizedBox(height: d.xs),
+                      ResponsiveGrid(
+                        minItemWidth: 260,
+                        maxColumns: 2,
+                        children: [
+                          _LabeledEventField(
+                            label: 'Start Time (HH:MM:SS)',
+                            child: TextFormField(
+                              key: const ValueKey<String>(
+                                'event-start-time-field',
+                              ),
+                              controller: _startTimeController,
+                              focusNode: _startTimeFocus,
+                              textInputAction: TextInputAction.next,
+                              keyboardType: TextInputType.datetime,
+                              autofillHints: const [AutofillHints.name],
+                              forceErrorText: _fieldServerErrors['start_time'],
+                              onChanged: (_) {
+                                if (_fieldServerErrors
+                                    .containsKey('start_time')) {
+                                  setState(
+                                    () =>
+                                        _fieldServerErrors.remove('start_time'),
+                                  );
+                                }
+                              },
+                              decoration: _inputDecoration(
+                                hintText: '09:00:00',
+                                prefixIcon: Icons.access_time_outlined,
+                                suffixIcon: IconButton(
+                                  tooltip: 'Pick Start Time',
+                                  icon: const Icon(Icons.schedule_outlined),
+                                  onPressed: () => _pickTime(
+                                    _startTimeController,
+                                    'start_time',
+                                  ),
+                                ),
+                              ),
+                              validator: (value) {
+                                final trimmed = value?.trim() ?? '';
+                                if (trimmed.isEmpty) {
+                                  return 'Start time required.';
+                                }
+                                if (!RegExp(r'^\d{2}:\d{2}(:\d{2})?$')
+                                    .hasMatch(trimmed)) {
+                                  return 'Use HH:MM:SS.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          _LabeledEventField(
+                            label: 'End Time (HH:MM:SS)',
+                            child: TextFormField(
+                              key: const ValueKey<String>(
+                                'event-end-time-field',
+                              ),
+                              controller: _endTimeController,
+                              focusNode: _endTimeFocus,
+                              textInputAction: TextInputAction.next,
+                              keyboardType: TextInputType.datetime,
+                              autofillHints: const [AutofillHints.name],
+                              forceErrorText: _fieldServerErrors['end_time'],
+                              onChanged: (_) {
+                                if (_fieldServerErrors
+                                    .containsKey('end_time')) {
+                                  setState(
+                                    () => _fieldServerErrors.remove('end_time'),
+                                  );
+                                }
+                              },
+                              decoration: _inputDecoration(
+                                hintText: '12:00:00',
+                                prefixIcon: Icons.access_time_filled,
+                                suffixIcon: IconButton(
+                                  tooltip: 'Pick End Time',
+                                  icon: const Icon(Icons.schedule_outlined),
+                                  onPressed: () =>
+                                      _pickTime(_endTimeController, 'end_time'),
+                                ),
+                              ),
+                              validator: (value) {
+                                final trimmed = value?.trim() ?? '';
+                                if (trimmed.isEmpty) {
+                                  return 'End time required.';
+                                }
+                                if (!RegExp(r'^\d{2}:\d{2}(:\d{2})?$')
+                                    .hasMatch(trimmed)) {
+                                  return 'Use HH:MM:SS.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: d.xs),
+                      ResponsiveGrid(
+                        minItemWidth: 260,
+                        maxColumns: 2,
+                        children: [
+                          _LabeledEventField(
+                            label: 'Registration Start (YYYY-MM-DD HH:MM:SS)',
+                            child: TextFormField(
+                              key: const ValueKey<String>(
+                                'registration-start-field',
+                              ),
+                              controller: _registrationStartController,
+                              focusNode: _registrationStartFocus,
+                              textInputAction: TextInputAction.next,
+                              keyboardType: TextInputType.datetime,
+                              autofillHints: const [AutofillHints.name],
+                              forceErrorText:
+                                  _fieldServerErrors['registration_start'],
+                              onChanged: (_) {
+                                if (_fieldServerErrors
+                                    .containsKey('registration_start')) {
+                                  setState(
+                                    () => _fieldServerErrors
+                                        .remove('registration_start'),
+                                  );
+                                }
+                              },
+                              decoration: _inputDecoration(
+                                hintText: '2026-11-01 08:00:00',
+                                prefixIcon: Icons.how_to_reg_outlined,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Registration start timestamp is required.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          _LabeledEventField(
+                            label: 'Registration End (YYYY-MM-DD HH:MM:SS)',
+                            child: TextFormField(
+                              key: const ValueKey<String>(
+                                'registration-end-field',
+                              ),
+                              controller: _registrationEndController,
+                              focusNode: _registrationEndFocus,
+                              textInputAction: TextInputAction.next,
+                              keyboardType: TextInputType.datetime,
+                              autofillHints: const [AutofillHints.name],
+                              forceErrorText:
+                                  _fieldServerErrors['registration_end'],
+                              onChanged: (_) {
+                                if (_fieldServerErrors
+                                    .containsKey('registration_end')) {
+                                  setState(
+                                    () => _fieldServerErrors
+                                        .remove('registration_end'),
+                                  );
+                                }
+                              },
+                              decoration: _inputDecoration(
+                                hintText: '2026-11-14 23:59:59',
+                                prefixIcon: Icons.event_available_outlined,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Registration cutoff timestamp is required.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Card(
-                    child: SwitchListTile(
-                      key: const ValueKey<String>('walk-in-allowed-switch'),
-                      title: const Text(
-                        'Allow Walk-In Attendance',
-                        style: AppTypography.subtitle,
-                      ),
-                      subtitle: const Text(
-                        'Permit unregistered students to check in via QR scan at the venue',
-                        style: AppTypography.bodyMuted,
-                      ),
-                      value: _walkInAllowed,
-                      onChanged: (val) => setState(() => _walkInAllowed = val),
+                  SizedBox(height: d.md),
+
+                  // Section 3: Capacity & Attendance Rules
+                  _FormSectionCard(
+                    header: const SectionHeader(
+                      title: 'Capacity & Attendance Rules',
+                      subtitle:
+                          'Configure participant cap, late grace period, and walk-in rules',
                     ),
+                    children: [
+                      ResponsiveGrid(
+                        minItemWidth: 260,
+                        maxColumns: 2,
+                        children: [
+                          _LabeledEventField(
+                            label: 'Max Participants (Optional)',
+                            child: TextFormField(
+                              key: const ValueKey<String>(
+                                'max-participants-field',
+                              ),
+                              controller: _maxParticipantsController,
+                              focusNode: _maxParticipantsFocus,
+                              textInputAction: TextInputAction.next,
+                              keyboardType: TextInputType.number,
+                              autofillHints: const [AutofillHints.name],
+                              forceErrorText:
+                                  _fieldServerErrors['max_participants'],
+                              decoration: _inputDecoration(
+                                hintText: 'Empty = Unlimited',
+                                prefixIcon: Icons.group_outlined,
+                                helperText: 'Leave blank for unlimited slots',
+                              ),
+                              validator: (value) {
+                                final trimmed = value?.trim() ?? '';
+                                if (trimmed.isEmpty) return null;
+                                final parsed = int.tryParse(trimmed);
+                                if (parsed == null || parsed < 1) {
+                                  return 'Enter a whole number ≥ 1.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          _LabeledEventField(
+                            label: 'Late Grace Period (Mins)',
+                            child: TextFormField(
+                              key: const ValueKey<String>(
+                                'late-grace-period-field',
+                              ),
+                              controller: _lateGraceController,
+                              focusNode: _lateGraceFocus,
+                              textInputAction: TextInputAction.done,
+                              keyboardType: TextInputType.number,
+                              autofillHints: const [AutofillHints.name],
+                              forceErrorText: _fieldServerErrors[
+                                  'late_grace_period_minutes'],
+                              onFieldSubmitted: (_) => _saveEvent(),
+                              decoration: _inputDecoration(
+                                hintText: '15',
+                                prefixIcon: Icons.timer_outlined,
+                                helperText: '0–120 minutes after start',
+                              ),
+                              validator: (value) {
+                                final trimmed = value?.trim() ?? '';
+                                if (trimmed.isEmpty) {
+                                  return 'Required.';
+                                }
+                                final parsed = int.tryParse(trimmed);
+                                if (parsed == null ||
+                                    parsed < 0 ||
+                                    parsed > 120) {
+                                  return 'Enter 0 to 120.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: d.sm),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: d.muted,
+                          borderRadius: BorderRadius.circular(d.radiusControl),
+                          border: Border.all(color: d.border),
+                        ),
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: SwitchListTile(
+                            key: const ValueKey<String>(
+                              'walk-in-allowed-switch',
+                            ),
+                            title: Text(
+                              'Allow Walk-In Attendance',
+                              style: d.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Permit unregistered students to check in via QR scan at the venue',
+                              style: d.supporting,
+                            ),
+                            value: _walkInAllowed,
+                            onChanged: (val) =>
+                                setState(() => _walkInAllowed = val),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.lg),
-                  ElevatedButton.icon(
+                  SizedBox(height: d.lg),
+
+                  // Action Buttons
+                  AppButton(
                     key: const ValueKey<String>('save-event-button'),
-                    onPressed: _isSaving || _isSubmittingAction
-                        ? null
-                        : _saveEvent,
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Icon(_isEditing ? Icons.save_outlined : Icons.add),
-                    label: Text(
-                      _isEditing ? 'Save Event Changes' : 'Create Event Draft',
-                    ),
+                    onPressed:
+                        _isSaving || _isSubmittingAction ? null : _saveEvent,
+                    isLoading: _isSaving,
+                    icon: _isEditing ? Icons.save_outlined : Icons.add,
+                    label: _isEditing
+                        ? 'Save Event Changes'
+                        : 'Create Event Draft',
                   ),
                   if (_isEditing && _currentStatus == 'draft') ...[
-                    const SizedBox(height: AppSpacing.sm + 4),
-                    OutlinedButton.icon(
+                    SizedBox(height: d.gap),
+                    AppButton(
                       key: const ValueKey<String>('submit-approval-button'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.present,
-                        side: const BorderSide(color: AppColors.present),
-                      ),
+                      variant: AppButtonVariant.outline,
                       onPressed: _isSaving || _isSubmittingAction
                           ? null
                           : _submitForApproval,
-                      icon: const Icon(Icons.send_outlined),
-                      label: const Text('Submit for Admin Approval'),
+                      isLoading: _isSubmittingAction,
+                      icon: Icons.send_outlined,
+                      label: 'Submit for Admin Approval',
                     ),
                   ],
                   if (_isEditing && _currentStatus == 'published') ...[
-                    const SizedBox(height: AppSpacing.sm + 4),
-                    OutlinedButton.icon(
-                      key: const ValueKey<String>('request-cancellation-button'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.absent,
-                        side: const BorderSide(color: AppColors.absent),
+                    SizedBox(height: d.gap),
+                    AppButton(
+                      key: const ValueKey<String>(
+                        'request-cancellation-button',
                       ),
+                      variant: AppButtonVariant.destructive,
                       onPressed: _isSaving || _isSubmittingAction
                           ? null
                           : _requestCancellation,
-                      icon: const Icon(Icons.cancel_schedule_send_outlined),
-                      label: const Text('Request Event Cancellation'),
+                      isLoading: _isSubmittingAction,
+                      icon: Icons.cancel_schedule_send_outlined,
+                      label: 'Request Event Cancellation',
                     ),
                   ],
-                  const SizedBox(height: AppSpacing.xl),
                 ],
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FormSectionCard extends StatelessWidget {
+  final Widget header;
+  final List<Widget> children;
+
+  const _FormSectionCard({
+    required this.header,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    return Container(
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          header,
+          SizedBox(height: d.md),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _LabeledEventField extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _LabeledEventField({
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: d.supporting.copyWith(
+            color: d.foreground,
+            fontWeight: FontWeight.w600,
+          ),
+          softWrap: true,
+        ),
+        SizedBox(height: d.xs),
+        child,
+      ],
     );
   }
 }
@@ -832,19 +992,23 @@ class _EventStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: EdgeInsets.all(d.md),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border),
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: d.sm,
+        runSpacing: d.sm,
         children: [
-          const Text(
+          Text(
             'Current Lifecycle Status',
-            style: AppTypography.subtitle,
+            style: d.cardTitle,
           ),
           StatusBadge(status: status),
         ],
@@ -888,45 +1052,59 @@ class _RequestCancellationDialogState
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return AlertDialog(
       title: const Text('Request Event Cancellation'),
-      content: FocusTraversalGroup(
-        child: AutofillGroup(
-          child: Form(
-            key: _dialogFormKey,
-            autovalidateMode: _autovalidateMode,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Provide a mandatory justification for cancelling this published event. An administrator will review your request.',
-                  style: AppTypography.bodyMuted,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: FocusTraversalGroup(
+          child: AutofillGroup(
+            child: Form(
+              key: _dialogFormKey,
+              autovalidateMode: _autovalidateMode,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Provide a mandatory justification for cancelling this published event. An administrator will review your request.',
+                      style: d.supporting,
+                    ),
+                    SizedBox(height: d.md),
+                    Text(
+                      'Cancellation Reason',
+                      style: d.supporting.copyWith(
+                        color: d.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: d.xs),
+                    TextFormField(
+                      key: const ValueKey<String>('cancellation-reason-field'),
+                      controller: _reasonController,
+                      focusNode: _reasonFocus,
+                      autofocus: true,
+                      maxLines: 3,
+                      textInputAction: TextInputAction.done,
+                      keyboardType: TextInputType.text,
+                      autofillHints: const [AutofillHints.name],
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: const InputDecoration(
+                        hintText: 'Explain why this event must be cancelled',
+                        helperText: ' ',
+                        errorMaxLines: 3,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().length < 5) {
+                          return 'Please enter at least 5 characters.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  key: const ValueKey<String>('cancellation-reason-field'),
-                  controller: _reasonController,
-                  focusNode: _reasonFocus,
-                  autofocus: true,
-                  maxLines: 3,
-                  textInputAction: TextInputAction.done,
-                  keyboardType: TextInputType.text,
-                  autofillHints: const [AutofillHints.name],
-                  onFieldSubmitted: (_) => _submit(),
-                  decoration: const InputDecoration(
-                    labelText: 'Cancellation Reason',
-                    hintText: 'Explain why this event must be cancelled',
-                    helperText: ' ',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().length < 5) {
-                      return 'Please enter at least 5 characters.';
-                    }
-                    return null;
-                  },
-                ),
-              ],
+              ),
             ),
           ),
         ),

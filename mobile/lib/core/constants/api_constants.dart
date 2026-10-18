@@ -7,6 +7,10 @@ class ApiConstants {
   /// Base URL for API v1 requests.
   /// Uses 10.0.2.2 for Android Emulator, or 127.0.0.1 for iOS/desktop/web.
   static String get baseUrl {
+    const override = String.fromEnvironment('API_BASE_URL');
+    if (override.isNotEmpty) {
+      return override;
+    }
     if (!kIsWeb && Platform.isAndroid) {
       return 'http://10.0.2.2:8000/api/v1';
     }
@@ -19,8 +23,6 @@ class ApiConstants {
   static const String login = '/auth/login';
   static const String logout = '/auth/logout';
   static const String verifyEmail = '/auth/verify-email';
-  static const String forgotPassword = '/auth/forgot-password';
-  static const String resetPassword = '/auth/reset-password';
   static const String profile = '/profile';
   static const String updateProfile = '/profile';
   static const String changePassword = '/profile/change-password';

@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_button.dart';
+import '../auth/account_input.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/status_badge.dart';
 import 'notification_preferences_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final Map<String, dynamic>? initialData;
+
+  const ProfileScreen({super.key, this.initialData});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -62,7 +69,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchProfile();
+    if (widget.initialData != null) {
+      _isLoading = false;
+      _applyProfileData(widget.initialData!);
+    } else {
+      _fetchProfile();
+    }
+  }
+
+  void _applyProfileData(Map<String, dynamic> data) {
+    final user = (data['user'] as Map<String, dynamic>?) ?? data;
+    final student = data['student_profile'] as Map<String, dynamic>?;
+
+    _email = user['email']?.toString() ?? '';
+    _role = user['role']?.toString() ?? 'student';
+    _status = user['status']?.toString() ?? 'active';
+
+    if (student != null) {
+      _hasStudentProfile = true;
+      _studentIdNumber = student['student_id_number']?.toString() ?? '';
+      _firstNameController.text = student['first_name']?.toString() ?? '';
+      _middleNameController.text = student['middle_name']?.toString() ?? '';
+      _lastNameController.text = student['last_name']?.toString() ?? '';
+      _courseController.text = student['course']?.toString() ?? '';
+      _sectionController.text = student['section']?.toString() ?? '';
+      _departmentController.text = student['department']?.toString() ?? '';
+      _contactController.text = student['contact_number']?.toString() ?? '';
+
+      final year = student['year_level']?.toString() ?? '1st Year';
+      _selectedYearLevel =
+          _yearLevels.contains(year) ? year : _yearLevels.first;
+    } else {
+      _hasStudentProfile = false;
+    }
   }
 
   @override
@@ -93,31 +132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _isLoading = false;
       if (response.success && response.data is Map<String, dynamic>) {
-        final data = response.data as Map<String, dynamic>;
-        final user = (data['user'] as Map<String, dynamic>?) ?? data;
-        final student = data['student_profile'] as Map<String, dynamic>?;
-
-        _email = user['email']?.toString() ?? '';
-        _role = user['role']?.toString() ?? 'student';
-        _status = user['status']?.toString() ?? 'active';
-
-        if (student != null) {
-          _hasStudentProfile = true;
-          _studentIdNumber = student['student_id_number']?.toString() ?? '';
-          _firstNameController.text = student['first_name']?.toString() ?? '';
-          _middleNameController.text = student['middle_name']?.toString() ?? '';
-          _lastNameController.text = student['last_name']?.toString() ?? '';
-          _courseController.text = student['course']?.toString() ?? '';
-          _sectionController.text = student['section']?.toString() ?? '';
-          _departmentController.text = student['department']?.toString() ?? '';
-          _contactController.text = student['contact_number']?.toString() ?? '';
-
-          final year = student['year_level']?.toString() ?? '1st Year';
-          _selectedYearLevel =
-              _yearLevels.contains(year) ? year : _yearLevels.first;
-        } else {
-          _hasStudentProfile = false;
-        }
+        _applyProfileData(response.data as Map<String, dynamic>);
       } else {
         _errorMessage = response.message ?? 'Failed to load profile details.';
       }
@@ -125,6 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    if (_isSavingProfile) return;
     if (!_profileFormKey.currentState!.validate()) {
       setState(() {
         _profileAutovalidate = AutovalidateMode.onUserInteraction;
@@ -149,10 +165,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _isSavingProfile = false);
 
+    final d = context.design;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor:
-            response.success ? AppColors.present : AppColors.absent,
+        backgroundColor: response.success ? d.success : d.destructive,
         content: Text(
           response.message ??
               (response.success
@@ -164,6 +180,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _changePassword() async {
+    if (_isSavingPassword) return;
     if (!_passwordFormKey.currentState!.validate()) {
       setState(() {
         _passwordAutovalidate = AutovalidateMode.onUserInteraction;
@@ -173,9 +190,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (_newPasswordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.absent,
-          content: Text('New passwords do not match.'),
+        SnackBar(
+          backgroundColor: context.design.destructive,
+          content: const Text('New passwords do not match.'),
         ),
       );
       return;
@@ -200,10 +217,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _confirmPasswordController.clear();
     }
 
+    final d = context.design;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor:
-            response.success ? AppColors.present : AppColors.absent,
+        backgroundColor: response.success ? d.success : d.destructive,
         content: Text(
           response.message ??
               (response.success
@@ -216,17 +233,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Profile & Settings'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Profile',
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetchProfile,
-          ),
-        ],
-      ),
+    final d = context.design;
+    return AppPageScaffold(
+      title: 'My Profile & Settings',
+      maxWidth: 720,
+      actions: [
+        IconButton(
+          tooltip: 'Refresh Profile',
+          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
+          onPressed: _isLoading ? null : _fetchProfile,
+        ),
+      ],
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -236,29 +253,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onRetry: _fetchProfile,
                   )
                 : SingleChildScrollView(
-                    padding: const EdgeInsets.all(AppSpacing.md),
+                    padding: EdgeInsets.all(d.md),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // Account Identity Summary Card
                         Card(
                           child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: EdgeInsets.all(d.md),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
-                                    const CircleAvatar(
-                                      radius: 26,
-                                      backgroundColor: AppColors.primaryLight,
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: d.selection,
+                                        borderRadius: BorderRadius.circular(
+                                          d.radiusControl,
+                                        ),
+                                        border: Border.all(
+                                          color: d.primary.withValues(
+                                            alpha: 0.18,
+                                          ),
+                                        ),
+                                      ),
                                       child: Icon(
-                                        Icons.person_outline,
-                                        size: 28,
-                                        color: AppColors.primary,
+                                        LucideIcons.user,
+                                        size: 22,
+                                        color: d.primary,
                                       ),
                                     ),
-                                    const SizedBox(width: AppSpacing.md),
+                                    SizedBox(width: d.md),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
@@ -266,14 +294,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         children: [
                                           Text(
                                             _email,
-                                            style: AppTypography.subtitle,
+                                            style: d.sectionTitle,
                                           ),
                                           if (_hasStudentProfile &&
                                               _studentIdNumber.isNotEmpty) ...[
                                             const SizedBox(height: 2),
                                             Text(
                                               'Student ID: $_studentIdNumber (Immutable)',
-                                              style: AppTypography.caption,
+                                              style: d.supporting,
                                             ),
                                           ],
                                         ],
@@ -281,10 +309,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                   ],
                                 ),
-                                const Divider(height: AppSpacing.lg),
+                                Divider(height: d.lg, color: d.border),
                                 Wrap(
-                                  spacing: AppSpacing.sm,
-                                  runSpacing: AppSpacing.sm,
+                                  spacing: d.sm,
+                                  runSpacing: d.sm,
                                   children: [
                                     StatusBadge(
                                       status: _role,
@@ -300,24 +328,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.md),
+                        SizedBox(height: d.md),
 
                         // Notification Preferences Link Card
                         Card(
                           child: ListTile(
-                            leading: const Icon(
-                              Icons.notifications_active_outlined,
-                              color: AppColors.primary,
+                            leading: Icon(
+                              LucideIcons.bell,
+                              size: 20,
+                              color: d.primary,
                             ),
-                            title: const Text(
+                            title: Text(
                               'Notification Preferences',
-                              style: AppTypography.subtitle,
+                              style: d.cardTitle,
                             ),
-                            subtitle: const Text(
+                            subtitle: Text(
                               'Manage event reminders and mandatory campus alerts',
-                              style: AppTypography.caption,
+                              style: d.supporting,
                             ),
-                            trailing: const Icon(Icons.chevron_right),
+                            trailing: Icon(
+                              LucideIcons.chevronRight,
+                              size: 18,
+                              color: d.mutedForeground,
+                            ),
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -329,7 +362,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.lg),
+                        SizedBox(height: d.lg),
 
                         // Student Editable Profile Section
                         if (_hasStudentProfile) ...[
@@ -338,10 +371,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             subtitle:
                                 'Student ID and school email are permanently bound to your identity.',
                           ),
-                          const SizedBox(height: AppSpacing.sm + 4),
+                          SizedBox(height: d.gap),
                           Card(
                             child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.md),
+                              padding: EdgeInsets.all(d.md),
                               child: FocusTraversalGroup(
                                 child: AutofillGroup(
                                   child: Form(
@@ -351,60 +384,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
                                       children: [
-                                        Row(
+                                        ResponsiveGrid(
+                                          minItemWidth: 280,
+                                          maxColumns: 2,
                                           children: [
-                                            Expanded(
-                                              child: TextFormField(
-                                                key: const ValueKey<String>(
-                                                  'profile-first-name',
-                                                ),
-                                                controller:
-                                                    _firstNameController,
-                                                textInputAction:
-                                                    TextInputAction.next,
-                                                autofillHints: const [
-                                                  AutofillHints.givenName
-                                                ],
-                                                decoration:
-                                                    const InputDecoration(
-                                                  labelText: 'First Name *',
-                                                ),
-                                                validator: (v) => v == null ||
-                                                        v.trim().isEmpty
-                                                    ? 'Required'
-                                                    : null,
+                                            AccountInput(
+                                              key: const ValueKey<String>(
+                                                'profile-first-name',
                                               ),
-                                            ),
-                                            const SizedBox(
-                                              width: AppSpacing.sm + 4,
-                                            ),
-                                            Expanded(
-                                              child: TextFormField(
-                                                key: const ValueKey<String>(
-                                                  'profile-last-name',
-                                                ),
-                                                controller: _lastNameController,
-                                                textInputAction:
-                                                    TextInputAction.next,
-                                                autofillHints: const [
-                                                  AutofillHints.familyName
-                                                ],
-                                                decoration:
-                                                    const InputDecoration(
-                                                  labelText: 'Last Name *',
-                                                ),
-                                                validator: (v) => v == null ||
-                                                        v.trim().isEmpty
-                                                    ? 'Required'
-                                                    : null,
+                                              controller: _firstNameController,
+                                              textInputAction:
+                                                  TextInputAction.next,
+                                              autofillHints: const [
+                                                AutofillHints.givenName
+                                              ],
+                                              decoration: const InputDecoration(
+                                                labelText: 'First Name *',
                                               ),
+                                              validator: (v) => v == null ||
+                                                      v.trim().isEmpty
+                                                  ? 'Required'
+                                                  : null,
+                                            ),
+                                            AccountInput(
+                                              key: const ValueKey<String>(
+                                                'profile-last-name',
+                                              ),
+                                              controller: _lastNameController,
+                                              textInputAction:
+                                                  TextInputAction.next,
+                                              autofillHints: const [
+                                                AutofillHints.familyName
+                                              ],
+                                              decoration: const InputDecoration(
+                                                labelText: 'Last Name *',
+                                              ),
+                                              validator: (v) => v == null ||
+                                                      v.trim().isEmpty
+                                                  ? 'Required'
+                                                  : null,
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(
-                                          height: AppSpacing.sm + 4,
-                                        ),
-                                        TextFormField(
+                                        SizedBox(height: d.gap),
+                                        AccountInput(
                                           key: const ValueKey<String>(
                                             'profile-middle-name',
                                           ),
@@ -417,122 +440,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             labelText: 'Middle Name (Optional)',
                                           ),
                                         ),
-                                        const SizedBox(
-                                          height: AppSpacing.sm + 4,
-                                        ),
-                                        Row(
+                                        SizedBox(height: d.gap),
+                                        ResponsiveGrid(
+                                          minItemWidth: 280,
+                                          maxColumns: 2,
                                           children: [
-                                            Expanded(
-                                              flex: 2,
-                                              child: TextFormField(
-                                                key: const ValueKey<String>(
-                                                  'profile-course',
-                                                ),
-                                                controller: _courseController,
-                                                textInputAction:
-                                                    TextInputAction.next,
-                                                decoration:
-                                                    const InputDecoration(
-                                                  labelText:
-                                                      'Course / Program *',
-                                                ),
-                                                validator: (v) => v == null ||
-                                                        v.trim().isEmpty
-                                                    ? 'Required'
-                                                    : null,
+                                            AccountInput(
+                                              key: const ValueKey<String>(
+                                                'profile-course',
                                               ),
-                                            ),
-                                            const SizedBox(
-                                              width: AppSpacing.sm + 4,
-                                            ),
-                                            Expanded(
-                                              child: DropdownButtonFormField<
-                                                  String>(
-                                                key: const ValueKey<String>(
-                                                  'profile-year-level',
-                                                ),
-                                                initialValue:
-                                                    _selectedYearLevel,
-                                                decoration:
-                                                    const InputDecoration(
-                                                  labelText: 'Year Level *',
-                                                ),
-                                                items: _yearLevels
-                                                    .map(
-                                                      (yr) => DropdownMenuItem<
-                                                          String>(
-                                                        value: yr,
-                                                        child: Text(yr),
-                                                      ),
-                                                    )
-                                                    .toList(),
-                                                onChanged: (val) {
-                                                  if (val != null) {
-                                                    setState(
-                                                      () => _selectedYearLevel =
-                                                          val,
-                                                    );
-                                                  }
-                                                },
+                                              controller: _courseController,
+                                              textInputAction:
+                                                  TextInputAction.next,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Course / Program *',
                                               ),
+                                              validator: (v) => v == null ||
+                                                      v.trim().isEmpty
+                                                  ? 'Required'
+                                                  : null,
+                                            ),
+                                            DropdownButtonFormField<String>(
+                                              key: const ValueKey<String>(
+                                                'profile-year-level',
+                                              ),
+                                              initialValue: _selectedYearLevel,
+                                              isExpanded: true,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Year Level *',
+                                              ),
+                                              items: _yearLevels
+                                                  .map(
+                                                    (yr) => DropdownMenuItem<
+                                                        String>(
+                                                      value: yr,
+                                                      child: Text(yr),
+                                                    ),
+                                                  )
+                                                  .toList(),
+                                              onChanged: (val) {
+                                                if (val != null) {
+                                                  setState(
+                                                    () => _selectedYearLevel =
+                                                        val,
+                                                  );
+                                                }
+                                              },
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(
-                                          height: AppSpacing.sm + 4,
-                                        ),
-                                        Row(
+                                        SizedBox(height: d.gap),
+                                        ResponsiveGrid(
+                                          minItemWidth: 280,
+                                          maxColumns: 2,
                                           children: [
-                                            Expanded(
-                                              child: TextFormField(
-                                                key: const ValueKey<String>(
-                                                  'profile-section',
-                                                ),
-                                                controller: _sectionController,
-                                                textInputAction:
-                                                    TextInputAction.next,
-                                                decoration:
-                                                    const InputDecoration(
-                                                  labelText: 'Section *',
-                                                ),
-                                                validator: (v) => v == null ||
-                                                        v.trim().isEmpty
-                                                    ? 'Required'
-                                                    : null,
+                                            AccountInput(
+                                              key: const ValueKey<String>(
+                                                'profile-section',
                                               ),
-                                            ),
-                                            const SizedBox(
-                                              width: AppSpacing.sm + 4,
-                                            ),
-                                            Expanded(
-                                              child: TextFormField(
-                                                key: const ValueKey<String>(
-                                                  'profile-contact',
-                                                ),
-                                                controller: _contactController,
-                                                keyboardType:
-                                                    TextInputType.phone,
-                                                textInputAction:
-                                                    TextInputAction.next,
-                                                autofillHints: const [
-                                                  AutofillHints.telephoneNumber
-                                                ],
-                                                decoration:
-                                                    const InputDecoration(
-                                                  labelText: 'Contact Number *',
-                                                ),
-                                                validator: (v) => v == null ||
-                                                        v.trim().isEmpty
-                                                    ? 'Required'
-                                                    : null,
+                                              controller: _sectionController,
+                                              textInputAction:
+                                                  TextInputAction.next,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Section *',
                                               ),
+                                              validator: (v) => v == null ||
+                                                      v.trim().isEmpty
+                                                  ? 'Required'
+                                                  : null,
+                                            ),
+                                            AccountInput(
+                                              key: const ValueKey<String>(
+                                                'profile-contact',
+                                              ),
+                                              controller: _contactController,
+                                              keyboardType: TextInputType.phone,
+                                              textInputAction:
+                                                  TextInputAction.next,
+                                              autofillHints: const [
+                                                AutofillHints.telephoneNumber
+                                              ],
+                                              decoration: const InputDecoration(
+                                                labelText: 'Contact Number *',
+                                              ),
+                                              validator: (v) => v == null ||
+                                                      v.trim().isEmpty
+                                                  ? 'Required'
+                                                  : null,
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(
-                                          height: AppSpacing.sm + 4,
-                                        ),
-                                        TextFormField(
+                                        SizedBox(height: d.gap),
+                                        AccountInput(
                                           key: const ValueKey<String>(
                                             'profile-department',
                                           ),
@@ -548,28 +547,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   ? 'Required'
                                                   : null,
                                         ),
-                                        const SizedBox(height: AppSpacing.md),
-                                        ElevatedButton.icon(
+                                        SizedBox(height: d.md),
+                                        AppButton(
                                           key: const ValueKey<String>(
                                             'save-profile-button',
                                           ),
                                           onPressed: _isSavingProfile
                                               ? null
                                               : _saveProfile,
-                                          icon: const Icon(Icons.save_outlined),
-                                          label: _isSavingProfile
-                                              ? const SizedBox(
-                                                  height: 20,
-                                                  width: 20,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    color: Colors.white,
-                                                    strokeWidth: 2,
-                                                  ),
-                                                )
-                                              : const Text(
-                                                  'Save Profile Changes',
-                                                ),
+                                          isLoading: _isSavingProfile,
+                                          label: 'Save Profile Changes',
                                         ),
                                       ],
                                     ),
@@ -578,7 +565,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          SizedBox(height: d.lg),
                         ],
 
                         // Change Password Section
@@ -587,10 +574,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           subtitle:
                               'Requires your current password and a strong 8+ character password.',
                         ),
-                        const SizedBox(height: AppSpacing.sm + 4),
+                        SizedBox(height: d.gap),
                         Card(
                           child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: EdgeInsets.all(d.md),
                             child: FocusTraversalGroup(
                               child: AutofillGroup(
                                 child: Form(
@@ -600,7 +587,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
-                                      TextFormField(
+                                      AccountInput(
                                         key: const ValueKey<String>(
                                           'change-current-password',
                                         ),
@@ -612,16 +599,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ],
                                         decoration: InputDecoration(
                                           labelText: 'Current Password *',
-                                          prefixIcon:
-                                              const Icon(Icons.lock_outline),
+                                          prefixIcon: Icon(
+                                            LucideIcons.lock,
+                                            size: 18,
+                                            color: d.mutedForeground,
+                                          ),
                                           suffixIcon: IconButton(
                                             tooltip: _obscureCurrentPassword
                                                 ? 'Show current password'
                                                 : 'Hide current password',
                                             icon: Icon(
                                               _obscureCurrentPassword
-                                                  ? Icons.visibility_off
-                                                  : Icons.visibility,
+                                                  ? LucideIcons.eyeOff
+                                                  : LucideIcons.eye,
+                                              size: 18,
+                                              color: d.mutedForeground,
                                             ),
                                             onPressed: () => setState(
                                               () => _obscureCurrentPassword =
@@ -633,8 +625,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             ? 'Enter current password'
                                             : null,
                                       ),
-                                      const SizedBox(height: AppSpacing.sm + 4),
-                                      TextFormField(
+                                      SizedBox(height: d.gap),
+                                      AccountInput(
                                         key: const ValueKey<String>(
                                           'change-new-password',
                                         ),
@@ -647,16 +639,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         decoration: InputDecoration(
                                           labelText:
                                               'New Password (min. 8 chars) *',
-                                          prefixIcon:
-                                              const Icon(Icons.lock_reset),
+                                          prefixIcon: Icon(
+                                            LucideIcons.keyRound,
+                                            size: 18,
+                                            color: d.mutedForeground,
+                                          ),
                                           suffixIcon: IconButton(
                                             tooltip: _obscureNewPassword
                                                 ? 'Show new password'
                                                 : 'Hide new password',
                                             icon: Icon(
                                               _obscureNewPassword
-                                                  ? Icons.visibility_off
-                                                  : Icons.visibility,
+                                                  ? LucideIcons.eyeOff
+                                                  : LucideIcons.eye,
+                                              size: 18,
+                                              color: d.mutedForeground,
                                             ),
                                             onPressed: () => setState(
                                               () => _obscureNewPassword =
@@ -669,8 +666,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                 ? 'Minimum 8 characters'
                                                 : null,
                                       ),
-                                      const SizedBox(height: AppSpacing.sm + 4),
-                                      TextFormField(
+                                      SizedBox(height: d.gap),
+                                      AccountInput(
                                         key: const ValueKey<String>(
                                           'change-confirm-password',
                                         ),
@@ -684,16 +681,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             _changePassword(),
                                         decoration: InputDecoration(
                                           labelText: 'Confirm New Password *',
-                                          prefixIcon:
-                                              const Icon(Icons.lock_outline),
+                                          prefixIcon: Icon(
+                                            LucideIcons.lock,
+                                            size: 18,
+                                            color: d.mutedForeground,
+                                          ),
                                           suffixIcon: IconButton(
                                             tooltip: _obscureConfirmPassword
                                                 ? 'Show confirm password'
                                                 : 'Hide confirm password',
                                             icon: Icon(
                                               _obscureConfirmPassword
-                                                  ? Icons.visibility_off
-                                                  : Icons.visibility,
+                                                  ? LucideIcons.eyeOff
+                                                  : LucideIcons.eye,
+                                              size: 18,
+                                              color: d.mutedForeground,
                                             ),
                                             onPressed: () => setState(
                                               () => _obscureConfirmPassword =
@@ -705,25 +707,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             ? 'Confirm your new password'
                                             : null,
                                       ),
-                                      const SizedBox(height: AppSpacing.md),
-                                      OutlinedButton.icon(
+                                      SizedBox(height: d.md),
+                                      AppButton(
+                                        variant: AppButtonVariant.outline,
                                         key: const ValueKey<String>(
                                           'update-password-button',
                                         ),
                                         onPressed: _isSavingPassword
                                             ? null
                                             : _changePassword,
-                                        icon: const Icon(Icons.key_outlined),
-                                        label: _isSavingPassword
-                                            ? const SizedBox(
-                                                height: 18,
-                                                width: 18,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                ),
-                                              )
-                                            : const Text('Update Password'),
+                                        isLoading: _isSavingPassword,
+                                        label: 'Update Password',
                                       ),
                                     ],
                                   ),
@@ -732,7 +726,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.xl),
+                        SizedBox(height: d.xl),
                       ],
                     ),
                   ),

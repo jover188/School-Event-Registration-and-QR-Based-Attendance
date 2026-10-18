@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
+import '../../core/navigation/app_destination.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_pressable.dart';
+import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/event_card.dart';
@@ -18,7 +24,16 @@ import 'live_attendance_screen.dart';
 import 'qr_scanner_screen.dart';
 
 class OrganizerDashboardScreen extends StatefulWidget {
-  const OrganizerDashboardScreen({super.key});
+  final List<EventModel>? initialEvents;
+  final Map<String, dynamic>? initialSummary;
+  final String? initialErrorMessage;
+
+  const OrganizerDashboardScreen({
+    super.key,
+    this.initialEvents,
+    this.initialSummary,
+    this.initialErrorMessage,
+  });
 
   @override
   State<OrganizerDashboardScreen> createState() =>
@@ -26,15 +41,59 @@ class OrganizerDashboardScreen extends StatefulWidget {
 }
 
 class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
+  static const List<AppDestination> _destinations = [
+    AppDestination(
+      id: 'overview',
+      label: 'Overview',
+      icon: LucideIcons.layoutDashboard,
+      essential: true,
+    ),
+    AppDestination(
+      id: 'events',
+      label: 'My Events',
+      icon: LucideIcons.calendarRange,
+      essential: true,
+    ),
+    AppDestination(
+      id: 'reports',
+      label: 'Reports',
+      icon: LucideIcons.chartBar,
+    ),
+  ];
+
+  String _selectedDestinationId = 'overview';
+  String _selectedStatusFilter = 'all';
+  late final TextEditingController _searchController = TextEditingController();
+  late final FocusNode _searchFocus = FocusNode();
+
   bool _isLoading = true;
   String? _errorMessage;
   Map<String, dynamic> _stats = {};
   List<EventModel> _myEvents = [];
 
+  bool get _hasFixtures =>
+      widget.initialEvents != null ||
+      widget.initialSummary != null ||
+      widget.initialErrorMessage != null;
+
   @override
   void initState() {
     super.initState();
-    _fetchDashboardData();
+    if (_hasFixtures) {
+      _isLoading = false;
+      _myEvents = List<EventModel>.from(widget.initialEvents ?? const []);
+      _stats = Map<String, dynamic>.from(widget.initialSummary ?? const {});
+      _errorMessage = widget.initialErrorMessage;
+    } else {
+      _fetchDashboardData();
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchDashboardData() async {
@@ -90,6 +149,41 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     }
   }
 
+  void _openRegistrations(EventModel event) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventRegistrationsScreen(
+          eventId: event.id,
+          eventTitle: event.title,
+          canCancel: true,
+        ),
+      ),
+    );
+  }
+
+  void _openAttendance(EventModel event) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LiveAttendanceScreen(
+          eventId: event.id,
+          eventTitle: event.title,
+          canCorrect: true,
+        ),
+      ),
+    );
+  }
+
+  void _openScanner(EventModel event) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QrScannerScreen(event: event),
+      ),
+    );
+  }
+
   Future<void> _logout() async {
     await ApiClient().post(ApiConstants.logout, {});
     await ApiClient().clearSession();
@@ -100,190 +194,337 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     );
   }
 
+  List<EventModel> get _filteredEvents {
+    final query = _searchController.text.trim().toLowerCase();
+    return _myEvents.where((event) {
+      final matchesStatus = _selectedStatusFilter == 'all' ||
+          event.status.toLowerCase() == _selectedStatusFilter;
+      final matchesQuery = query.isEmpty ||
+          event.title.toLowerCase().contains(query) ||
+          event.venue.toLowerCase().contains(query);
+      return matchesStatus && matchesQuery;
+    }).toList();
+  }
+
+  String get _shellTitle => switch (_selectedDestinationId) {
+        'events' => 'My Events',
+        'reports' => 'Reports & Exports',
+        _ => 'Organizer Portal',
+      };
+
+  Widget _buildOverviewTab(BuildContext context) {
+    final d = context.design;
+    if (_isLoading && _myEvents.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_errorMessage != null && _myEvents.isEmpty) {
+      return ErrorStateView(
+        message: _errorMessage!,
+        onRetry: _fetchDashboardData,
+      );
+    }
+
+    final totalCount =
+        (_stats['total_events'] as num?)?.toInt() ?? _myEvents.length;
+    final publishedCount = (_stats['published_events'] as num?)?.toInt() ??
+        _myEvents.where((e) => e.status == 'published').length;
+    final ongoingCount = (_stats['ongoing_events'] as num?)?.toInt() ??
+        _myEvents.where((e) => e.status == 'ongoing').length;
+    final draftOrPendingCount = (_stats['pending_events'] as num?)?.toInt() ??
+        _myEvents
+            .where(
+              (e) => e.status == 'draft' || e.status == 'pending_approval',
+            )
+            .length;
+
+    final priorityEvents = _myEvents.take(4).toList();
+
+    return RefreshIndicator(
+      onRefresh: _fetchDashboardData,
+      child: AppResponsivePage(
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SectionHeader(
+                title: 'Event Operations Summary',
+                subtitle:
+                    'Create event drafts, monitor registrations, and launch QR check-in',
+                trailing: AppButton(
+                  key: const ValueKey<String>('organizer-create-event-fab'),
+                  label: 'Create Event',
+                  icon: Icons.add,
+                  onPressed: _openCreateEvent,
+                ),
+              ),
+              SizedBox(height: d.md),
+              ResponsiveGrid(
+                minItemWidth: 150,
+                maxColumns: 4,
+                children: [
+                  StatMetricCard(
+                    label: 'Total Events',
+                    value: '$totalCount',
+                    icon: Icons.event_note_outlined,
+                    color: d.primary,
+                  ),
+                  StatMetricCard(
+                    label: 'Published',
+                    value: '$publishedCount',
+                    icon: Icons.public,
+                    color: d.success,
+                  ),
+                  StatMetricCard(
+                    label: 'Ongoing',
+                    value: '$ongoingCount',
+                    icon: Icons.sensors,
+                    color: d.information,
+                  ),
+                  StatMetricCard(
+                    label: 'Draft & Pending',
+                    value: '$draftOrPendingCount',
+                    icon: Icons.hourglass_top_rounded,
+                    color: d.warning,
+                  ),
+                ],
+              ),
+              SizedBox(height: d.lg),
+              SectionHeader(
+                title: 'Recent & Active Events',
+                subtitle:
+                    'Manage registrations, inspect attendance, or open the QR scanner',
+                actionLabel: 'View All (${_myEvents.length})',
+                onAction: () =>
+                    setState(() => _selectedDestinationId = 'events'),
+              ),
+              SizedBox(height: d.md),
+              if (priorityEvents.isEmpty)
+                EmptyStateView(
+                  icon: Icons.event_busy_outlined,
+                  title: 'No events found.',
+                  message:
+                      'Create a new event draft or refresh your dashboard.',
+                  actionLabel: 'Create Event',
+                  onAction: _openCreateEvent,
+                )
+              else
+                for (final event in priorityEvents)
+                  _OrganizerEventManagementCard(
+                    event: event,
+                    onEdit: () => _openEditEvent(event),
+                    onRegistrations: () => _openRegistrations(event),
+                    onAttendance: () => _openAttendance(event),
+                    onScanQr: () => _openScanner(event),
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMyEventsTab(BuildContext context) {
+    final d = context.design;
+    if (_isLoading && _myEvents.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_errorMessage != null && _myEvents.isEmpty) {
+      return ErrorStateView(
+        message: _errorMessage!,
+        onRetry: _fetchDashboardData,
+      );
+    }
+
+    final events = _filteredEvents;
+
+    return RefreshIndicator(
+      onRefresh: _fetchDashboardData,
+      child: AppResponsivePage(
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SectionHeader(
+                title: 'Manage Owned Events',
+                subtitle:
+                    'Filter by lifecycle state, edit details, or manage attendance',
+                trailing: AppButton(
+                  label: 'Create Event',
+                  icon: Icons.add,
+                  onPressed: _openCreateEvent,
+                ),
+              ),
+              SizedBox(height: d.md),
+              TextField(
+                key: const ValueKey<String>('organizer-events-search-field'),
+                controller: _searchController,
+                focusNode: _searchFocus,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Search owned events by title or venue',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          tooltip: 'Clear Search',
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                ),
+              ),
+              SizedBox(height: d.sm),
+              _EventStatusFilterChips(
+                selectedStatus: _selectedStatusFilter,
+                onSelect: (status) =>
+                    setState(() => _selectedStatusFilter = status),
+              ),
+              SizedBox(height: d.md),
+              if (events.isEmpty)
+                EmptyStateView(
+                  icon: Icons.event_busy_outlined,
+                  title: 'No matching events.',
+                  message: _myEvents.isEmpty
+                      ? 'Create your first school event draft to get started.'
+                      : 'Adjust your search query or lifecycle status filter.',
+                  actionLabel:
+                      _myEvents.isEmpty ? 'Create Event' : 'Reset Filters',
+                  onAction: _myEvents.isEmpty
+                      ? _openCreateEvent
+                      : () {
+                          _searchController.clear();
+                          setState(() => _selectedStatusFilter = 'all');
+                        },
+                )
+              else
+                for (final event in events)
+                  _OrganizerEventManagementCard(
+                    event: event,
+                    onEdit: () => _openEditEvent(event),
+                    onRegistrations: () => _openRegistrations(event),
+                    onAttendance: () => _openAttendance(event),
+                    onScanQr: () => _openScanner(event),
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Organizer Portal'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.analytics_outlined),
-            tooltip: 'Reports & Exports',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ReportsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            tooltip: 'Notifications',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'My Profile',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh Dashboard',
-            onPressed: _isLoading ? null : _fetchDashboardData,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: _logout,
-          ),
-        ],
+    return AppShell(
+      title: _shellTitle,
+      destinations: _destinations,
+      selectedId: _selectedDestinationId,
+      onDestinationSelected: (id) =>
+          setState(() => _selectedDestinationId = id),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          tooltip: 'Notifications',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            );
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.person_outline),
+          tooltip: 'My Profile',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            );
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Refresh Dashboard',
+          onPressed: _isLoading ? null : _fetchDashboardData,
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Logout',
+          onPressed: _logout,
+        ),
+      ],
+      body: AppDestinationStack(
+        selectedId: _selectedDestinationId,
+        builders: {
+          'overview': _buildOverviewTab,
+          'events': _buildMyEventsTab,
+          'reports': (_) => const ReportsScreen(embedded: true),
+        },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const ValueKey<String>('organizer-create-event-fab'),
-        onPressed: _openCreateEvent,
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Create Event'),
-      ),
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null && _myEvents.isEmpty
-                ? ErrorStateView(
-                    message: _errorMessage!,
-                    onRetry: _fetchDashboardData,
-                  )
-                : RefreshIndicator(
-                    onRefresh: _fetchDashboardData,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        88,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: StatMetricCard(
-                                  label: 'Total Events',
-                                  value: '${_stats['total_events'] ?? 0}',
-                                  icon: Icons.event_note_outlined,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: StatMetricCard(
-                                  label: 'Published',
-                                  value: '${_stats['published_events'] ?? 0}',
-                                  icon: Icons.public,
-                                  color: AppColors.present,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: StatMetricCard(
-                                  label: 'Ongoing',
-                                  value: '${_stats['ongoing_events'] ?? 0}',
-                                  icon: Icons.sensors,
-                                  color: AppColors.late,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          SectionHeader(
-                            title: 'Manage Events & Scan Attendance',
-                            subtitle:
-                                'Edit drafts, manage registrations, monitor live attendance, and scan QR codes',
-                            actionLabel: 'Reports',
-                            onAction: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const ReportsScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: AppSpacing.sm + 4),
-                          if (_myEvents.isEmpty)
-                            EmptyStateView(
-                              icon: Icons.event_busy_outlined,
-                              title: 'No events found.',
-                              message:
-                                  'Create a new event draft or refresh your dashboard.',
-                              actionLabel: 'Create Event',
-                              onAction: _openCreateEvent,
-                            )
-                          else
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _myEvents.length,
-                              itemBuilder: (context, index) {
-                                final event = _myEvents[index];
-                                return _OrganizerEventManagementCard(
-                                  event: event,
-                                  onEdit: () => _openEditEvent(event),
-                                  onRegistrations: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            EventRegistrationsScreen(
-                                          eventId: event.id,
-                                          eventTitle: event.title,
-                                          canCancel: true,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  onLiveAttendance: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => LiveAttendanceScreen(
-                                          eventId: event.id,
-                                          eventTitle: event.title,
-                                          canCorrect: true,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  onScanQr: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            QrScannerScreen(event: event),
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-      ),
+    );
+  }
+}
+
+class _EventStatusFilterChips extends StatelessWidget {
+  final String selectedStatus;
+  final ValueChanged<String> onSelect;
+
+  const _EventStatusFilterChips({
+    required this.selectedStatus,
+    required this.onSelect,
+  });
+
+  static const List<({String value, String label})> _filters = [
+    (value: 'all', label: 'All'),
+    (value: 'draft', label: 'Draft'),
+    (value: 'pending_approval', label: 'Pending Approval'),
+    (value: 'published', label: 'Published'),
+    (value: 'ongoing', label: 'Ongoing'),
+    (value: 'completed', label: 'Completed'),
+    (value: 'cancelled', label: 'Cancelled'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    return Wrap(
+      spacing: d.sm,
+      runSpacing: d.xs,
+      children: [
+        for (final filter in _filters)
+          AppPressable(
+            key: ValueKey<String>('org-event-filter-${filter.value}'),
+            semanticLabel: 'Filter ${filter.label}',
+            selected: selectedStatus == filter.value,
+            onPressed: () => onSelect(filter.value),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 40),
+              padding: EdgeInsets.symmetric(
+                horizontal: d.gap,
+                vertical: d.xs + 2,
+              ),
+              decoration: BoxDecoration(
+                color: selectedStatus == filter.value ? d.selection : d.card,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                border: Border.all(
+                  color:
+                      selectedStatus == filter.value ? d.primary : d.border,
+                ),
+              ),
+              child: Text(
+                filter.label,
+                style: d.badge.copyWith(
+                  color: selectedStatus == filter.value
+                      ? d.primary
+                      : d.foreground,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -292,80 +533,77 @@ class _OrganizerEventManagementCard extends StatelessWidget {
   final EventModel event;
   final VoidCallback onEdit;
   final VoidCallback onRegistrations;
-  final VoidCallback onLiveAttendance;
+  final VoidCallback onAttendance;
   final VoidCallback onScanQr;
 
   const _OrganizerEventManagementCard({
     required this.event,
     required this.onEdit,
     required this.onRegistrations,
-    required this.onLiveAttendance,
+    required this.onAttendance,
     required this.onScanQr,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        EventCard(
-          event: event,
-          onTap: onEdit,
-          showEventStatusBadge: true,
-          showCapacity: true,
-          trailingAction: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 8,
-              ),
-            ),
-            onPressed: onScanQr,
-            icon: const Icon(
-              Icons.qr_code_scanner,
-              size: 18,
-            ),
-            label: const Text(
-              'Open Scanner',
-              style: TextStyle(fontSize: 13),
+    final d = context.design;
+    final canScan =
+        event.status == 'published' || event.status == 'ongoing';
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: d.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          EventCard(
+            event: event,
+            onTap: onEdit,
+            showEventStatusBadge: true,
+            showCapacity: true,
+            trailingAction: AppButton(
+              key: ValueKey<String>('open-scanner-${event.id}'),
+              label: 'Open Scanner',
+              icon: Icons.qr_code_scanner,
+              onPressed: canScan ? onScanQr : null,
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-          child: Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.xs,
+          if (!canScan)
+            Padding(
+              padding: EdgeInsets.only(bottom: d.xs),
+              child: Text(
+                'QR scanning requires Published or Ongoing status (currently ${event.status.replaceAll('_', ' ')}).',
+                style: d.supporting,
+              ),
+            ),
+          Wrap(
+            spacing: d.sm,
+            runSpacing: d.xs,
             children: [
-              OutlinedButton.icon(
+              AppButton(
+                key: ValueKey<String>('edit-event-${event.id}'),
+                variant: AppButtonVariant.outline,
+                icon: Icons.edit_outlined,
+                label: event.status == 'draft' ? 'Edit / Submit' : 'Edit Event',
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 16),
-                label: Text(
-                  event.status == 'draft' ? 'Edit / Submit' : 'Edit Event',
-                  style: const TextStyle(fontSize: 13),
-                ),
               ),
-              OutlinedButton.icon(
+              AppButton(
+                key: ValueKey<String>('event-registrations-${event.id}'),
+                variant: AppButtonVariant.outline,
+                icon: Icons.people_alt_outlined,
+                label: 'Registrations',
                 onPressed: onRegistrations,
-                icon: const Icon(Icons.people_alt_outlined, size: 16),
-                label: const Text(
-                  'Registrations',
-                  style: TextStyle(fontSize: 13),
-                ),
               ),
-              OutlinedButton.icon(
-                onPressed: onLiveAttendance,
-                icon: const Icon(Icons.fact_check_outlined, size: 16),
-                label: const Text(
-                  'Live Attendance',
-                  style: TextStyle(fontSize: 13),
-                ),
+              AppButton(
+                key: ValueKey<String>('event-attendance-${event.id}'),
+                variant: AppButtonVariant.outline,
+                icon: Icons.fact_check_outlined,
+                label: 'Attendance',
+                onPressed: onAttendance,
               ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

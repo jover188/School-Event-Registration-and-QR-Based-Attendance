@@ -332,7 +332,7 @@ The first version includes:
 -   Activity logs
 -   System configuration
 -   Database management
--   Password reset (email self-service + admin fallback)
+-   Password management (authenticated password change + Administrator manual password reset; student accounts synchronized via school SIS / demo seeders)
 -   Single-session enforcement
 
 ## 3.2 Out of Scope for Initial Release
@@ -420,23 +420,27 @@ Organizer/Staff, Student, and School Management.
 The API shall reject requests from users who do not have permission to
 access the requested resource.
 
-### AUTH-009 Institutional Student Account Provisioning & Sync
+### AUTH-009 Institutional Student Account Provisioning & SIS Sync
 
 Student accounts, profile records, and permanent QR identities shall be
-pre-provisioned and synchronized directly from the institution's central
-student database via database seeders and institutional middleware. Public
-open self-registration is disabled to prevent unauthorized account creation
-and ensure strict data synchronization with institutional registrar records.
+pre-provisioned and synchronized directly from the institution's Student
+Information System (SIS) — and populated via database seeders (`RoleSeeder`,
+`UserSeeder`, `DemoSchoolDataSeeder`) in local/demo environments. Public open
+self-registration is disabled to prevent unauthorized account creation and
+ensure strict data synchronization with institutional registrar records.
 
-### AUTH-010 Password Reset (Email Self-Service)
+### AUTH-010 Institutional Credential Management (No Self-Service Forgot Password)
 
-Users shall be able to request a password reset via their registered
-school email. The system shall send a secure, time-limited reset link.
+Because student accounts are integrated with the school SIS (and provisioned
+via seeded demo accounts in non-production environments), public self-service
+forgot-password recovery is omitted. Authenticated users may change their
+password from their profile (`POST /api/v1/profile/change-password`).
 
 ### AUTH-011 Password Reset (Admin)
 
-Administrators shall be able to manually reset a user's password as a
-fallback when email self-service is unavailable.
+Administrators shall be able to manually reset a user's password
+(`POST /api/v1/admin/users/{id}/reset-password`) and invalidate prior
+sessions when administrative credential recovery is required.
 
 ### AUTH-012 Single Active Session
 
@@ -1272,8 +1276,7 @@ Report generation is logged but does not require approval.
 ## 19.1 Major Entities
 
 The system requires the following **13 core domain tables** (plus
-framework support tables `personal_access_tokens` and
-`password_reset_tokens`):
+framework support table `personal_access_tokens`):
 
 1.  **Roles (`roles`)** — Fixed role definitions (`administrator`,
     `organizer`, `student`, `management`); role-based permissions are
@@ -1390,12 +1393,10 @@ The exact endpoint names are specified in `REST_API_Specification.md` and
 
 ### Authentication
 
--   Pre-provisioned account onboarding via institutional database seeders/middleware
+-   Pre-provisioned account onboarding via school SIS integration and demo database seeders
 -   Verify email / initial account activation
 -   Login (email + password for all roles, or numeric student ID + password for students)
 -   Logout
--   Password reset request (email self-service)
--   Password reset confirm
 -   Change password (authenticated)
 -   Current user/profile view and update
 
@@ -1998,8 +1999,10 @@ decided as follows:
 -   **Login Credential:** All users may log in using their registered school
     email + password; users with the **Student** role may alternatively log in
     using their numeric Student ID number + password.
--   **Password Reset:** Both email self-service reset and Administrator
-    manual reset fallback.
+-   **Password Management:** Self-service forgot-password recovery is omitted
+    because student accounts are integrated with the school SIS (and provisioned
+    via seeded demo accounts in development/demo environments). Authenticated
+    password changes and Administrator manual password resets are supported.
 -   **Student Profile Fields:** Full name (first, middle, last), Student ID
     number, School email, Course/Program, Year level, Section, Department/College,
     Contact number, and Profile photo.

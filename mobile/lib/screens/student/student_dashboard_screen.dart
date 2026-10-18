@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
+import '../../core/navigation/app_destination.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/event_card.dart';
+import '../../core/widgets/section_header.dart';
 import '../../core/widgets/stat_metric_card.dart';
+import '../../core/widgets/status_badge.dart';
 import '../../models/event_model.dart';
 import '../auth/login_screen.dart';
 import '../common/notifications_screen.dart';
@@ -16,24 +23,102 @@ import 'my_registrations_screen.dart';
 import 'permanent_qr_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
-  const StudentDashboardScreen({super.key});
+  final List<EventModel>? initialEvents;
+  final Map<String, dynamic>? initialStats;
+  final String? initialErrorMessage;
+  final List<Map<String, dynamic>>? initialRegistrations;
+  final Map<String, dynamic>? initialQrData;
+  final List<Map<String, dynamic>>? initialAttendanceRecords;
+
+  const StudentDashboardScreen({
+    super.key,
+    this.initialEvents,
+    this.initialStats,
+    this.initialErrorMessage,
+    this.initialRegistrations,
+    this.initialQrData,
+    this.initialAttendanceRecords,
+  });
 
   @override
   State<StudentDashboardScreen> createState() => _StudentDashboardScreenState();
 }
 
 class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
+  static const List<AppDestination> _destinations = [
+    AppDestination(
+      id: 'events',
+      label: 'Events',
+      icon: LucideIcons.calendar,
+      essential: true,
+    ),
+    AppDestination(
+      id: 'registrations',
+      label: 'My Registrations',
+      icon: LucideIcons.clipboardCheck,
+    ),
+    AppDestination(
+      id: 'qr',
+      label: 'My QR',
+      icon: LucideIcons.qrCode,
+      essential: true,
+    ),
+    AppDestination(
+      id: 'history',
+      label: 'History',
+      icon: LucideIcons.history,
+    ),
+  ];
+
+  String _selectedId = 'events';
   List<EventModel> _events = [];
   Map<String, dynamic>? _stats;
   bool _isLoading = true;
   String? _errorMessage;
+  String? _partialWarningMessage;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+
+  bool get _hasFixtureData =>
+      widget.initialEvents != null ||
+      widget.initialStats != null ||
+      widget.initialErrorMessage != null;
 
   @override
   void initState() {
     super.initState();
-    _fetchEvents();
+    if (_hasFixtureData) {
+      _applyFixtureData();
+    } else {
+      _fetchEvents();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant StudentDashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialEvents != oldWidget.initialEvents ||
+        widget.initialStats != oldWidget.initialStats ||
+        widget.initialErrorMessage != oldWidget.initialErrorMessage) {
+      if (_hasFixtureData) {
+        _applyFixtureData();
+      }
+    }
+  }
+
+  void _applyFixtureData() {
+    _isLoading = false;
+    _events = List<EventModel>.from(widget.initialEvents ?? const []);
+    _stats = widget.initialStats != null
+        ? Map<String, dynamic>.from(widget.initialStats!)
+        : null;
+    if (_events.isNotEmpty && widget.initialErrorMessage != null) {
+      _partialWarningMessage = widget.initialErrorMessage;
+      _errorMessage = null;
+    } else {
+      _errorMessage = widget.initialErrorMessage;
+      _partialWarningMessage = null;
+    }
   }
 
   @override
@@ -43,9 +128,28 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   }
 
   Future<void> _fetchEvents() async {
+    if (_hasFixtureData) {
+      final base = widget.initialEvents ?? const <EventModel>[];
+      final query = _searchQuery.trim().toLowerCase();
+      setState(() {
+        _isLoading = false;
+        _events = query.isEmpty
+            ? List<EventModel>.from(base)
+            : base
+                .where(
+                  (e) =>
+                      e.title.toLowerCase().contains(query) ||
+                      e.venue.toLowerCase().contains(query),
+                )
+                .toList();
+      });
+      return;
+    }
+
     setState(() {
-      _isLoading = true;
+      _isLoading = _events.isEmpty;
       _errorMessage = null;
+      _partialWarningMessage = null;
     });
 
     final queryParams = <String, String>{};
@@ -67,13 +171,29 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       _isLoading = false;
       if (response.success && response.data is List) {
         _events = (response.data as List)
-            .map((e) => EventModel.fromJson(e as Map<String, dynamic>))
+            .map(
+              (e) => EventModel.fromJson(
+                Map<String, dynamic>.from(e as Map),
+              ),
+            )
             .toList();
       } else if (!response.success) {
-        _errorMessage = response.message ?? 'Unable to load campus events.';
+        final msg = response.message ?? 'Unable to load campus events.';
+        if (_events.isNotEmpty) {
+          _partialWarningMessage = msg;
+        } else {
+          _errorMessage = msg;
+        }
       }
-      if (dashResponse.success && dashResponse.data is Map<String, dynamic>) {
-        _stats = dashResponse.data['stats'] as Map<String, dynamic>?;
+
+      if (dashResponse.success && dashResponse.data is Map) {
+        final dashData = Map<String, dynamic>.from(dashResponse.data as Map);
+        if (dashData['stats'] is Map) {
+          _stats = Map<String, dynamic>.from(dashData['stats'] as Map);
+        }
+      } else if (!dashResponse.success && response.success) {
+        _partialWarningMessage =
+            dashResponse.message ?? 'Summary metrics could not be refreshed.';
       }
     });
   }
@@ -88,266 +208,314 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Campus Events'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_2),
-            tooltip: 'My Permanent QR',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PermanentQrScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            tooltip: 'Notifications',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const NotificationsScreen(),
-                ),
-              );
-              _fetchEvents();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'My Profile',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: _logout,
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const PermanentQrScreen()),
-          );
-        },
-        icon: const Icon(Icons.qr_code, color: Colors.white),
-        label: const Text(
-          'My QR Code',
-          style: TextStyle(color: Colors.white),
+  Future<void> _openEventDetail(EventModel event) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventDetailScreen(
+          eventId: event.id,
+          event: event,
+          initialEvent: _hasFixtureData ? event : null,
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Student Dashboard Summary Metrics (SRS DASH-001)
-            if (_stats != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  0,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: StatMetricCard(
-                        label: 'Registered',
-                        value:
-                            '${(_stats!['total_registered_events'] as num?)?.toInt() ?? 0}',
-                        icon: Icons.event_available,
-                        color: AppColors.primary,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const MyRegistrationsScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: StatMetricCard(
-                        label: 'Attended',
-                        value:
-                            '${(_stats!['total_attended_events'] as num?)?.toInt() ?? 0}',
-                        icon: Icons.verified_user_outlined,
-                        color: AppColors.present,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const MyAttendanceHistoryScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: StatMetricCard(
-                        label: 'Unread Alerts',
-                        value:
-                            '${(_stats!['unread_notifications'] as num?)?.toInt() ?? 0}',
-                        icon: Icons.notifications_active_outlined,
-                        color: AppColors.late,
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const NotificationsScreen(),
-                            ),
-                          );
-                          _fetchEvents();
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+    );
+    if (!mounted) return;
+    _fetchEvents();
+  }
 
-            // Quick Navigation Action Bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.sm + 4,
-                AppSpacing.md,
-                0,
-              ),
-              child: Row(
+  String get _currentTitle => switch (_selectedId) {
+        'registrations' => 'My Registrations',
+        'qr' => 'Permanent Student QR',
+        'history' => 'Attendance History',
+        _ => 'Campus Events',
+      };
+
+  Widget _buildEventTrailingAction(BuildContext context, EventModel event) {
+    final remaining = event.remainingSlots;
+    final isFull = remaining != null && remaining <= 0;
+    final normalizedStatus = event.status.trim().toLowerCase();
+
+    if (normalizedStatus == 'cancelled') {
+      return const StatusBadge(
+        status: 'cancelled',
+        label: 'CANCELLED',
+      );
+    }
+    if (event.isRegistered) {
+      return AppButton(
+        variant: AppButtonVariant.outline,
+        onPressed: () => _openEventDetail(event),
+        label: 'Manage Registration',
+      );
+    }
+    if (event.isWaitingList) {
+      return StatusBadge(
+        status: 'waiting_list',
+        label: 'WAITING LIST #${event.userWaitingPosition ?? 1}',
+      );
+    }
+    if (isFull) {
+      return AppButton(
+        variant: AppButtonVariant.outline,
+        icon: Icons.queue_rounded,
+        onPressed: () => _openEventDetail(event),
+        label: 'Join Waiting List',
+      );
+    }
+    return AppButton(
+      variant: AppButtonVariant.ghost,
+      onPressed: () => _openEventDetail(event),
+      label: 'View Event',
+    );
+  }
+
+  Widget _buildEventsDestination(BuildContext context) {
+    final d = context.design;
+    final warningMessage = _partialWarningMessage ??
+        (_events.isNotEmpty ? _errorMessage : null);
+
+    return AppResponsivePage(
+      child: RefreshIndicator(
+        onRefresh: _fetchEvents,
+        child: CustomScrollView(
+          key: const PageStorageKey<String>('student-events-scroll'),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const MyRegistrationsScreen(),
+                  if (warningMessage != null) ...[
+                    Container(
+                      padding: EdgeInsets.all(d.md),
+                      decoration: BoxDecoration(
+                        color: d.warningBackground,
+                        borderRadius: BorderRadius.circular(d.radiusCard),
+                        border: Border.all(
+                          color: d.warning.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: d.sm,
+                        runSpacing: d.sm,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: d.warning,
+                                size: 20,
+                              ),
+                              SizedBox(width: d.sm),
+                              Flexible(
+                                child: Text(
+                                  warningMessage,
+                                  style: d.supporting.copyWith(
+                                    color: d.warning,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        );
-                        _fetchEvents();
-                      },
-                      icon: const Icon(Icons.event_note_outlined, size: 18),
-                      label: const Text(
-                        'My Registrations',
-                        style: TextStyle(fontSize: 13),
+                          AppButton(
+                            variant: AppButtonVariant.outline,
+                            icon: Icons.refresh,
+                            onPressed: _fetchEvents,
+                            label: 'Retry',
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const MyAttendanceHistoryScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.history_outlined, size: 18),
-                      label: const Text(
-                        'Attendance History',
-                        style: TextStyle(fontSize: 13),
-                      ),
+                    SizedBox(height: d.md),
+                  ],
+                  if (_stats != null) ...[
+                    ResponsiveGrid(
+                      minItemWidth: 150,
+                      maxColumns: 3,
+                      spacing: d.gap,
+                      children: [
+                        StatMetricCard(
+                          label: 'Registered',
+                          value:
+                              '${(_stats!['total_registered_events'] ?? _stats!['registered'] ?? 0)}',
+                          icon: Icons.event_available,
+                          color: d.primary,
+                          onTap: () =>
+                              setState(() => _selectedId = 'registrations'),
+                        ),
+                        StatMetricCard(
+                          label: 'Attended',
+                          value:
+                              '${(_stats!['total_attended_events'] ?? _stats!['attended'] ?? 0)}',
+                          icon: Icons.verified_user_outlined,
+                          color: d.success,
+                          onTap: () => setState(() => _selectedId = 'history'),
+                        ),
+                        StatMetricCard(
+                          label: 'Waiting List',
+                          value:
+                              '${(_stats!['waiting_list_count'] ?? _stats!['total_waiting_list'] ?? _stats!['waiting_list'] ?? _stats!['unread_notifications'] ?? 0)}',
+                          icon: Icons.queue_rounded,
+                          color: d.waiting,
+                          onTap: () =>
+                              setState(() => _selectedId = 'registrations'),
+                        ),
+                      ],
                     ),
+                    SizedBox(height: d.md),
+                  ],
+                  TextField(
+                    key: const ValueKey('student-events-search-input'),
+                    controller: _searchController,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      labelText: 'Search events by title or venue',
+                      hintText: 'Search events or venues...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: (_searchQuery.isNotEmpty ||
+                              _searchController.text.isNotEmpty)
+                          ? IconButton(
+                              tooltip: 'Clear search',
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                                _fetchEvents();
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (val) {
+                      setState(() => _searchQuery = val.trim());
+                    },
+                    onSubmitted: (val) {
+                      setState(() => _searchQuery = val.trim());
+                      _fetchEvents();
+                    },
                   ),
+                  SizedBox(height: d.md),
+                  SectionHeader(
+                    title: 'Campus Events',
+                    subtitle: _isLoading
+                        ? null
+                        : '${_events.length} event${_events.length == 1 ? '' : 's'} available',
+                  ),
+                  SizedBox(height: d.gap),
                 ],
               ),
             ),
-
-            // Search Bar
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: TextField(
-                controller: _searchController,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  labelText: 'Search events by title or venue',
-                  hintText: 'Search events or venues...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          tooltip: 'Clear search',
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                            _fetchEvents();
-                          },
-                        )
-                      : null,
+            if (_isLoading)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_errorMessage != null && _events.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: ErrorStateView(
+                  message: _errorMessage!,
+                  onRetry: _fetchEvents,
                 ),
-                onSubmitted: (val) {
-                  setState(() => _searchQuery = val.trim());
-                  _fetchEvents();
+              )
+            else if (_events.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: EmptyStateView(
+                  icon: Icons.event_busy,
+                  title: 'No upcoming events found.',
+                  message:
+                      'Check back soon or adjust your search filters.',
+                  actionLabel: 'Refresh',
+                  onAction: _fetchEvents,
+                ),
+              )
+            else
+              ResponsiveCardSliver(
+                itemCount: _events.length,
+                minItemWidth: 300,
+                maxColumns: 3,
+                itemBuilder: (context, index) {
+                  final event = _events[index];
+                  return EventCard(
+                    event: event,
+                    showEventStatusBadge: true,
+                    showCapacity: true,
+                    onTap: () => _openEventDetail(event),
+                    trailingAction: _buildEventTrailingAction(context, event),
+                  );
                 },
               ),
-            ),
-
-            // Events List
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null && _events.isEmpty
-                      ? ErrorStateView(
-                          message: _errorMessage!,
-                          onRetry: _fetchEvents,
-                        )
-                      : _events.isEmpty
-                          ? EmptyStateView(
-                              icon: Icons.event_busy,
-                              title: 'No upcoming events found.',
-                              message:
-                                  'Check back soon or adjust your search filters.',
-                              actionLabel: 'Refresh',
-                              onAction: _fetchEvents,
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _fetchEvents,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(
-                                  AppSpacing.md,
-                                  AppSpacing.sm,
-                                  AppSpacing.md,
-                                  80,
-                                ),
-                                itemCount: _events.length,
-                                itemBuilder: (context, index) {
-                                  final event = _events[index];
-                                  return EventCard(
-                                    event: event,
-                                    onTap: () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              EventDetailScreen(event: event),
-                                        ),
-                                      );
-                                      _fetchEvents();
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-            ),
           ],
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppShell(
+      title: _currentTitle,
+      destinations: _destinations,
+      selectedId: _selectedId,
+      onDestinationSelected: (id) {
+        setState(() => _selectedId = id);
+      },
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Refresh',
+          onPressed: _isLoading ? null : _fetchEvents,
+        ),
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          tooltip: 'Notifications',
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationsScreen(),
+              ),
+            );
+            if (!mounted) return;
+            _fetchEvents();
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.person_outline),
+          tooltip: 'My Profile',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            );
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Logout',
+          onPressed: _logout,
+        ),
+      ],
+      body: AppDestinationStack(
+        selectedId: _selectedId,
+        builders: {
+          'events': _buildEventsDestination,
+          'registrations': (_) => MyRegistrationsScreen(
+                embedded: true,
+                initialRegistrations: widget.initialRegistrations,
+              ),
+          'qr': (_) => PermanentQrScreen(
+                embedded: true,
+                initialQrData: widget.initialQrData,
+              ),
+          'history': (_) => MyAttendanceHistoryScreen(
+                embedded: true,
+                initialRecords: widget.initialAttendanceRecords,
+              ),
+        },
       ),
     );
   }

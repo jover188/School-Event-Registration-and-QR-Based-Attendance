@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
 
 class MyAttendanceHistoryScreen extends StatefulWidget {
-  const MyAttendanceHistoryScreen({super.key});
+  final bool embedded;
+  final List<Map<String, dynamic>>? initialRecords;
+  final String? initialErrorMessage;
+
+  const MyAttendanceHistoryScreen({
+    super.key,
+    this.embedded = false,
+    this.initialRecords,
+    this.initialErrorMessage,
+  });
 
   @override
   State<MyAttendanceHistoryScreen> createState() =>
@@ -19,13 +30,35 @@ class _MyAttendanceHistoryScreenState extends State<MyAttendanceHistoryScreen> {
   String? _errorMessage;
   List<Map<String, dynamic>> _records = [];
 
+  bool get _hasFixtureData =>
+      widget.initialRecords != null || widget.initialErrorMessage != null;
+
   @override
   void initState() {
     super.initState();
-    _fetchHistory();
+    if (_hasFixtureData) {
+      _isLoading = false;
+      _errorMessage = widget.initialErrorMessage;
+      _records = (widget.initialRecords ?? const [])
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } else {
+      _fetchHistory();
+    }
   }
 
   Future<void> _fetchHistory() async {
+    if (_hasFixtureData && widget.initialRecords != null) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = null;
+        _records = widget.initialRecords!
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -51,47 +84,49 @@ class _MyAttendanceHistoryScreenState extends State<MyAttendanceHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Attendance History'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Attendance History',
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetchHistory,
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null && _records.isEmpty
-                ? ErrorStateView(
-                    message: _errorMessage!,
-                    onRetry: _fetchHistory,
-                  )
-                : _records.isEmpty
-                    ? EmptyStateView(
-                        icon: Icons.fact_check_outlined,
-                        title: 'No attendance records yet',
-                        message:
-                            'Present your permanent student QR code at campus events to record check-ins and check-outs.',
-                        actionLabel: 'Refresh',
-                        onAction: _fetchHistory,
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _fetchHistory,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          itemCount: _records.length,
-                          itemBuilder: (context, index) {
-                            return _AttendanceHistoryCard(
-                              record: _records[index],
-                            );
-                          },
-                        ),
+    return AppPageScaffold(
+      title: 'Attendance History',
+      embedded: widget.embedded,
+      actions: [
+        IconButton(
+          tooltip: 'Refresh Attendance History',
+          icon: const Icon(Icons.refresh),
+          onPressed: _isLoading ? null : _fetchHistory,
+        ),
+      ],
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null && _records.isEmpty
+              ? ErrorStateView(
+                  message: _errorMessage!,
+                  onRetry: _fetchHistory,
+                )
+              : _records.isEmpty
+                  ? EmptyStateView(
+                      icon: Icons.fact_check_outlined,
+                      title: 'No attendance records yet',
+                      message:
+                          'Present your permanent student QR code at campus events to record check-ins and check-outs.',
+                      actionLabel: 'Refresh',
+                      onAction: _fetchHistory,
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _fetchHistory,
+                      child: CustomScrollView(
+                        slivers: [
+                          ResponsiveCardSliver(
+                            itemCount: _records.length,
+                            minItemWidth: 340,
+                            maxColumns: 2,
+                            itemBuilder: (context, index) {
+                              return _AttendanceHistoryCard(
+                                record: _records[index],
+                              );
+                            },
+                          ),
+                        ],
                       ),
-      ),
+                    ),
     );
   }
 }
@@ -103,103 +138,93 @@ class _AttendanceHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     final status = record['status']?.toString() ?? 'present';
     final checkInTime = record['check_in_time']?.toString() ?? 'N/A';
     final checkOutTime = record['check_out_time']?.toString();
+    final hasCheckOut = checkOutTime != null && checkOutTime.trim().isNotEmpty;
     final event = (record['event'] as Map<String, dynamic>?) ?? {};
     final title = event['title']?.toString() ?? 'Campus Event';
     final venue = event['venue']?.toString() ?? 'Campus Venue';
     final eventDate = event['event_date']?.toString() ?? '';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm + 4),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: AppTypography.subtitle.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+    return Container(
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: d.sm,
+            runSpacing: d.xs,
+            children: [
+              Text(
+                title,
+                style: d.cardTitle,
+              ),
+              StatusBadge(status: status),
+            ],
+          ),
+          SizedBox(height: d.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.location_on_outlined,
+                size: 16,
+                color: d.mutedForeground,
+              ),
+              SizedBox(width: d.xs),
+              Expanded(
+                child: Text(
+                  eventDate.isNotEmpty ? '$eventDate • $venue' : venue,
+                  style: d.supporting,
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
+          Divider(height: d.lg, color: d.border),
+          ResponsiveGrid(
+            minItemWidth: 160,
+            maxColumns: 2,
+            spacing: d.sm,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Check-In Time', style: d.supporting),
+                  const SizedBox(height: 2),
+                  Text(
+                    checkInTime,
+                    style: d.body.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Check-Out Time', style: d.supporting),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasCheckOut ? checkOutTime : 'Not checked out',
+                    style: d.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: hasCheckOut ? d.foreground : d.mutedForeground,
                     ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                StatusBadge(status: status),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                const Icon(
-                  Icons.location_on_outlined,
-                  size: 15,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    eventDate.isNotEmpty ? '$eventDate • $venue' : venue,
-                    style: AppTypography.bodyMuted,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: AppSpacing.lg),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Check-In Time',
-                        style: AppTypography.caption,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        checkInTime,
-                        style: AppTypography.body.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Check-Out Time',
-                        style: AppTypography.caption,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        checkOutTime != null && checkOutTime.isNotEmpty
-                            ? checkOutTime
-                            : 'Not checked out',
-                        style: AppTypography.body.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: checkOutTime != null && checkOutTime.isNotEmpty
-                              ? AppColors.textPrimary
-                              : AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
+import '../../core/widgets/status_badge.dart';
 
 class NotificationPreferencesScreen extends StatefulWidget {
-  const NotificationPreferencesScreen({super.key});
+  final Map<String, dynamic>? initialPreferences;
+
+  const NotificationPreferencesScreen({super.key, this.initialPreferences});
 
   @override
   State<NotificationPreferencesScreen> createState() =>
@@ -29,7 +34,21 @@ class _NotificationPreferencesScreenState
   @override
   void initState() {
     super.initState();
-    _fetchPreferences();
+    if (widget.initialPreferences != null) {
+      _isLoading = false;
+      _applyPreferences(widget.initialPreferences!);
+    } else {
+      _fetchPreferences();
+    }
+  }
+
+  void _applyPreferences(Map<String, dynamic> data) {
+    _newEventPublished = _parseBool(data['new_event_published']);
+    _registrationConfirmed = _parseBool(data['registration_confirmed']);
+    _eventReminders = _parseBool(data['event_reminders']);
+    _eventUpdates = _parseBool(data['event_updates']);
+    _waitingListPromoted = _parseBool(data['waiting_list_promoted']);
+    _adminAnnouncements = _parseBool(data['admin_announcements']);
   }
 
   bool _parseBool(dynamic val) {
@@ -53,13 +72,7 @@ class _NotificationPreferencesScreenState
     setState(() {
       _isLoading = false;
       if (response.success && response.data is Map<String, dynamic>) {
-        final data = response.data as Map<String, dynamic>;
-        _newEventPublished = _parseBool(data['new_event_published']);
-        _registrationConfirmed = _parseBool(data['registration_confirmed']);
-        _eventReminders = _parseBool(data['event_reminders']);
-        _eventUpdates = _parseBool(data['event_updates']);
-        _waitingListPromoted = _parseBool(data['waiting_list_promoted']);
-        _adminAnnouncements = _parseBool(data['admin_announcements']);
+        _applyPreferences(response.data as Map<String, dynamic>);
       } else if (!response.success) {
         _errorMessage =
             response.message ?? 'Failed to load notification preferences.';
@@ -106,198 +119,210 @@ class _NotificationPreferencesScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notification Preferences'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Preferences',
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetchPreferences,
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
-                ? ErrorStateView(
-                    message: _errorMessage!,
-                    onRetry: _fetchPreferences,
-                  )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Mandatory Critical Notifications (SRS NOTIF-004)
-                        const SectionHeader(
-                          title: 'Mandatory Critical Alerts',
-                          subtitle:
-                              'Required by school policy (SRS NOTIF-004) and cannot be disabled.',
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        const Card(
-                          child: Column(
-                            children: [
-                              SwitchListTile(
-                                value: true,
-                                onChanged: null,
-                                secondary: Icon(
-                                  Icons.warning_amber_rounded,
-                                  color: AppColors.absent,
-                                ),
-                                title: Text(
-                                  'Event Cancellations',
-                                  style: AppTypography.subtitle,
-                                ),
-                                subtitle: Text(
-                                  'Mandatory per school policy (SRS NOTIF-004) — immediate notice when a registered event is cancelled.',
-                                  style: AppTypography.caption,
-                                ),
+    final d = context.design;
+    return AppPageScaffold(
+      title: 'Notification Preferences',
+      maxWidth: 720,
+      actions: [
+        IconButton(
+          tooltip: 'Refresh Preferences',
+          icon: const Icon(Icons.refresh),
+          onPressed: _isLoading ? null : _fetchPreferences,
+        ),
+      ],
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? ErrorStateView(
+                  message: _errorMessage!,
+                  onRetry: _fetchPreferences,
+                )
+              : SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Mandatory Critical Notifications (SRS NOTIF-004)
+                      const SectionHeader(
+                        title: 'Mandatory Critical Alerts',
+                        subtitle:
+                            'Required by school policy (SRS NOTIF-004) and cannot be disabled.',
+                      ),
+                      SizedBox(height: d.sm),
+                      Card(
+                        child: Column(
+                          children: [
+                            SwitchListTile(
+                              value: true,
+                              onChanged: null,
+                              secondary: Icon(
+                                Icons.lock_outline,
+                                color: d.destructive,
                               ),
-                              Divider(height: 1),
-                              SwitchListTile(
-                                value: true,
-                                onChanged: null,
-                                secondary: Icon(
-                                  Icons.qr_code_scanner,
-                                  color: AppColors.present,
-                                ),
-                                title: Text(
-                                  'Attendance Confirmation',
-                                  style: AppTypography.subtitle,
-                                ),
-                                subtitle: Text(
-                                  'Mandatory per school policy (SRS NOTIF-004) — real-time receipt when your QR code is scanned.',
-                                  style: AppTypography.caption,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-
-                        // Optional Notification Preferences
-                        const SectionHeader(
-                          title: 'Optional Notifications',
-                          subtitle:
-                              'Customize non-critical event reminders and announcements.',
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Card(
-                          child: Column(
-                            children: [
-                              SwitchListTile(
-                                value: _newEventPublished,
-                                onChanged: (val) =>
-                                    setState(() => _newEventPublished = val),
-                                title: const Text(
-                                  'New Events Published',
-                                  style: AppTypography.subtitle,
-                                ),
-                                subtitle: const Text(
-                                  'Notify me when new campus events open for registration.',
-                                  style: AppTypography.caption,
-                                ),
-                              ),
-                              const Divider(height: 1),
-                              SwitchListTile(
-                                value: _registrationConfirmed,
-                                onChanged: (val) => setState(
-                                  () => _registrationConfirmed = val,
-                                ),
-                                title: const Text(
-                                  'Registration Confirmed',
-                                  style: AppTypography.subtitle,
-                                ),
-                                subtitle: const Text(
-                                  'Confirmations when you register or join a waiting list.',
-                                  style: AppTypography.caption,
-                                ),
-                              ),
-                              const Divider(height: 1),
-                              SwitchListTile(
-                                value: _waitingListPromoted,
-                                onChanged: (val) =>
-                                    setState(() => _waitingListPromoted = val),
-                                title: const Text(
-                                  'Waiting List Promotions',
-                                  style: AppTypography.subtitle,
-                                ),
-                                subtitle: const Text(
-                                  'Alerts when a slot opens and you are promoted to registered.',
-                                  style: AppTypography.caption,
-                                ),
-                              ),
-                              const Divider(height: 1),
-                              SwitchListTile(
-                                value: _eventReminders,
-                                onChanged: (val) =>
-                                    setState(() => _eventReminders = val),
-                                title: const Text(
-                                  'Upcoming Event Reminders',
-                                  style: AppTypography.subtitle,
-                                ),
-                                subtitle: const Text(
-                                  'Reminders 24 hours and 1 hour before registered events.',
-                                  style: AppTypography.caption,
-                                ),
-                              ),
-                              const Divider(height: 1),
-                              SwitchListTile(
-                                value: _eventUpdates,
-                                onChanged: (val) =>
-                                    setState(() => _eventUpdates = val),
-                                title: const Text(
-                                  'Event Schedule & Venue Updates',
-                                  style: AppTypography.subtitle,
-                                ),
-                                subtitle: const Text(
-                                  'Changes to event venue, date, or time.',
-                                  style: AppTypography.caption,
-                                ),
-                              ),
-                              const Divider(height: 1),
-                              SwitchListTile(
-                                value: _adminAnnouncements,
-                                onChanged: (val) =>
-                                    setState(() => _adminAnnouncements = val),
-                                title: const Text(
-                                  'Campus Announcements',
-                                  style: AppTypography.subtitle,
-                                ),
-                                subtitle: const Text(
-                                  'General broadcasts from school administration.',
-                                  style: AppTypography.caption,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-
-                        ElevatedButton.icon(
-                          key: const ValueKey<String>(
-                            'save-notification-preferences-button',
-                          ),
-                          onPressed: _isSaving ? null : _savePreferences,
-                          icon: const Icon(Icons.save_outlined),
-                          label: _isSaving
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
+                              title: Wrap(
+                                spacing: d.sm,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    'Event Cancellations',
+                                    style: d.cardTitle,
                                   ),
-                                )
-                              : const Text('Save Preferences'),
+                                  const StatusBadge(
+                                    status: 'active',
+                                    label: 'LOCKED',
+                                    showIcon: false,
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text(
+                                'Mandatory per school policy (SRS NOTIF-004) — immediate notice when a registered event is cancelled.',
+                                style: d.supporting,
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            SwitchListTile(
+                              value: true,
+                              onChanged: null,
+                              secondary: Icon(
+                                Icons.lock_outline,
+                                color: d.success,
+                              ),
+                              title: Wrap(
+                                spacing: d.sm,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    'Attendance Confirmation',
+                                    style: d.cardTitle,
+                                  ),
+                                  const StatusBadge(
+                                    status: 'active',
+                                    label: 'LOCKED',
+                                    showIcon: false,
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text(
+                                'Mandatory per school policy (SRS NOTIF-004) — real-time receipt when your QR code is scanned.',
+                                style: d.supporting,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      SizedBox(height: d.lg),
+
+                      // Optional Notification Preferences
+                      const SectionHeader(
+                        title: 'Optional Notifications',
+                        subtitle:
+                            'Customize non-critical event reminders and announcements.',
+                      ),
+                      SizedBox(height: d.sm),
+                      Card(
+                        child: Column(
+                          children: [
+                            SwitchListTile(
+                              value: _newEventPublished,
+                              onChanged: (val) =>
+                                  setState(() => _newEventPublished = val),
+                              title: Text(
+                                'New Events Published',
+                                style: d.cardTitle,
+                              ),
+                              subtitle: Text(
+                                'Notify me when new campus events open for registration.',
+                                style: d.supporting,
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            SwitchListTile(
+                              value: _registrationConfirmed,
+                              onChanged: (val) => setState(
+                                () => _registrationConfirmed = val,
+                              ),
+                              title: Text(
+                                'Registration Confirmed',
+                                style: d.cardTitle,
+                              ),
+                              subtitle: Text(
+                                'Confirmations when you register or join a waiting list.',
+                                style: d.supporting,
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            SwitchListTile(
+                              value: _waitingListPromoted,
+                              onChanged: (val) =>
+                                  setState(() => _waitingListPromoted = val),
+                              title: Text(
+                                'Waiting List Promotions',
+                                style: d.cardTitle,
+                              ),
+                              subtitle: Text(
+                                'Alerts when a slot opens and you are promoted to registered.',
+                                style: d.supporting,
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            SwitchListTile(
+                              value: _eventReminders,
+                              onChanged: (val) =>
+                                  setState(() => _eventReminders = val),
+                              title: Text(
+                                'Upcoming Event Reminders',
+                                style: d.cardTitle,
+                              ),
+                              subtitle: Text(
+                                'Reminders 24 hours and 1 hour before registered events.',
+                                style: d.supporting,
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            SwitchListTile(
+                              value: _eventUpdates,
+                              onChanged: (val) =>
+                                  setState(() => _eventUpdates = val),
+                              title: Text(
+                                'Event Schedule & Venue Updates',
+                                style: d.cardTitle,
+                              ),
+                              subtitle: Text(
+                                'Changes to event venue, date, or time.',
+                                style: d.supporting,
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            SwitchListTile(
+                              value: _adminAnnouncements,
+                              onChanged: (val) =>
+                                  setState(() => _adminAnnouncements = val),
+                              title: Text(
+                                'Campus Announcements',
+                                style: d.cardTitle,
+                              ),
+                              subtitle: Text(
+                                'General broadcasts from school administration.',
+                                style: d.supporting,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: d.lg),
+
+                      AppButton(
+                        key: const ValueKey<String>(
+                          'save-notification-preferences-button',
+                        ),
+                        onPressed: _isSaving ? null : _savePreferences,
+                        isLoading: _isSaving,
+                        icon: Icons.save_outlined,
+                        label: 'Save Preferences',
+                      ),
+                    ],
                   ),
-      ),
+                ),
     );
   }
 }
+

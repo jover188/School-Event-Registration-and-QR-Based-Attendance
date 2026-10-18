@@ -160,34 +160,14 @@ Every JSON response conforms to a consistent structure.
 
 ---
 
-### 2.4 Password Reset Request & Confirmation
-- **`POST /auth/forgot-password`**
-  - **Access:** Public
-  - **Body:** `{ "email": "student@school.edu" }`
-  - **Response `200 OK`:** Reset link/token sent to registered email.
-- **`POST /auth/reset-password`**
-  - **Access:** Public
-  - **Body:**
-```json
-{
-  "email": "student@school.edu",
-  "token": "reset_token_string",
-  "password": "NewPassword@123",
-  "password_confirmation": "NewPassword@123"
-}
-```
-  - **Response `200 OK`:** Password reset successfully; any existing sessions are invalidated.
-
----
-
-### 2.5 Authenticated Profile Management
+### 2.4 Authenticated Profile Management
 - **`GET /profile`**
   - **Access:** Authenticated (All roles)
   - **Description:** Retrieves authenticated user details, student profile (if student), and notification preferences.
 - **`PUT /profile`** (and **`POST /profile`** for `multipart/form-data` photo upload)
   - **Access:** Authenticated (All roles)
   - **Description:** Updates editable student profile details: `first_name`, `middle_name`, `last_name`, `course`, `year_level`, `section`, `department`, `contact_number`, `profile_photo` (JPG/PNG, max 2MB).
-  - **Note:** `student_id_number` and `email` are immutable by students.
+  - **Note:** `student_id_number` and `email` are immutable by students. Self-service forgot-password endpoints are omitted because student and staff accounts are integrated with the school SIS (and provisioned via database seeders for demo environments).
 - **`POST /profile/change-password`**
   - **Access:** Authenticated (All roles)
   - **Body:** Accepts `current_password` and `new_password` + `new_password_confirmation` (or `password` + `password_confirmation`):

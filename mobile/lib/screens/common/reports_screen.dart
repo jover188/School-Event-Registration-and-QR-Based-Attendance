@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -12,16 +15,34 @@ import '../../models/event_model.dart';
 
 class ReportsScreen extends StatefulWidget {
   final int? initialEventId;
+  final bool embedded;
+  final List<EventModel>? initialEvents;
+  final dynamic initialReportPayload;
+  final String? initialErrorMessage;
+  final String? initialReportType;
 
-  const ReportsScreen({super.key, this.initialEventId});
+  const ReportsScreen({
+    super.key,
+    this.initialEventId,
+    this.embedded = false,
+    this.initialEvents,
+    this.initialReportPayload,
+    this.initialErrorMessage,
+    this.initialReportType,
+  });
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  static const List<({String key, String label, bool needsEvent, bool needsStudent})>
-      _reportTypes = [
+  static const List<
+      ({
+        String key,
+        String label,
+        bool needsEvent,
+        bool needsStudent,
+      })> _reportTypes = [
     (
       key: 'event_attendance',
       label: 'Event Attendance Report',
@@ -87,9 +108,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
   String? _errorMessage;
   dynamic _reportPayload;
 
+  bool get _hasFixtures =>
+      widget.initialEvents != null ||
+      widget.initialReportPayload != null ||
+      widget.initialErrorMessage != null;
+
   @override
   void initState() {
     super.initState();
+    if (widget.initialReportType != null &&
+        _reportTypes.any((r) => r.key == widget.initialReportType)) {
+      _selectedReportType = widget.initialReportType!;
+    }
+
     _eventIdController = TextEditingController(
       text: widget.initialEventId != null ? '${widget.initialEventId}' : '1',
     );
@@ -99,7 +130,40 @@ class _ReportsScreenState extends State<ReportsScreen> {
     _dateFromController = TextEditingController();
     _dateToController = TextEditingController();
 
-    _loadEventsAndInitialReport();
+    if (_hasFixtures) {
+      _availableEvents = List<EventModel>.from(
+        widget.initialEvents ?? const [],
+      );
+      if (widget.initialEventId == null && _availableEvents.isNotEmpty) {
+        _eventIdController.text = '${_availableEvents.first.id}';
+      }
+      _reportPayload = widget.initialReportPayload;
+      _errorMessage = widget.initialErrorMessage;
+      _isLoadingReport = false;
+    } else {
+      _loadEventsAndInitialReport();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ReportsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialReportType != oldWidget.initialReportType &&
+        widget.initialReportType != null &&
+        _reportTypes.any((r) => r.key == widget.initialReportType)) {
+      _selectedReportType = widget.initialReportType!;
+    }
+    if (widget.initialEvents != oldWidget.initialEvents) {
+      _availableEvents = List<EventModel>.from(
+        widget.initialEvents ?? const [],
+      );
+    }
+    if (widget.initialReportPayload != oldWidget.initialReportPayload ||
+        widget.initialErrorMessage != oldWidget.initialErrorMessage) {
+      _reportPayload = widget.initialReportPayload;
+      _errorMessage = widget.initialErrorMessage;
+      _isLoadingReport = false;
+    }
   }
 
   @override
@@ -175,6 +239,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _errorMessage = 'Please enter or select a valid Event ID.';
         _reportPayload = null;
       });
+      _eventIdFocus.requestFocus();
       return;
     }
 
@@ -183,6 +248,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _errorMessage = 'Please enter a valid numeric Student ID.';
         _reportPayload = null;
       });
+      _studentIdFocus.requestFocus();
       return;
     }
 
@@ -232,6 +298,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _isLoadingReport = false;
         _reportPayload = payload ?? <String, dynamic>{};
       });
+    } else if (widget.initialReportPayload != null) {
+      setState(() {
+        _isLoadingReport = false;
+        _reportPayload = widget.initialReportPayload;
+        _errorMessage = null;
+      });
     } else {
       setState(() {
         _isLoadingReport = false;
@@ -244,6 +316,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final config = _currentConfig;
     final eventId = int.tryParse(_eventIdController.text.trim());
     final studentId = int.tryParse(_studentIdController.text.trim());
+
+    if (config.needsEvent && (eventId == null || eventId < 1)) {
+      setState(() {
+        _errorMessage = 'Please enter or select a valid Event ID.';
+      });
+      _eventIdFocus.requestFocus();
+      return;
+    }
+
+    if (config.needsStudent && (studentId == null || studentId < 1)) {
+      setState(() {
+        _errorMessage = 'Please enter a valid numeric Student ID.';
+      });
+      _studentIdFocus.requestFocus();
+      return;
+    }
 
     final queryParams = <String, String>{
       'report_type': _selectedReportType,
@@ -268,274 +356,308 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (!mounted) return;
     setState(() => _isExporting = false);
 
+    final upperFormat = format.toUpperCase();
     if (result.statusCode >= 200 &&
         result.statusCode < 300 &&
         result.bytes.isNotEmpty) {
-      final ext = format.toLowerCase();
-      final filename = 'report_$_selectedReportType.$ext';
+      final bytes = result.bytes;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.present,
+          backgroundColor: context.design.success,
           content: Text(
-            'Exported $filename (${result.bytes.length} bytes downloaded).',
+            '$upperFormat report generated (${bytes.length} bytes received).',
           ),
         ),
       );
+      await _showExportPreviewDialog(upperFormat, bytes);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.absent,
+          backgroundColor: context.design.destructive,
           content: Text(
             result.errorMessage ??
-                'Export not available for $_selectedReportType in ${format.toUpperCase()} format.',
+                'Export not available for $_selectedReportType in $upperFormat format.',
           ),
         ),
       );
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final config = _currentConfig;
+  Future<void> _showExportPreviewDialog(
+    String upperFormat,
+    List<int> bytes,
+  ) async {
+    String previewText;
+    try {
+      final decoded = utf8.decode(bytes, allowMalformed: true);
+      previewText =
+          decoded.length > 600 ? '${decoded.substring(0, 600)}…' : decoded;
+    } catch (_) {
+      previewText = 'Binary $upperFormat payload (${bytes.length} bytes).';
+    }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reports & Data Exports'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Report',
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoadingReport ? null : _generateReport,
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: FocusTraversalGroup(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SectionHeader(
-                  title: 'Report Configuration',
-                  subtitle: 'Select report type, target event/student, and filters',
-                ),
-                const SizedBox(height: AppSpacing.sm + 4),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        DropdownButtonFormField<String>(
-                          key: const ValueKey<String>('report-type-dropdown'),
-                          initialValue: _selectedReportType,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Report Type',
-                            prefixIcon: Icon(Icons.analytics_outlined),
-                          ),
-                          items: _reportTypes
-                              .map(
-                                (r) => DropdownMenuItem<String>(
-                                  value: r.key,
-                                  child: Text(
-                                    r.label,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedReportType = val);
-                              _generateReport();
-                            }
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        if (config.needsEvent) ...[
-                          if (_availableEvents.isNotEmpty) ...[
-                            DropdownButtonFormField<int>(
-                              key: const ValueKey<String>('report-event-picker'),
-                              initialValue: _availableEvents.any(
-                                (e) =>
-                                    e.id ==
-                                    int.tryParse(
-                                      _eventIdController.text.trim(),
-                                    ),
-                              )
-                                  ? int.tryParse(_eventIdController.text.trim())
-                                  : _availableEvents.first.id,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Select Event',
-                                prefixIcon: Icon(Icons.event_outlined),
-                              ),
-                              items: _availableEvents
-                                  .map(
-                                    (e) => DropdownMenuItem<int>(
-                                      value: e.id,
-                                      child: Text(
-                                        '#${e.id} • ${e.title}',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() {
-                                    _eventIdController.text = '$val';
-                                  });
-                                  _generateReport();
-                                }
-                              },
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                          ],
-                          TextField(
-                            key: const ValueKey<String>('report-event-id-field'),
-                            controller: _eventIdController,
-                            focusNode: _eventIdFocus,
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _generateReport(),
-                            decoration: const InputDecoration(
-                              labelText: 'Event ID',
-                              hintText: 'Enter numeric event ID',
-                              prefixIcon: Icon(Icons.tag),
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                        ],
-                        if (config.needsStudent) ...[
-                          TextField(
-                            key: const ValueKey<String>(
-                              'report-student-id-field',
-                            ),
-                            controller: _studentIdController,
-                            focusNode: _studentIdFocus,
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _generateReport(),
-                            decoration: const InputDecoration(
-                              labelText: 'Student Record ID',
-                              hintText: 'Enter numeric student ID (e.g. 1)',
-                              prefixIcon: Icon(Icons.person_search_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                        ],
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                key: const ValueKey<String>(
-                                  'report-department-field',
-                                ),
-                                controller: _departmentController,
-                                focusNode: _departmentFocus,
-                                textInputAction: TextInputAction.next,
-                                decoration: const InputDecoration(
-                                  labelText: 'Department (Optional)',
-                                  hintText: 'e.g. CCS',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: TextField(
-                                key: const ValueKey<String>(
-                                  'report-year-level-field',
-                                ),
-                                controller: _yearLevelController,
-                                focusNode: _yearLevelFocus,
-                                textInputAction: TextInputAction.next,
-                                decoration: const InputDecoration(
-                                  labelText: 'Year Level (Optional)',
-                                  hintText: 'e.g. 3rd Year',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                key: const ValueKey<String>(
-                                  'report-date-from-field',
-                                ),
-                                controller: _dateFromController,
-                                focusNode: _dateFromFocus,
-                                textInputAction: TextInputAction.next,
-                                decoration: const InputDecoration(
-                                  labelText: 'Date From (YYYY-MM-DD)',
-                                  hintText: '2026-01-01',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: TextField(
-                                key: const ValueKey<String>(
-                                  'report-date-to-field',
-                                ),
-                                controller: _dateToController,
-                                focusNode: _dateToFocus,
-                                textInputAction: TextInputAction.done,
-                                onSubmitted: (_) => _generateReport(),
-                                decoration: const InputDecoration(
-                                  labelText: 'Date To (YYYY-MM-DD)',
-                                  hintText: '2026-12-31',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        ElevatedButton.icon(
-                          key: const ValueKey<String>('generate-report-button'),
-                          onPressed: _isLoadingReport ? null : _generateReport,
-                          icon: const Icon(Icons.play_arrow_outlined),
-                          label: const Text('Generate Report'),
-                        ),
-                      ],
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final d = ctx.design;
+        return AlertDialog(
+          title: Text('$upperFormat Export Ready'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Report payload received from server (${bytes.length} bytes)',
+                    style: d.body.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: d.sm),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(d.sm),
+                    decoration: BoxDecoration(
+                      color: d.muted,
+                      borderRadius: BorderRadius.circular(d.radiusControl),
+                      border: Border.all(color: d.border),
+                    ),
+                    child: Text(
+                      previewText,
+                      style: d.supporting,
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _ReportExportButtonsCard(
-                  isExporting: _isExporting,
-                  onExportPdf: () => _exportReportFormat('pdf'),
-                  onExportCsv: () => _exportReportFormat('csv'),
-                  onExportExcel: () => _exportReportFormat('xlsx'),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                SectionHeader(
-                  title: 'Report Results',
-                  subtitle: config.label,
-                ),
-                const SizedBox(height: AppSpacing.sm + 4),
-                if (_isLoadingReport)
-                  const Padding(
-                    padding: EdgeInsets.all(AppSpacing.xl),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_errorMessage != null)
-                  ErrorStateView(
-                    message: _errorMessage!,
-                    onRetry: _generateReport,
-                  )
-                else
-                  _ReportPayloadViewer(
-                    reportType: _selectedReportType,
-                    payload: _reportPayload,
-                  ),
-              ],
+                ],
+              ),
             ),
+          ),
+          actions: [
+            AppButton(
+              variant: AppButtonVariant.primary,
+              label: 'Close',
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    final config = _currentConfig;
+    final selectedEventValue = _availableEvents.any(
+      (e) => e.id == int.tryParse(_eventIdController.text.trim()),
+    )
+        ? int.tryParse(_eventIdController.text.trim())
+        : (_availableEvents.isNotEmpty ? _availableEvents.first.id : null);
+
+    final filterFields = <Widget>[
+      if (config.needsEvent && _availableEvents.isNotEmpty)
+        DropdownButtonFormField<int>(
+          key: const ValueKey<String>('report-event-picker'),
+          initialValue: selectedEventValue,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Select Event',
+          ),
+          items: _availableEvents
+              .map(
+                (e) => DropdownMenuItem<int>(
+                  value: e.id,
+                  child: Text(
+                    '#${e.id} • ${e.title}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _eventIdController.text = '$val';
+              });
+              _generateReport();
+            }
+          },
+        ),
+      if (config.needsEvent)
+        TextField(
+          key: const ValueKey<String>('report-event-id-field'),
+          controller: _eventIdController,
+          focusNode: _eventIdFocus,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _generateReport(),
+          decoration: const InputDecoration(
+            labelText: 'Event ID',
+            hintText: 'Enter numeric event ID',
+          ),
+        ),
+      if (config.needsStudent)
+        TextField(
+          key: const ValueKey<String>('report-student-id-field'),
+          controller: _studentIdController,
+          focusNode: _studentIdFocus,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _generateReport(),
+          decoration: const InputDecoration(
+            labelText: 'Student Record ID',
+            hintText: 'Enter numeric student ID (e.g. 1)',
+          ),
+        ),
+      TextField(
+        key: const ValueKey<String>('report-department-field'),
+        controller: _departmentController,
+        focusNode: _departmentFocus,
+        textInputAction: TextInputAction.next,
+        decoration: const InputDecoration(
+          labelText: 'Department (Optional)',
+          hintText: 'e.g. CCS',
+        ),
+      ),
+      TextField(
+        key: const ValueKey<String>('report-year-level-field'),
+        controller: _yearLevelController,
+        focusNode: _yearLevelFocus,
+        textInputAction: TextInputAction.next,
+        decoration: const InputDecoration(
+          labelText: 'Year Level (Optional)',
+          hintText: 'e.g. 3rd Year',
+        ),
+      ),
+      TextField(
+        key: const ValueKey<String>('report-date-from-field'),
+        controller: _dateFromController,
+        focusNode: _dateFromFocus,
+        textInputAction: TextInputAction.next,
+        decoration: const InputDecoration(
+          labelText: 'Date From (YYYY-MM-DD)',
+          hintText: '2026-01-01',
+        ),
+      ),
+      TextField(
+        key: const ValueKey<String>('report-date-to-field'),
+        controller: _dateToController,
+        focusNode: _dateToFocus,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _generateReport(),
+        decoration: const InputDecoration(
+          labelText: 'Date To (YYYY-MM-DD)',
+          hintText: '2026-12-31',
+        ),
+      ),
+    ];
+
+    return AppPageScaffold(
+      title: 'Attendance & Event Reports',
+      embedded: widget.embedded,
+      actions: [
+        IconButton(
+          tooltip: 'Refresh Report',
+          icon: const Icon(Icons.refresh),
+          onPressed: _isLoadingReport ? null : _generateReport,
+        ),
+      ],
+      body: FocusTraversalGroup(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SectionHeader(
+                title: 'Report Configuration',
+                subtitle:
+                    'Select report type, target event/student, and filters',
+              ),
+              SizedBox(height: d.gap),
+              Container(
+                padding: EdgeInsets.all(d.md),
+                decoration: BoxDecoration(
+                  color: d.card,
+                  borderRadius: BorderRadius.circular(d.radiusCard),
+                  border: Border.all(color: d.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      key: const ValueKey<String>('report-type-dropdown'),
+                      initialValue: _selectedReportType,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Report Type',
+                      ),
+                      items: _reportTypes
+                          .map(
+                            (r) => DropdownMenuItem<String>(
+                              value: r.key,
+                              child: Text(
+                                r.label,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedReportType = val);
+                          _generateReport();
+                        }
+                      },
+                    ),
+                    SizedBox(height: d.md),
+                    ResponsiveGrid(
+                      minItemWidth: 220,
+                      maxColumns: 3,
+                      spacing: d.gap,
+                      children: filterFields,
+                    ),
+                    SizedBox(height: d.md),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: AppButton(
+                        key: const ValueKey<String>('generate-report-button'),
+                        onPressed: _isLoadingReport ? null : _generateReport,
+                        isLoading: _isLoadingReport,
+                        icon: Icons.play_arrow_outlined,
+                        label: 'Generate Report',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: d.md),
+              _ReportExportButtonsCard(
+                reportType: _selectedReportType,
+                isExporting: _isExporting,
+                onExportPdf: () => _exportReportFormat('pdf'),
+                onExportCsv: () => _exportReportFormat('csv'),
+                onExportExcel: () => _exportReportFormat('xlsx'),
+              ),
+              SizedBox(height: d.lg),
+              SectionHeader(
+                title: 'Report Results',
+                subtitle: config.label,
+              ),
+              SizedBox(height: d.gap),
+              if (_isLoadingReport)
+                Padding(
+                  padding: EdgeInsets.all(d.xl),
+                  child: const Center(child: CircularProgressIndicator()),
+                )
+              else if (_errorMessage != null)
+                ErrorStateView(
+                  message: _errorMessage!,
+                  onRetry: _generateReport,
+                )
+              else
+                _ReportPayloadViewer(
+                  reportType: _selectedReportType,
+                  payload: _reportPayload,
+                ),
+            ],
           ),
         ),
       ),
@@ -544,67 +666,76 @@ class _ReportsScreenState extends State<ReportsScreen> {
 }
 
 class _ReportExportButtonsCard extends StatelessWidget {
+  final String reportType;
   final bool isExporting;
   final VoidCallback onExportPdf;
   final VoidCallback onExportCsv;
   final VoidCallback onExportExcel;
 
   const _ReportExportButtonsCard({
+    required this.reportType,
     required this.isExporting,
     required this.onExportPdf,
     required this.onExportCsv,
     required this.onExportExcel,
   });
 
+  bool get _supportsPdf => reportType == 'event_attendance';
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+    final d = context.design;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 880),
+      child: Container(
+        padding: EdgeInsets.all(d.md),
+        decoration: BoxDecoration(
+          color: d.card,
+          borderRadius: BorderRadius.circular(d.radiusCard),
+          border: Border.all(color: d.border),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Download Official Report File',
-              style: AppTypography.subtitle,
+            Text(
+              'Export Report Payload',
+              style: d.cardTitle,
             ),
-            const SizedBox(height: AppSpacing.xs),
-            const Text(
-              'Export formatted records in PDF, CSV, or Excel (.xlsx)',
-              style: AppTypography.bodyMuted,
+            SizedBox(height: d.xs),
+            Text(
+              _supportsPdf
+                  ? 'Generate formatted report data in CSV, XLSX, or PDF.'
+                  : 'Generate formatted report data in CSV or XLSX (PDF is supported for Event Attendance Report).',
+              style: d.supporting,
+              softWrap: true,
             ),
-            const SizedBox(height: AppSpacing.sm + 4),
+            SizedBox(height: d.gap),
             Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
+              spacing: d.sm,
+              runSpacing: d.sm,
               children: [
-                OutlinedButton.icon(
-                  key: const ValueKey<String>('export-pdf-button'),
-                  onPressed: isExporting ? null : onExportPdf,
-                  icon: const Icon(
-                    Icons.picture_as_pdf_outlined,
-                    color: AppColors.absent,
-                  ),
-                  label: const Text('Export PDF'),
-                ),
-                OutlinedButton.icon(
+                AppButton(
                   key: const ValueKey<String>('export-csv-button'),
+                  variant: AppButtonVariant.outline,
                   onPressed: isExporting ? null : onExportCsv,
-                  icon: const Icon(
-                    Icons.table_rows_outlined,
-                    color: AppColors.primary,
-                  ),
-                  label: const Text('Export CSV'),
+                  icon: Icons.table_rows_outlined,
+                  label: 'Export CSV',
                 ),
-                OutlinedButton.icon(
+                AppButton(
                   key: const ValueKey<String>('export-excel-button'),
+                  variant: AppButtonVariant.outline,
                   onPressed: isExporting ? null : onExportExcel,
-                  icon: const Icon(
-                    Icons.grid_on_outlined,
-                    color: AppColors.present,
-                  ),
-                  label: const Text('Export Excel'),
+                  icon: Icons.grid_on_outlined,
+                  label: 'Export XLSX',
                 ),
+                if (_supportsPdf)
+                  AppButton(
+                    key: const ValueKey<String>('export-pdf-button'),
+                    variant: AppButtonVariant.outline,
+                    onPressed: isExporting ? null : onExportPdf,
+                    icon: Icons.picture_as_pdf_outlined,
+                    label: 'Export PDF',
+                  ),
               ],
             ),
           ],
@@ -625,6 +756,7 @@ class _ReportPayloadViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     if (payload == null) {
       return const EmptyStateView(
         icon: Icons.description_outlined,
@@ -635,38 +767,67 @@ class _ReportPayloadViewer extends StatelessWidget {
 
     if (payload is Map<String, dynamic>) {
       final map = payload as Map<String, dynamic>;
-      final nestedSummary = map['summary'] is Map<String, dynamic>
-          ? map['summary'] as Map<String, dynamic>
-          : map;
+      final Map<String, dynamic> summaryMap;
+      if (map['summary'] is Map<String, dynamic>) {
+        summaryMap = map['summary'] as Map<String, dynamic>;
+      } else {
+        summaryMap = {
+          for (final entry in map.entries)
+            if (entry.value is! List && entry.value is! Map)
+              entry.key: entry.value,
+        };
+      }
 
-      if ( nestedSummary.isEmpty) {
+      final rawList = map['records'] ??
+          map['items'] ??
+          map['data'] ??
+          map['attendances'];
+      final recordsList = rawList is List
+          ? rawList.whereType<Map<String, dynamic>>().toList()
+          : const <Map<String, dynamic>>[];
+
+      if (summaryMap.isEmpty && recordsList.isEmpty) {
         return const EmptyStateView(
           icon: Icons.inbox_outlined,
           title: 'No summary metrics available.',
         );
       }
 
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: nestedSummary.entries.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: AppSpacing.sm,
-          crossAxisSpacing: AppSpacing.sm,
-          childAspectRatio: 1.55,
-        ),
-        itemBuilder: (context, index) {
-          final entry = nestedSummary.entries.elementAt(index);
-          final label = entry.key.replaceAll('_', ' ').toUpperCase();
-          final value = entry.value?.toString() ?? 'N/A';
-          return StatMetricCard(
-            label: label,
-            value: value,
-            icon: Icons.query_stats_outlined,
-            color: AppColors.primary,
-          );
-        },
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (summaryMap.isNotEmpty)
+            ResponsiveGrid(
+              minItemWidth: 160,
+              maxColumns: 4,
+              spacing: d.gap,
+              children: [
+                for (final entry in summaryMap.entries)
+                  StatMetricCard(
+                    label: entry.key.replaceAll('_', ' ').toUpperCase(),
+                    value: entry.value?.toString() ?? 'N/A',
+                    icon: Icons.query_stats_outlined,
+                    color: d.primary,
+                  ),
+              ],
+            ),
+          if (summaryMap.isNotEmpty && recordsList.isNotEmpty)
+            SizedBox(height: d.md),
+          if (recordsList.isNotEmpty)
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 880),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final item in recordsList)
+                      _ReportRowItemCard(reportType: reportType, item: item),
+                  ],
+                ),
+              ),
+            ),
+        ],
       );
     }
 
@@ -680,21 +841,34 @@ class _ReportPayloadViewer extends StatelessWidget {
         );
       }
 
-      return ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: list.length,
-        itemBuilder: (context, index) {
-          final item = list[index];
-          return _ReportRowItemCard(reportType: reportType, item: item);
-        },
+      return Align(
+        alignment: Alignment.topLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 880),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final item in list)
+                _ReportRowItemCard(reportType: reportType, item: item),
+            ],
+          ),
+        ),
       );
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Text(payload.toString(), style: AppTypography.body),
+    return Align(
+      alignment: Alignment.topLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: Container(
+          padding: EdgeInsets.all(d.md),
+          decoration: BoxDecoration(
+            color: d.card,
+            borderRadius: BorderRadius.circular(d.radiusCard),
+            border: Border.all(color: d.border),
+          ),
+          child: Text(payload.toString(), style: d.body, softWrap: true),
+        ),
       ),
     );
   }
@@ -711,24 +885,48 @@ class _ReportRowItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     if (reportType == 'organizer_summary') {
       final email = item['email']?.toString() ?? 'Organizer';
       final eventsCount = item['events_count'] ?? 0;
       final totalRegs = item['total_registrations'] ?? 0;
       final totalAtt = item['total_attendances'] ?? 0;
 
-      return Card(
-        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: ListTile(
-          leading: const CircleAvatar(
-            backgroundColor: AppColors.primaryLight,
-            child: Icon(Icons.person_outline, color: AppColors.primary),
-          ),
-          title: Text(email, style: AppTypography.subtitle),
-          subtitle: Text(
-            'Events: $eventsCount • Registered: $totalRegs • Attended: $totalAtt',
-            style: AppTypography.bodyMuted,
-          ),
+      return Container(
+        margin: EdgeInsets.only(bottom: d.sm),
+        padding: EdgeInsets.all(d.md),
+        decoration: BoxDecoration(
+          color: d.card,
+          borderRadius: BorderRadius.circular(d.radiusCard),
+          border: Border.all(color: d.border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.all(d.sm),
+              decoration: BoxDecoration(
+                color: d.selection,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.person_outline, color: d.primary, size: 20),
+            ),
+            SizedBox(width: d.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(email, style: d.cardTitle, softWrap: true),
+                  SizedBox(height: d.xs),
+                  Text(
+                    'Events: $eventsCount • Registered: $totalRegs • Attended: $totalAtt',
+                    style: d.supporting,
+                    softWrap: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -752,29 +950,51 @@ class _ReportRowItemCard extends StatelessWidget {
         'Check-In: ${item['check_in_time'].toString().replaceAll('T', ' ').split('.').first}',
     ].join(' • ');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(primaryTitle, style: AppTypography.subtitle),
-                  if (secondarySubtitle.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(secondarySubtitle, style: AppTypography.bodyMuted),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            StatusBadge(status: status),
-          ],
-        ),
+    return Container(
+      margin: EdgeInsets.only(bottom: d.sm),
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stack = constraints.maxWidth < 380 ||
+              MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(primaryTitle, style: d.cardTitle, softWrap: true),
+              if (secondarySubtitle.isNotEmpty) ...[
+                SizedBox(height: d.xs),
+                Text(secondarySubtitle, style: d.supporting, softWrap: true),
+              ],
+            ],
+          );
+
+          if (stack) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                details,
+                SizedBox(height: d.sm),
+                StatusBadge(status: status),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: details),
+              SizedBox(width: d.sm),
+              StatusBadge(status: status),
+            ],
+          );
+        },
       ),
     );
   }

@@ -1,21 +1,30 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
+import '../../core/widgets/stat_metric_card.dart';
 import '../../core/widgets/status_badge.dart';
 
 class EventRegistrationsScreen extends StatefulWidget {
   final int eventId;
   final String eventTitle;
   final bool canCancel;
+  final List<Map<String, dynamic>>? initialRegistrations;
+  final Map<String, int>? initialSummary;
 
   const EventRegistrationsScreen({
     super.key,
     required this.eventId,
     required this.eventTitle,
     this.canCancel = true,
+    this.initialRegistrations,
+    this.initialSummary,
   });
 
   @override
@@ -24,15 +33,65 @@ class EventRegistrationsScreen extends StatefulWidget {
 }
 
 class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
+  late final TextEditingController _searchController = TextEditingController();
+  late final FocusNode _searchFocus = FocusNode();
+
   bool _isLoading = true;
   String? _errorMessage;
   String _selectedStatus = 'all';
   List<Map<String, dynamic>> _registrations = [];
+  Map<String, int> _summary = {
+    'total': 0,
+    'registered': 0,
+    'waiting_list': 0,
+    'walk_in': 0,
+  };
+
+  bool get _hasFixtures =>
+      widget.initialRegistrations != null || widget.initialSummary != null;
 
   @override
   void initState() {
     super.initState();
-    _fetchRegistrations();
+    if (_hasFixtures) {
+      _isLoading = false;
+      _registrations = List<Map<String, dynamic>>.from(
+        widget.initialRegistrations ?? const [],
+      );
+      _summary = _computeSummary(_registrations, widget.initialSummary);
+    } else {
+      _fetchRegistrations();
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  static Map<String, int> _computeSummary(
+    List<Map<String, dynamic>> items, [
+    Map<String, int>? overrideSummary,
+  ]) {
+    if (overrideSummary != null) {
+      return {
+        'total': overrideSummary['total'] ?? items.length,
+        'registered': overrideSummary['registered'] ?? 0,
+        'waiting_list': overrideSummary['waiting_list'] ?? 0,
+        'walk_in': overrideSummary['walk_in'] ?? 0,
+      };
+    }
+    return {
+      'total': items.length,
+      'registered':
+          items.where((r) => r['status']?.toString() == 'registered').length,
+      'waiting_list':
+          items.where((r) => r['status']?.toString() == 'waiting_list').length,
+      'walk_in':
+          items.where((r) => r['status']?.toString() == 'walk_in').length,
+    };
   }
 
   Future<void> _fetchRegistrations() async {
@@ -59,11 +118,33 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
         _registrations = (response.data as List)
             .whereType<Map<String, dynamic>>()
             .toList();
-      } else {
+        if (_selectedStatus == 'all') {
+          _summary = _computeSummary(_registrations);
+        }
+      } else if (_registrations.isEmpty) {
         _errorMessage =
             response.message ?? 'Failed to load event registrations.';
       }
     });
+  }
+
+  List<Map<String, dynamic>> get _filteredRegistrations {
+    final query = _searchController.text.trim().toLowerCase();
+    return _registrations.where((reg) {
+      final status = reg['status']?.toString().toLowerCase() ?? 'registered';
+      final matchesStatus =
+          _selectedStatus == 'all' || status == _selectedStatus;
+      if (!matchesStatus) return false;
+      if (query.isEmpty) return true;
+      final student = (reg['student'] as Map<String, dynamic>?) ?? {};
+      final fullName = _resolveStudentName(student).toLowerCase();
+      final studentId =
+          student['student_id_number']?.toString().toLowerCase() ?? '';
+      final course = student['course']?.toString().toLowerCase() ?? '';
+      return fullName.contains(query) ||
+          studentId.contains(query) ||
+          course.contains(query);
+    }).toList();
   }
 
   Future<void> _confirmAndCancelRegistration(
@@ -139,92 +220,150 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Registrations: ${widget.eventTitle}'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Registrations',
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetchRegistrations,
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!widget.canCancel)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
-                ),
-                color: AppColors.primaryLight,
-                child: const Row(
-                  children: [
-                    Icon(
-                      Icons.visibility_outlined,
-                      size: 18,
-                      color: AppColors.primary,
+    final d = context.design;
+    final visibleRegistrations = _filteredRegistrations;
+
+    return AppPageScaffold(
+      title: 'Registrations — ${widget.eventTitle}',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh Registrations',
+          icon: const Icon(Icons.refresh),
+          onPressed: _isLoading ? null : _fetchRegistrations,
+        ),
+      ],
+      body: RefreshIndicator(
+        onRefresh: _fetchRegistrations,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!widget.canCancel) ...[
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: d.md,
+                    vertical: d.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: d.selection,
+                    borderRadius: BorderRadius.circular(d.radiusControl),
+                    border: Border.all(
+                      color: d.primary.withValues(alpha: 0.25),
                     ),
-                    SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        'Read-Only View: Registration mutations are disabled for School Management.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primary,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.visibility_outlined,
+                        size: 18,
+                        color: d.primary,
+                      ),
+                      SizedBox(width: d.sm),
+                      Expanded(
+                        child: Text(
+                          'Read-Only View: Registration mutations are disabled for School Management.',
+                          style: d.supporting.copyWith(
+                            color: d.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+                SizedBox(height: d.md),
+              ],
+              ResponsiveGrid(
+                minItemWidth: 150,
+                maxColumns: 4,
+                children: [
+                  StatMetricCard(
+                    label: 'Total',
+                    value: '${_summary['total'] ?? 0}',
+                    icon: Icons.people_alt_outlined,
+                    color: d.primary,
+                  ),
+                  StatMetricCard(
+                    label: 'Registered',
+                    value: '${_summary['registered'] ?? 0}',
+                    icon: Icons.check_circle_outline,
+                    color: d.success,
+                  ),
+                  StatMetricCard(
+                    label: 'Waiting List',
+                    value: '${_summary['waiting_list'] ?? 0}',
+                    icon: Icons.queue_rounded,
+                    color: d.waiting,
+                  ),
+                  StatMetricCard(
+                    label: 'Walk-In',
+                    value: '${_summary['walk_in'] ?? 0}',
+                    icon: Icons.directions_walk,
+                    color: d.information,
+                  ),
+                ],
+              ),
+              SizedBox(height: d.md),
+              TextField(
+                key: const ValueKey<String>('registration-search-field'),
+                controller: _searchController,
+                focusNode: _searchFocus,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Search student name, ID, or course',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          tooltip: 'Clear Search',
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
                 ),
               ),
-            _RegistrationStatusFilterBar(
-              selectedStatus: _selectedStatus,
-              onSelectStatus: (status) {
-                setState(() => _selectedStatus = status);
-                _fetchRegistrations();
-              },
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
-                      ? ErrorStateView(
-                          message: _errorMessage!,
-                          onRetry: _fetchRegistrations,
-                        )
-                      : _registrations.isEmpty
-                          ? EmptyStateView(
-                              icon: Icons.how_to_reg_outlined,
-                              title: 'No registrations found.',
-                              message:
-                                  'No student registrations match the selected filter.',
-                              actionLabel: 'Refresh',
-                              onAction: _fetchRegistrations,
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _fetchRegistrations,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.all(AppSpacing.md),
-                                itemCount: _registrations.length,
-                                itemBuilder: (context, index) {
-                                  final reg = _registrations[index];
-                                  return _RegistrationItemCard(
-                                    registration: reg,
-                                    canCancel: widget.canCancel,
-                                    onCancel: () =>
-                                        _confirmAndCancelRegistration(reg),
-                                  );
-                                },
-                              ),
-                            ),
-            ),
-          ],
+              SizedBox(height: d.sm),
+              _RegistrationStatusFilterBar(
+                selectedStatus: _selectedStatus,
+                onSelectStatus: (status) {
+                  setState(() => _selectedStatus = status);
+                  if (!_hasFixtures) {
+                    _fetchRegistrations();
+                  }
+                },
+              ),
+              SizedBox(height: d.md),
+              if (_isLoading && _registrations.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_errorMessage != null && _registrations.isEmpty)
+                ErrorStateView(
+                  message: _errorMessage!,
+                  onRetry: _fetchRegistrations,
+                )
+              else if (visibleRegistrations.isEmpty)
+                EmptyStateView(
+                  icon: Icons.how_to_reg_outlined,
+                  title: 'No registrations found.',
+                  message:
+                      'No student registrations match the selected filter.',
+                  actionLabel: 'Refresh',
+                  onAction: _fetchRegistrations,
+                )
+              else
+                for (final reg in visibleRegistrations)
+                  _RegistrationItemCard(
+                    registration: reg,
+                    canCancel: widget.canCancel,
+                    onCancel: () => _confirmAndCancelRegistration(reg),
+                  ),
+            ],
+          ),
         ),
       ),
     );
@@ -250,26 +389,42 @@ class _RegistrationStatusFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm + 2,
-      ),
-      child: Row(
-        children: [
-          for (final filter in _filters)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.sm),
-              child: ChoiceChip(
-                key: ValueKey<String>('reg-filter-${filter.value}'),
-                label: Text(filter.label),
-                selected: selectedStatus == filter.value,
-                onSelected: (_) => onSelectStatus(filter.value),
+    final d = context.design;
+    return Wrap(
+      spacing: d.sm,
+      runSpacing: d.xs,
+      children: [
+        for (final filter in _filters)
+          AppPressable(
+            key: ValueKey<String>('reg-filter-${filter.value}'),
+            semanticLabel: filter.label,
+            selected: selectedStatus == filter.value,
+            onPressed: () => onSelectStatus(filter.value),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 40),
+              padding: EdgeInsets.symmetric(
+                horizontal: d.gap,
+                vertical: d.xs + 2,
+              ),
+              decoration: BoxDecoration(
+                color: selectedStatus == filter.value ? d.selection : d.card,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                border: Border.all(
+                  color:
+                      selectedStatus == filter.value ? d.primary : d.border,
+                ),
+              ),
+              child: Text(
+                filter.label,
+                style: d.badge.copyWith(
+                  color: selectedStatus == filter.value
+                      ? d.primary
+                      : d.foreground,
+                ),
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -287,6 +442,8 @@ class _RegistrationItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
+    final regId = registration['id'];
     final student =
         (registration['student'] as Map<String, dynamic>?) ?? {};
     final fullName =
@@ -309,71 +466,72 @@ class _RegistrationItemCard extends StatelessWidget {
     final isCancellable =
         canCancel && (status == 'registered' || status == 'waiting_list');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          fullName,
-                          style: AppTypography.subtitle.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      StatusBadge(
-                        status: status,
-                        label: status == 'waiting_list' && waitingPos != null
-                            ? 'WAITING #$waitingPos'
-                            : null,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Student ID: $studentIdNumber',
-                    style: AppTypography.bodyMuted,
-                  ),
-                  if (academicMeta.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      academicMeta,
-                      style: AppTypography.caption,
-                    ),
-                  ],
-                  if (registeredAt.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'Registered: ${registeredAt.split('T').first}',
-                      style: AppTypography.caption,
-                    ),
-                  ],
-                ],
+    return Container(
+      margin: EdgeInsets.only(bottom: d.gap),
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: d.sm,
+            runSpacing: d.xs,
+            children: [
+              Text(
+                fullName,
+                style: d.cardTitle,
+                softWrap: true,
               ),
-            ),
-            if (isCancellable) ...[
-              const SizedBox(width: AppSpacing.xs),
-              IconButton(
-                tooltip: 'Cancel Student Registration',
-                icon: const Icon(
-                  Icons.person_remove_outlined,
-                  color: AppColors.absent,
-                ),
-                onPressed: onCancel,
+              StatusBadge(
+                status: status,
+                label: status == 'waiting_list' && waitingPos != null
+                    ? 'WAITING #$waitingPos'
+                    : null,
               ),
             ],
+          ),
+          SizedBox(height: d.xs),
+          Text(
+            'Student ID: $studentIdNumber',
+            style: d.supporting.copyWith(
+              color: d.foreground,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (academicMeta.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              academicMeta,
+              style: d.supporting,
+            ),
           ],
-        ),
+          if (registeredAt.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Registered: ${registeredAt.split('T').first}',
+              style: d.supporting,
+            ),
+          ],
+          if (isCancellable) ...[
+            SizedBox(height: d.gap),
+            Align(
+              alignment: Alignment.centerRight,
+              child: AppButton(
+                key: ValueKey<String>('cancel-registration-$regId'),
+                variant: AppButtonVariant.destructive,
+                icon: Icons.person_remove_outlined,
+                label: 'Cancel Registration',
+                onPressed: onCancel,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -1,20 +1,22 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_pressable.dart';
+import 'account_input.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../management/management_dashboard_screen.dart';
 import '../organizer/organizer_dashboard_screen.dart';
 import '../student/student_dashboard_screen.dart';
-import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  final VoidCallback? onForgotPassword;
-
   const LoginScreen({
     super.key,
-    this.onForgotPassword,
   });
 
   @override
@@ -43,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) {
       setState(() {
         _autovalidateMode = AutovalidateMode.onUserInteraction;
@@ -101,170 +104,475 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _handleForgotPasswordTap() {
-    if (widget.onForgotPassword != null) {
-      widget.onForgotPassword!();
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const ForgotPasswordScreen(),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.xl,
-            ),
-            child: FocusTraversalGroup(
-              child: AutofillGroup(
-                child: Form(
-                  key: _formKey,
-                  autovalidateMode: _autovalidateMode,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Icon(
-                        Icons.qr_code_scanner_rounded,
-                        size: 72,
-                        color: AppColors.primary,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      const Text(
-                        'School Event Attendance',
-                        textAlign: TextAlign.center,
-                        style: AppTypography.headline,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      const Text(
-                        'QR-Based Attendance & Event System',
-                        textAlign: TextAlign.center,
-                        style: AppTypography.bodyMuted,
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      if (_errorMessage != null) ...[
-                        Semantics(
-                          liveRegion: true,
+    final d = context.design;
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    final overlayStyle =
+        ThemeData.estimateBrightnessForColor(d.authPage) == Brightness.dark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark;
+    final fieldDecoration = ShadDecoration(
+      color: d.authLight,
+      border: ShadBorder.all(
+        color: d.authDark.withValues(alpha: 0.08),
+        width: 1,
+        radius: BorderRadius.circular(d.authFieldRadius),
+      ),
+      focusedBorder: ShadBorder.all(
+        color: d.authDark,
+        width: 1.5,
+        radius: BorderRadius.circular(d.authFieldRadius),
+      ),
+      errorBorder: ShadBorder.all(
+        color: d.destructive,
+        width: 1.5,
+        radius: BorderRadius.circular(d.authFieldRadius),
+      ),
+      errorPadding: EdgeInsets.only(
+        left: d.md + (d.xs / 2),
+        top: d.xs + 2,
+      ),
+      errorStyle: d.supporting.copyWith(
+        color: d.destructive,
+        fontWeight: FontWeight.w600,
+      ),
+      shadows: [
+        BoxShadow(
+          color: d.authDark.withValues(alpha: 0.05),
+          offset: const Offset(0, 2),
+          blurRadius: 10,
+        ),
+      ],
+      disableSecondaryBorder: true,
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: Scaffold(
+        backgroundColor: d.authPage,
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final leftInset = math.max(d.md, viewPadding.left);
+            final rightInset = math.max(d.md, viewPadding.right);
+            final topInset = d.md + viewPadding.top;
+            final bottomInset = d.md + viewPadding.bottom;
+            final surfaceWidth = math.max(
+              0.0,
+              math.min(
+                d.authSurfaceMaxWidth,
+                constraints.maxWidth - leftInset - rightInset,
+              ),
+            );
+            final isNarrowCard = surfaceWidth <= 400;
+            final isVeryNarrowCard = surfaceWidth < 320;
+            final headerHeight = surfaceWidth * d.authHeaderAspectRatio;
+            final availableHeight = math.max(
+              0.0,
+              constraints.maxHeight - topInset - bottomInset,
+            );
+            final surfaceRadius = BorderRadius.circular(d.authSurfaceRadius);
+
+            return SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(
+                leftInset,
+                topInset,
+                rightInset,
+                bottomInset,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: availableHeight,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints:
+                        BoxConstraints(maxWidth: d.authSurfaceMaxWidth),
+                    child: FocusTraversalGroup(
+                      child: AutofillGroup(
+                        child: Form(
+                          key: _formKey,
+                          autovalidateMode: _autovalidateMode,
                           child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.sm + 4),
+                            key: const ValueKey<String>('login-surface'),
+                            width: surfaceWidth,
+                            clipBehavior: Clip.antiAlias,
                             decoration: BoxDecoration(
-                              color: AppColors.absent.withValues(alpha: 0.1),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.sm),
-                              border: Border.all(color: AppColors.absent),
-                            ),
-                            child: Text(
-                              _errorMessage!,
-                              style: AppTypography.bodyMuted.copyWith(
-                                color: AppColors.absent,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                      ],
-                      TextFormField(
-                        key: const ValueKey<String>('login-identifier-field'),
-                        controller: _loginController,
-                        focusNode: _loginFocus,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.username],
-                        onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
-                        decoration: const InputDecoration(
-                          labelText: 'Student ID or School Email',
-                          hintText: 'e.g. 20260001 or student@school.edu',
-                          prefixIcon: Icon(Icons.person_outline),
-                        ),
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Please enter your student ID or email';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextFormField(
-                        key: const ValueKey<String>('login-password-field'),
-                        controller: _passwordController,
-                        focusNode: _passwordFocus,
-                        obscureText: _obscurePassword,
-                        keyboardType: TextInputType.visiblePassword,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [AutofillHints.password],
-                        onFieldSubmitted: (_) => _handleLogin(),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            tooltip: _obscurePassword
-                                ? 'Show password'
-                                : 'Hide password',
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                        ),
-                        validator: (val) {
-                          if (val == null || val.isEmpty) {
-                            return 'Please enter your password';
-                          }
-                          return null;
-                        },
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed:
-                              _isLoading ? null : _handleForgotPasswordTap,
-                          child: const Text('Forgot Password?'),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      ElevatedButton(
-                        key: const ValueKey<String>('login-submit-button'),
-                        onPressed: _isLoading ? null : _handleLogin,
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
+                              color: d.authSurface,
+                              borderRadius: surfaceRadius,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: d.authDark.withValues(alpha: 0.18),
+                                  offset: const Offset(0, 24),
+                                  blurRadius: 60,
                                 ),
-                              )
-                            : const Text('Log In'),
+                              ],
+                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(
+                                key: const ValueKey<String>('login-header'),
+                                height: headerHeight,
+                                child: CustomPaint(
+                                  painter: AttendifyHeaderPainter(
+                                    color: d.authDark,
+                                  ),
+                                  child: Padding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      isNarrowCard ? d.lg : d.xl,
+                                      isVeryNarrowCard
+                                          ? d.md
+                                          : isNarrowCard
+                                              ? d.lg + d.xs
+                                              : d.xl + d.xs,
+                                      isNarrowCard ? d.lg : d.xl,
+                                      0,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        SvgPicture.asset(
+                                          'assets/images/logo_icon.svg',
+                                          key: const ValueKey<String>(
+                                            'attendify-login-logo',
+                                          ),
+                                          width: d.authLogoSize,
+                                          height: d.authLogoSize,
+                                          fit: BoxFit.contain,
+                                          alignment: Alignment.centerLeft,
+                                          colorFilter: ColorFilter.mode(
+                                            d.authLight,
+                                            BlendMode.srcIn,
+                                          ),
+                                          placeholderBuilder: (_) =>
+                                              Image.asset(
+                                            'assets/images/logo_mark.png',
+                                            width: d.authLogoSize,
+                                            height: d.authLogoSize,
+                                            color: d.authLight,
+                                          ),
+                                          semanticsLabel: 'Attendify',
+                                        ),
+                                        SizedBox(height: d.sm),
+                                        Text(
+                                          'Attendify',
+                                          key: const ValueKey<String>(
+                                            'attendify-brand-name',
+                                          ),
+                                          style: d.authBrand.copyWith(
+                                            color: d.authLight,
+                                          ),
+                                        ),
+                                        SizedBox(height: d.xs),
+                                        Text(
+                                          'Welcome back! Log in to continue.',
+                                          style: d.body.copyWith(
+                                            color: d.authLight
+                                                .withValues(alpha: 0.62),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  isNarrowCard ? d.lg : d.xl,
+                                  d.sm,
+                                  isNarrowCard ? d.lg : d.xl,
+                                  d.xl + d.sm,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      'Login',
+                                      key: const ValueKey<String>(
+                                        'login-title',
+                                      ),
+                                      style: d.authTitle.copyWith(
+                                        color: d.authDark,
+                                        fontSize: isNarrowCard ? 30 : 34,
+                                      ),
+                                    ),
+                                    SizedBox(height: d.lg - (d.xs / 2)),
+                                    if (_errorMessage != null) ...[
+                                      Semantics(
+                                        liveRegion: true,
+                                        child: Container(
+                                          padding: EdgeInsets.all(d.gap),
+                                          decoration: BoxDecoration(
+                                            color: d.dangerBackground,
+                                            borderRadius: BorderRadius.circular(
+                                              d.radiusControl,
+                                            ),
+                                            border: Border.all(
+                                              color: d.destructive,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                LucideIcons.alertCircle,
+                                                size: 18,
+                                                color: d.destructive,
+                                              ),
+                                              SizedBox(width: d.sm),
+                                              Expanded(
+                                                child: Text(
+                                                  _errorMessage!,
+                                                  style: d.supporting.copyWith(
+                                                    color: d.destructive,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: d.md),
+                                    ],
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        left: d.md + (d.xs / 2),
+                                      ),
+                                      child: Text(
+                                        'ID or email',
+                                        style: d.body.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: d.authDark,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(height: d.sm),
+                                    AccountInput(
+                                      key: const ValueKey<String>(
+                                        'login-identifier-field',
+                                      ),
+                                      controller: _loginController,
+                                      focusNode: _loginFocus,
+                                      keyboardType: TextInputType.emailAddress,
+                                      textInputAction: TextInputAction.next,
+                                      autofillHints: const [
+                                        AutofillHints.username,
+                                      ],
+                                      showLeadingDivider: false,
+                                      fieldDecoration: fieldDecoration,
+                                      fieldPadding: EdgeInsets.symmetric(
+                                        horizontal: d.md + (d.xs / 2),
+                                        vertical: (d.authFieldHeight - 26) / 2,
+                                      ),
+                                      textStyle: d.authInputText.copyWith(
+                                        color: d.authDark,
+                                      ),
+                                      cursorColor: d.authDark,
+                                      selectionColor: d.authDarkSelection,
+                                      placeholderStyle:
+                                          d.authInputText.copyWith(
+                                        color:
+                                            d.authDark.withValues(alpha: 0.48),
+                                      ),
+                                      constraints: BoxConstraints(
+                                        minHeight: d.authFieldHeight,
+                                      ),
+                                      onFieldSubmitted: (_) =>
+                                          _passwordFocus.requestFocus(),
+                                      decoration: const InputDecoration(
+                                        hintText: 'you@school.edu.ph',
+                                      ),
+                                      validator: (val) {
+                                        if (val == null || val.trim().isEmpty) {
+                                          return 'Please enter your student ID or email';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                    SizedBox(
+                                      height: d.md + (d.xs / 2),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        left: d.md + (d.xs / 2),
+                                      ),
+                                      child: Text(
+                                        'Password',
+                                        style: d.body.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: d.authDark,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(height: d.sm),
+                                    Stack(
+                                      children: [
+                                        AccountInput(
+                                          key: const ValueKey<String>(
+                                            'login-password-field',
+                                          ),
+                                          controller: _passwordController,
+                                          focusNode: _passwordFocus,
+                                          obscureText: _obscurePassword,
+                                          keyboardType:
+                                              TextInputType.visiblePassword,
+                                          textInputAction: TextInputAction.done,
+                                          autofillHints: const [
+                                            AutofillHints.password,
+                                          ],
+                                          showLeadingDivider: false,
+                                          fieldDecoration: fieldDecoration,
+                                          fieldPadding: EdgeInsets.only(
+                                            left: d.md + (d.xs / 2),
+                                            right: d.minimumTarget + d.sm,
+                                            top: (d.authFieldHeight - 26) / 2,
+                                            bottom:
+                                                (d.authFieldHeight - 26) / 2,
+                                          ),
+                                          textStyle: d.authInputText.copyWith(
+                                            color: d.authDark,
+                                          ),
+                                          cursorColor: d.authDark,
+                                          selectionColor: d.authDarkSelection,
+                                          placeholderStyle:
+                                              d.authInputText.copyWith(
+                                            color: d.authDark.withValues(
+                                              alpha: 0.48,
+                                            ),
+                                          ),
+                                          constraints: BoxConstraints(
+                                            minHeight: d.authFieldHeight,
+                                          ),
+                                          onFieldSubmitted: (_) =>
+                                              _handleLogin(),
+                                          decoration: const InputDecoration(
+                                            hintText: 'Enter your password',
+                                          ),
+                                          validator: (val) {
+                                            if (val == null || val.isEmpty) {
+                                              return 'Please enter your password';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                        Positioned(
+                                          top: (d.authFieldHeight -
+                                                  d.minimumTarget) /
+                                              2,
+                                          right: d.xs,
+                                          child: Tooltip(
+                                            message: _obscurePassword
+                                                ? 'Show password'
+                                                : 'Hide password',
+                                            child: AppPressable(
+                                              key: const ValueKey<String>(
+                                                'password-visibility-toggle',
+                                              ),
+                                              semanticLabel: _obscurePassword
+                                                  ? 'Show password'
+                                                  : 'Hide password',
+                                              onPressed: () {
+                                                setState(() {
+                                                  _obscurePassword =
+                                                      !_obscurePassword;
+                                                });
+                                              },
+                                              child: SizedBox.square(
+                                                dimension: d.minimumTarget,
+                                                child: Icon(
+                                                  _obscurePassword
+                                                      ? LucideIcons.eyeOff
+                                                      : LucideIcons.eye,
+                                                  size: 20,
+                                                  color: d.authDark.withValues(
+                                                    alpha: 0.62,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(
+                                      height: d.xl,
+                                    ),
+                                    SizedBox(
+                                      height: d.authButtonHeight,
+                                      child: AppButton(
+                                        key: const ValueKey<String>(
+                                          'login-submit-button',
+                                        ),
+                                        onPressed:
+                                            _isLoading ? null : _handleLogin,
+                                        isLoading: _isLoading,
+                                        pill: true,
+                                        backgroundColor: d.authDark,
+                                        foregroundColor: d.authLight,
+                                        borderColor: d.authDark,
+                                        labelStyle: d.authButtonLabel,
+                                        label: 'Login',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      const Text(
-                        'Student and staff accounts are pre-provisioned by institutional administration.',
-                        style: AppTypography.caption,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          );
+        },
         ),
       ),
     );
   }
 }
+
+class AttendifyHeaderPainter extends CustomPainter {
+  const AttendifyHeaderPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final path = Path()
+    ..moveTo(-2, -2)                // start 2px outside the top-left corner
+    ..lineTo(w + 2, -2)             // go 2px past the right edge along the top
+    ..lineTo(w + 2, h * (46 / 270)) // go down the right side, still 2px outside
+    ..cubicTo(
+      w * (372 / 420), h * (168 / 270), // same curve as before
+      w * (258 / 420), h * (262 / 270),
+      w * (150 / 420), h * (252 / 270),
+    )
+    ..cubicTo(
+      w * (80 / 420), h * (246 / 270),  // same second curve
+      w * (28 / 420), h * (206 / 270),
+      -2, h * (168 / 270),              // end 2px outside the left edge
+    )
+    ..close();      
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant AttendifyHeaderPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+

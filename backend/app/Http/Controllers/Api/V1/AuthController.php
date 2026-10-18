@@ -10,7 +10,6 @@ use App\Models\StudentQR;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -316,91 +315,6 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'status' => $user->status,
             ],
-        ]);
-    }
-
-    /**
-     * Request Password Reset Token
-     */
-    public function forgotPassword(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'email' => ['required', 'email', 'exists:users,email'],
-        ]);
-
-        $plainToken = (string) random_int(100000, 999999);
-
-        DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $validated['email']],
-            [
-                'token' => Hash::make($plainToken),
-                'created_at' => now(),
-            ]
-        );
-
-        $user = User::where('email', $validated['email'])->first();
-
-        ActivityLog::log('password_reset_requested', 'auth', $user?->id, [
-            'email' => $validated['email'],
-        ], $user?->id);
-
-        $data = null;
-        if (app()->environment(['local', 'testing'])) {
-            $data = ['reset_token' => $plainToken];
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Password reset token generated and sent to your school email.',
-            'data' => $data,
-        ]);
-    }
-
-    /**
-     * Complete Password Reset with Token
-     */
-    public function resetPassword(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'email' => ['required', 'email'],
-            'token' => ['required', 'string'],
-            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers(), 'confirmed'],
-        ]);
-
-        $record = DB::table('password_reset_tokens')
-            ->where('email', $validated['email'])
-            ->first();
-
-        if (
-            !$record ||
-            ($record->created_at && \Carbon\Carbon::parse($record->created_at)->addMinutes(60)->isPast()) ||
-            !Hash::check($validated['token'], $record->token)
-        ) {
-            return response()->json([
-                'success' => false,
-                'error_code' => 'ERR_INVALID_RESET_TOKEN',
-                'message' => 'Invalid or expired password reset token.',
-            ], 422);
-        }
-
-        $user = User::where('email', $validated['email'])->firstOrFail();
-
-        $user->update([
-            'password' => Hash::make($validated['password']),
-            'active_session_id' => null,
-        ]);
-
-        $user->tokens()->delete();
-
-        DB::table('password_reset_tokens')->where('email', $validated['email'])->delete();
-
-        ActivityLog::log('password_reset_completed', 'auth', $user->id, [
-            'email' => $user->email,
-        ], $user->id);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Password has been reset successfully. You may now log in.',
         ]);
     }
 }

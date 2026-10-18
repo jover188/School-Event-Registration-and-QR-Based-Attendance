@@ -1,15 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
+import '../../core/widgets/section_header.dart';
 import '../../core/widgets/status_badge.dart';
+import '../auth/account_input.dart';
 import 'student_qr_inspect_screen.dart';
 
 class UserManagementScreen extends StatefulWidget {
-  const UserManagementScreen({super.key});
+  final bool embedded;
+  final String? initialRoleFilter;
+  final bool qrInspectMode;
+  final List<Map<String, dynamic>>? initialUsers;
+
+  const UserManagementScreen({
+    super.key,
+    this.embedded = false,
+    this.initialRoleFilter,
+    this.qrInspectMode = false,
+    this.initialUsers,
+  });
 
   @override
   State<UserManagementScreen> createState() => _UserManagementScreenState();
@@ -21,14 +37,24 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
   bool _isLoading = true;
   String? _errorMessage;
-  String _selectedRole = 'all';
+  late String _selectedRole =
+      widget.initialRoleFilter ?? (widget.qrInspectMode ? 'student' : 'all');
   String _selectedStatus = 'all';
+  List<Map<String, dynamic>>? _fixtureUsers;
   List<Map<String, dynamic>> _users = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchUsers();
+    if (widget.initialUsers != null) {
+      _isLoading = false;
+      _fixtureUsers = widget.initialUsers!
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      _users = _applyLocalFilters(_fixtureUsers!);
+    } else {
+      _fetchUsers();
+    }
   }
 
   @override
@@ -38,7 +64,57 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     super.dispose();
   }
 
+  static String _extractRoleSlug(Map<String, dynamic> user) {
+    final roleMap = user['role'] is Map
+        ? Map<String, dynamic>.from(user['role'] as Map)
+        : null;
+    return (roleMap?['slug']?.toString() ?? user['role']?.toString() ?? 'user')
+        .toLowerCase();
+  }
+
+  List<Map<String, dynamic>> _applyLocalFilters(
+    List<Map<String, dynamic>> source,
+  ) {
+    final search = _searchController.text.trim().toLowerCase();
+    return source.where((user) {
+      final roleSlug = _extractRoleSlug(user);
+      if (_selectedRole != 'all' && roleSlug != _selectedRole) {
+        return false;
+      }
+      final status = (user['status']?.toString() ?? 'active').toLowerCase();
+      if (_selectedStatus != 'all' && status != _selectedStatus) {
+        return false;
+      }
+      if (search.isNotEmpty) {
+        final email = (user['email']?.toString() ?? '').toLowerCase();
+        final student = user['student'] is Map
+            ? Map<String, dynamic>.from(user['student'] as Map)
+            : null;
+        final fullName = (student?['full_name']?.toString() ??
+                '${student?['first_name'] ?? ''} ${student?['last_name'] ?? ''}')
+            .toLowerCase();
+        final studentNumber =
+            (student?['student_id_number']?.toString() ?? '').toLowerCase();
+        if (!email.contains(search) &&
+            !fullName.contains(search) &&
+            !studentNumber.contains(search)) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+  }
+
   Future<void> _fetchUsers() async {
+    if (_fixtureUsers != null) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = null;
+        _users = _applyLocalFilters(_fixtureUsers!);
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -67,7 +143,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       _isLoading = false;
       if (response.success && response.data is List) {
         _users = (response.data as List)
-            .whereType<Map<String, dynamic>>()
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
             .toList();
       } else {
         _errorMessage =
@@ -85,6 +162,30 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     if (payload == null || !mounted) return;
 
+    if (_fixtureUsers != null) {
+      final roleSlug = switch (payload.roleId) {
+        1 => 'administrator',
+        4 => 'management',
+        _ => 'organizer',
+      };
+      setState(() {
+        _fixtureUsers!.insert(0, {
+          'id': _fixtureUsers!.length + 100,
+          'email': payload.email,
+          'status': 'active',
+          'role': {'slug': roleSlug},
+        });
+        _users = _applyLocalFilters(_fixtureUsers!);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.design.success,
+          content: const Text('Staff user account created successfully.'),
+        ),
+      );
+      return;
+    }
+
     final response = await ApiClient().post(ApiConstants.adminUsers, {
       'email': payload.email,
       'password': payload.password,
@@ -93,10 +194,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     if (!mounted) return;
 
+    final d = context.design;
     if (response.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.present,
+          backgroundColor: d.success,
           content: Text(
             response.message ?? 'Staff user account created successfully.',
           ),
@@ -106,7 +208,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.absent,
+          backgroundColor: d.destructive,
           content: Text(
             response.message ?? 'Failed to create staff user account.',
           ),
@@ -115,9 +217,46 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
-  Future<void> _toggleUserStatus(Map<String, dynamic> user) async {
+  Future<void> _confirmAndToggleUserStatus(Map<String, dynamic> user) async {
     final userId = (user['id'] as num?)?.toInt();
     if (userId == null) return;
+    final email = user['email']?.toString() ?? 'User #$userId';
+    final currentStatus =
+        (user['status']?.toString() ?? 'active').toLowerCase();
+    final isDeactivating = currentStatus == 'active';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ConfirmUserStatusDialog(
+        email: email,
+        isDeactivating: isDeactivating,
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final nextStatus = isDeactivating ? 'inactive' : 'active';
+
+    if (_fixtureUsers != null) {
+      setState(() {
+        for (var i = 0; i < _fixtureUsers!.length; i++) {
+          if ((_fixtureUsers![i]['id'] as num?)?.toInt() == userId) {
+            _fixtureUsers![i] = {
+              ..._fixtureUsers![i],
+              'status': nextStatus,
+            };
+          }
+        }
+        _users = _applyLocalFilters(_fixtureUsers!);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.design.success,
+          content: Text('User status updated to $nextStatus.'),
+        ),
+      );
+      return;
+    }
 
     final response = await ApiClient().patch(
       ApiConstants.adminUserStatus(userId),
@@ -126,10 +265,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     if (!mounted) return;
 
+    final d = context.design;
     if (response.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.present,
+          backgroundColor: d.success,
           content: Text(
             response.message ?? 'User status updated successfully.',
           ),
@@ -139,7 +279,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.absent,
+          backgroundColor: d.destructive,
           content: Text(
             response.message ?? 'Failed to update user account status.',
           ),
@@ -160,6 +300,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     if (newPassword == null || newPassword.isEmpty || !mounted) return;
 
+    if (_fixtureUsers != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.design.success,
+          content: Text(
+            'Password reset for $email and prior sessions revoked.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final response = await ApiClient().post(
       ApiConstants.adminResetPassword(userId),
       {'password': newPassword},
@@ -167,10 +319,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     if (!mounted) return;
 
+    final d = context.design;
     if (response.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.present,
+          backgroundColor: d.success,
           content: Text(
             response.message ?? 'Password reset and sessions revoked.',
           ),
@@ -179,7 +332,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.absent,
+          backgroundColor: d.destructive,
           content: Text(
             response.message ?? 'Failed to reset user password.',
           ),
@@ -188,119 +341,147 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
+  void _openQrInspect(int studentId, String? studentLabel) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StudentQrInspectScreen(
+          studentId: studentId,
+          studentName: studentLabel,
+          studentLabel: studentLabel,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('User & Role Management'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Users',
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetchUsers,
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const ValueKey<String>('create-staff-user-fab'),
-        onPressed: _openCreateStaffDialog,
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.person_add_alt_1),
-        label: const Text('Create Staff User'),
-      ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.xs,
+    final d = context.design;
+    final title = widget.qrInspectMode
+        ? 'Student QR Records'
+        : 'User & Role Management';
+
+    return AppPageScaffold(
+      title: title,
+      embedded: widget.embedded,
+      body: RefreshIndicator(
+        onRefresh: _fetchUsers,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SectionHeader(
+                    title: widget.qrInspectMode
+                        ? 'Student QR Identity Directory'
+                        : 'Institutional Accounts',
+                    subtitle: widget.qrInspectMode
+                        ? 'Select a student account to inspect active QR tokens, audit history, or force-reissue a code'
+                        : 'Search accounts, manage status, reset passwords, or provision staff users',
+                    trailing: Wrap(
+                      spacing: d.sm,
+                      runSpacing: d.xs,
+                      children: [
+                        if (!widget.qrInspectMode)
+                          AppButton(
+                            key: const ValueKey<String>(
+                              'create-staff-user-fab',
+                            ),
+                            onPressed: _openCreateStaffDialog,
+                            icon: Icons.person_add_alt_1,
+                            label: 'Create Staff User',
+                          ),
+                        AppButton(
+                          variant: AppButtonVariant.outline,
+                          onPressed: _isLoading ? null : _fetchUsers,
+                          icon: Icons.refresh,
+                          label: 'Refresh',
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: d.gap),
+                  AccountInput(
+                    key: const ValueKey<String>('user-search-field'),
+                    controller: _searchController,
+                    focusNode: _searchFocus,
+                    textInputAction: TextInputAction.search,
+                    onFieldSubmitted: (_) => _fetchUsers(),
+                    decoration: InputDecoration(
+                      labelText:
+                          'Search Users by Email, Name, or Student ID',
+                      hintText: 'Type email, name, or student ID',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: IconButton(
+                        tooltip: 'Search Users',
+                        icon: const Icon(Icons.arrow_forward),
+                        onPressed: _fetchUsers,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: d.gap),
+                  _UserFilterSection(
+                    selectedRole: _selectedRole,
+                    selectedStatus: _selectedStatus,
+                    onSelectRole: (role) {
+                      setState(() => _selectedRole = role);
+                      _fetchUsers();
+                    },
+                    onSelectStatus: (status) {
+                      setState(() => _selectedStatus = status);
+                      _fetchUsers();
+                    },
+                  ),
+                  const Divider(),
+                ],
               ),
-              child: TextField(
-                key: const ValueKey<String>('user-search-field'),
-                controller: _searchController,
-                focusNode: _searchFocus,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) => _fetchUsers(),
-                decoration: InputDecoration(
-                  labelText: 'Search Users by Email, Name, or Student ID',
-                  hintText: 'Type email or name and press search',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: IconButton(
-                    tooltip: 'Search Users',
-                    icon: const Icon(Icons.arrow_forward),
-                    onPressed: _fetchUsers,
+            ),
+            if (_isLoading)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: d.xl),
+                  child: Center(
+                    child: Semantics(
+                      label: 'Loading user accounts',
+                      child: const CircularProgressIndicator(),
+                    ),
                   ),
                 ),
+              )
+            else if (_errorMessage != null && _users.isEmpty)
+              SliverToBoxAdapter(
+                child: ErrorStateView(
+                  message: _errorMessage!,
+                  onRetry: _fetchUsers,
+                ),
+              )
+            else if (_users.isEmpty)
+              SliverToBoxAdapter(
+                child: EmptyStateView(
+                  icon: Icons.people_outline,
+                  title: 'No users match the selected filters.',
+                  actionLabel: 'Refresh',
+                  onAction: _fetchUsers,
+                ),
+              )
+            else
+              ResponsiveCardSliver(
+                itemCount: _users.length,
+                minItemWidth: 340,
+                maxColumns: 2,
+                itemBuilder: (context, index) {
+                  final user = _users[index];
+                  return _AdminUserCard(
+                    user: user,
+                    qrInspectMode: widget.qrInspectMode,
+                    onToggleStatus: () => _confirmAndToggleUserStatus(user),
+                    onResetPassword: () => _openResetPasswordDialog(user),
+                    onInspectQr: _openQrInspect,
+                  );
+                },
               ),
-            ),
-            _UserFilterSection(
-              selectedRole: _selectedRole,
-              selectedStatus: _selectedStatus,
-              onSelectRole: (role) {
-                setState(() => _selectedRole = role);
-                _fetchUsers();
-              },
-              onSelectStatus: (status) {
-                setState(() => _selectedStatus = status);
-                _fetchUsers();
-              },
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
-                      ? ErrorStateView(
-                          message: _errorMessage!,
-                          onRetry: _fetchUsers,
-                        )
-                      : _users.isEmpty
-                          ? EmptyStateView(
-                              icon: Icons.people_outline,
-                              title: 'No users match the selected filters.',
-                              actionLabel: 'Refresh',
-                              onAction: _fetchUsers,
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _fetchUsers,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(
-                                  AppSpacing.md,
-                                  AppSpacing.md,
-                                  AppSpacing.md,
-                                  88,
-                                ),
-                                itemCount: _users.length,
-                                itemBuilder: (context, index) {
-                                  final user = _users[index];
-                                  return _AdminUserCard(
-                                    user: user,
-                                    onToggleStatus: () =>
-                                        _toggleUserStatus(user),
-                                    onResetPassword: () =>
-                                        _openResetPasswordDialog(user),
-                                    onInspectQr: (studentId, studentName) {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              StudentQrInspectScreen(
-                                            studentId: studentId,
-                                            studentName: studentName,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-            ),
           ],
         ),
       ),
@@ -337,52 +518,36 @@ class _UserFilterSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              for (final r in _roles)
-                Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.sm),
-                  child: ChoiceChip(
-                    key: ValueKey<String>('role-filter-${r.value}'),
-                    label: Text(r.label),
-                    selected: selectedRole == r.value,
-                    onSelected: (_) => onSelectRole(r.value),
-                  ),
-                ),
-            ],
-          ),
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.xs,
+          children: [
+            for (final r in _roles)
+              ChoiceChip(
+                key: ValueKey<String>('role-filter-${r.value}'),
+                label: Text(r.label),
+                selected: selectedRole == r.value,
+                onSelected: (_) => onSelectRole(r.value),
+              ),
+          ],
         ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            0,
-            AppSpacing.md,
-            AppSpacing.sm,
-          ),
-          child: Row(
-            children: [
-              for (final s in _statuses)
-                Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.sm),
-                  child: ChoiceChip(
-                    key: ValueKey<String>('status-filter-${s.value}'),
-                    label: Text(s.label),
-                    selected: selectedStatus == s.value,
-                    onSelected: (_) => onSelectStatus(s.value),
-                  ),
-                ),
-            ],
-          ),
+        SizedBox(height: d.sm),
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.xs,
+          children: [
+            for (final s in _statuses)
+              ChoiceChip(
+                key: ValueKey<String>('status-filter-${s.value}'),
+                label: Text(s.label),
+                selected: selectedStatus == s.value,
+                onSelected: (_) => onSelectStatus(s.value),
+              ),
+          ],
         ),
       ],
     );
@@ -391,12 +556,14 @@ class _UserFilterSection extends StatelessWidget {
 
 class _AdminUserCard extends StatelessWidget {
   final Map<String, dynamic> user;
+  final bool qrInspectMode;
   final VoidCallback onToggleStatus;
   final VoidCallback onResetPassword;
   final void Function(int studentId, String? studentName) onInspectQr;
 
   const _AdminUserCard({
     required this.user,
+    required this.qrInspectMode,
     required this.onToggleStatus,
     required this.onResetPassword,
     required this.onInspectQr,
@@ -404,17 +571,21 @@ class _AdminUserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
+    final userId = (user['id'] as num?)?.toInt() ?? 0;
     final email = user['email']?.toString() ?? 'N/A';
     final status = user['status']?.toString() ?? 'active';
-    final roleMap = user['role'] is Map<String, dynamic>
-        ? user['role'] as Map<String, dynamic>
+    final roleMap = user['role'] is Map
+        ? Map<String, dynamic>.from(user['role'] as Map)
         : null;
     final roleSlug =
         roleMap?['slug']?.toString() ?? user['role']?.toString() ?? 'user';
-    final student = user['student'] is Map<String, dynamic>
-        ? user['student'] as Map<String, dynamic>
+    final student = user['student'] is Map
+        ? Map<String, dynamic>.from(user['student'] as Map)
         : null;
-    final studentId = (student?['id'] as num?)?.toInt();
+    final studentId = (student?['id'] as num?)?.toInt() ??
+        (user['student_id'] as num?)?.toInt() ??
+        (roleSlug.toLowerCase() == 'student' ? userId : null);
     final studentName = student?['full_name']?.toString() ??
         [
           student?['first_name']?.toString() ?? '',
@@ -423,95 +594,145 @@ class _AdminUserCard extends StatelessWidget {
     final studentNumber = student?['student_id_number']?.toString();
     final course = student?['course']?.toString();
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm + 4),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        email,
-                        style: AppTypography.subtitle.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (studentName.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          '$studentName${studentNumber != null ? ' ($studentNumber)' : ''}${course != null ? ' • $course' : ''}',
-                          style: AppTypography.bodyMuted,
-                        ),
-                      ],
-                    ],
+    return Container(
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Wrap(
+            spacing: d.sm,
+            runSpacing: d.xs,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(email, style: d.cardTitle),
+              Wrap(
+                spacing: d.xs,
+                runSpacing: d.xs,
+                children: [
+                  StatusBadge(
+                    status: 'completed',
+                    label: roleSlug.toUpperCase(),
+                    showIcon: false,
                   ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  children: [
-                    StatusBadge(
-                      status: 'completed',
-                      label: roleSlug.toUpperCase(),
-                      showIcon: false,
-                    ),
-                    StatusBadge(status: status),
-                  ],
-                ),
-              ],
+                  StatusBadge(status: status),
+                ],
+              ),
+            ],
+          ),
+          if (studentName.isNotEmpty || studentNumber != null) ...[
+            SizedBox(height: d.xs),
+            Text(
+              '${studentName.isEmpty ? email : studentName}${studentNumber != null ? ' ($studentNumber)' : ''}${course != null ? ' • $course' : ''}',
+              style: d.supporting,
             ),
-            const Divider(height: AppSpacing.lg),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.xs,
-              alignment: WrapAlignment.end,
-              children: [
-                OutlinedButton.icon(
+          ],
+          const Divider(),
+          Wrap(
+            spacing: d.sm,
+            runSpacing: d.sm,
+            alignment: WrapAlignment.end,
+            children: [
+              if (!qrInspectMode) ...[
+                AppButton(
+                  key: ValueKey<String>('toggle-user-status-$userId'),
+                  variant: status == 'active'
+                      ? AppButtonVariant.outline
+                      : AppButtonVariant.primary,
                   onPressed: onToggleStatus,
-                  icon: Icon(
-                    status == 'active'
-                        ? Icons.person_off_outlined
-                        : Icons.check_circle_outline,
-                    size: 16,
-                  ),
-                  label: Text(
-                    status == 'active' ? 'Deactivate' : 'Activate',
-                    style: const TextStyle(fontSize: 13),
-                  ),
+                  icon: status == 'active'
+                      ? Icons.person_off_outlined
+                      : Icons.check_circle_outline,
+                  label: status == 'active' ? 'Deactivate' : 'Activate',
                 ),
-                OutlinedButton.icon(
+                AppButton(
+                  key: ValueKey<String>('reset-user-password-$userId'),
+                  variant: AppButtonVariant.outline,
                   onPressed: onResetPassword,
-                  icon: const Icon(Icons.lock_reset_outlined, size: 16),
-                  label: const Text(
-                    'Reset Password',
-                    style: TextStyle(fontSize: 13),
-                  ),
+                  icon: Icons.lock_reset_outlined,
+                  label: 'Reset Password',
                 ),
-                if (studentId != null)
-                  ElevatedButton.icon(
-                    onPressed: () => onInspectQr(
-                      studentId,
-                      studentName.isEmpty ? email : studentName,
-                    ),
-                    icon: const Icon(Icons.qr_code_2_outlined, size: 16),
-                    label: const Text(
-                      'Inspect QR',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  ),
               ],
+              if (studentId != null && studentId > 0)
+                AppButton(
+                  key: ValueKey<String>('inspect-student-qr-$studentId'),
+                  variant: AppButtonVariant.primary,
+                  onPressed: () => onInspectQr(
+                    studentId,
+                    studentName.isEmpty ? email : studentName,
+                  ),
+                  icon: Icons.qr_code_2_outlined,
+                  label: 'Inspect QR',
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConfirmUserStatusDialog extends StatelessWidget {
+  final String email;
+  final bool isDeactivating;
+
+  const _ConfirmUserStatusDialog({
+    required this.email,
+    required this.isDeactivating,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    return AlertDialog(
+      title: Text(
+        '${isDeactivating ? 'Deactivate' : 'Activate'} User Account?',
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                isDeactivating
+                    ? 'Deactivating $email will immediately block login access and revoke any active session for this institutional account.'
+                    : 'Activating $email will restore login access for this institutional account.',
+                style: d.body,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.sm,
+          alignment: WrapAlignment.end,
+          children: [
+            AppButton(
+              variant: AppButtonVariant.ghost,
+              onPressed: () => Navigator.pop(context, false),
+              label: 'Cancel',
+            ),
+            AppButton(
+              key: const ValueKey<String>('confirm-user-status-button'),
+              variant: isDeactivating
+                  ? AppButtonVariant.destructive
+                  : AppButtonVariant.primary,
+              onPressed: () => Navigator.pop(context, true),
+              label: isDeactivating ? 'Confirm Deactivate' : 'Confirm Activate',
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
@@ -568,105 +789,124 @@ class _CreateStaffUserDialogState extends State<_CreateStaffUserDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return AlertDialog(
       title: const Text('Create Staff Account'),
-      content: FocusTraversalGroup(
-        child: AutofillGroup(
-          child: Form(
-            key: _formKey,
-            autovalidateMode: _autovalidateMode,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DropdownButtonFormField<int>(
-                    key: const ValueKey<String>('staff-role-dropdown'),
-                    initialValue: _selectedRoleId,
-                    decoration: const InputDecoration(
-                      labelText: 'Account Role',
-                      helperText: ' ',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 2,
-                        child: Text('Event Organizer (Role #2)'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: FocusTraversalGroup(
+          child: AutofillGroup(
+            child: Form(
+              key: _formKey,
+              autovalidateMode: _autovalidateMode,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<int>(
+                      key: const ValueKey<String>('staff-role-dropdown'),
+                      isExpanded: true,
+                      initialValue: _selectedRoleId,
+                      decoration: const InputDecoration(
+                        labelText: 'Account Role',
                       ),
-                      DropdownMenuItem(
-                        value: 4,
-                        child: Text('School Management - Read Only (Role #4)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 1,
-                        child: Text('System Administrator (Role #1)'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _selectedRoleId = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('staff-email-field'),
-                    controller: _emailController,
-                    focusNode: _emailFocus,
-                    autofocus: true,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.email],
-                    decoration: const InputDecoration(
-                      labelText: 'Official Email Address',
-                      hintText: 'organizer@school.edu.ph',
-                      prefixIcon: Icon(Icons.email_outlined),
-                      helperText: ' ',
+                      items: const [
+                        DropdownMenuItem(
+                          value: 2,
+                          child: Text(
+                            'Event Organizer (Role #2)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 4,
+                          child: Text(
+                            'School Management - Read Only (Role #4)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 1,
+                          child: Text(
+                            'System Administrator (Role #1)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedRoleId = val);
+                        }
+                      },
                     ),
-                    validator: (value) {
-                      final trimmed = value?.trim() ?? '';
-                      if (trimmed.isEmpty || !trimmed.contains('@')) {
-                        return 'Enter a valid email address.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('staff-password-field'),
-                    controller: _passwordController,
-                    focusNode: _passwordFocus,
-                    obscureText: true,
-                    keyboardType: TextInputType.visiblePassword,
-                    textInputAction: TextInputAction.done,
-                    autofillHints: const [AutofillHints.newPassword],
-                    onFieldSubmitted: (_) => _submit(),
-                    decoration: const InputDecoration(
-                      labelText: 'Initial Password',
-                      hintText: 'Minimum 8 characters',
-                      prefixIcon: Icon(Icons.lock_outline),
-                      helperText: ' ',
+                    SizedBox(height: d.gap),
+                    AccountInput(
+                      key: const ValueKey<String>('staff-email-field'),
+                      controller: _emailController,
+                      focusNode: _emailFocus,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
+                      decoration: const InputDecoration(
+                        labelText: 'Official Email Address',
+                        hintText: 'organizer@school.edu.ph',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                      validator: (value) {
+                        final trimmed = value?.trim() ?? '';
+                        if (trimmed.isEmpty || !trimmed.contains('@')) {
+                          return 'Enter a valid email address.';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null || value.length < 8) {
-                        return 'Password must be at least 8 characters.';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
+                    SizedBox(height: d.gap),
+                    AccountInput(
+                      key: const ValueKey<String>('staff-password-field'),
+                      controller: _passwordController,
+                      focusNode: _passwordFocus,
+                      obscureText: true,
+                      keyboardType: TextInputType.visiblePassword,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.newPassword],
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: const InputDecoration(
+                        labelText: 'Initial Password',
+                        hintText: 'Minimum 8 characters',
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.length < 8) {
+                          return 'Password must be at least 8 characters.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _submit,
-          child: const Text('Create User'),
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.sm,
+          alignment: WrapAlignment.end,
+          children: [
+            AppButton(
+              variant: AppButtonVariant.ghost,
+              onPressed: () => Navigator.pop(context),
+              label: 'Cancel',
+            ),
+            AppButton(
+              key: const ValueKey<String>('confirm-create-staff-button'),
+              onPressed: _submit,
+              label: 'Create User',
+            ),
+          ],
         ),
       ],
     );
@@ -710,58 +950,71 @@ class _ResetUserPasswordDialogState extends State<_ResetUserPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return AlertDialog(
       title: const Text('Reset User Password'),
-      content: FocusTraversalGroup(
-        child: AutofillGroup(
-          child: Form(
-            key: _formKey,
-            autovalidateMode: _autovalidateMode,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Set a new password for ${widget.email}. All existing sessions for this user will be immediately revoked.',
-                  style: AppTypography.bodyMuted,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: FocusTraversalGroup(
+          child: AutofillGroup(
+            child: Form(
+              key: _formKey,
+              autovalidateMode: _autovalidateMode,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Set a new password for ${widget.email}. All existing sessions for this user will be immediately revoked.',
+                      style: d.supporting,
+                    ),
+                    SizedBox(height: d.md),
+                    AccountInput(
+                      key: const ValueKey<String>('reset-password-field'),
+                      controller: _passwordController,
+                      focusNode: _passwordFocus,
+                      obscureText: true,
+                      keyboardType: TextInputType.visiblePassword,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.newPassword],
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: const InputDecoration(
+                        labelText: 'New Password',
+                        hintText: 'Minimum 8 characters',
+                        prefixIcon: Icon(Icons.lock_reset_outlined),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.length < 8) {
+                          return 'Password must be at least 8 characters.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  key: const ValueKey<String>('reset-password-field'),
-                  controller: _passwordController,
-                  focusNode: _passwordFocus,
-                  autofocus: true,
-                  obscureText: true,
-                  keyboardType: TextInputType.visiblePassword,
-                  textInputAction: TextInputAction.done,
-                  autofillHints: const [AutofillHints.newPassword],
-                  onFieldSubmitted: (_) => _submit(),
-                  decoration: const InputDecoration(
-                    labelText: 'New Password',
-                    hintText: 'Minimum 8 characters',
-                    prefixIcon: Icon(Icons.lock_reset_outlined),
-                    helperText: ' ',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.length < 8) {
-                      return 'Password must be at least 8 characters.';
-                    }
-                    return null;
-                  },
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _submit,
-          child: const Text('Reset Password'),
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.sm,
+          alignment: WrapAlignment.end,
+          children: [
+            AppButton(
+              variant: AppButtonVariant.ghost,
+              onPressed: () => Navigator.pop(context),
+              label: 'Cancel',
+            ),
+            AppButton(
+              key: const ValueKey<String>('confirm-reset-password-button'),
+              onPressed: _submit,
+              label: 'Reset Password',
+            ),
+          ],
         ),
       ],
     );

@@ -2,60 +2,142 @@ import 'package:flutter/material.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/event_model.dart';
 
 class EventDetailScreen extends StatefulWidget {
-  final EventModel event;
-  const EventDetailScreen({super.key, required this.event});
+  final int? eventId;
+  final EventModel? event;
+  final EventModel? initialEvent;
+  final String? initialErrorMessage;
+
+  const EventDetailScreen({
+    super.key,
+    this.eventId,
+    this.event,
+    this.initialEvent,
+    this.initialErrorMessage,
+  });
 
   @override
   State<EventDetailScreen> createState() => _EventDetailScreenState();
 }
 
 class _EventDetailScreenState extends State<EventDetailScreen> {
-  late EventModel _event;
+  EventModel? _event;
   bool _isLoading = false;
+  bool _isSubmitting = false;
+  String? _errorMessage;
+
+  bool get _hasFixtureData =>
+      widget.initialEvent != null || widget.initialErrorMessage != null;
+
+  int get _resolvedEventId =>
+      widget.eventId ??
+      _event?.id ??
+      widget.initialEvent?.id ??
+      widget.event?.id ??
+      0;
 
   @override
   void initState() {
     super.initState();
-    _event = widget.event;
-    _refreshEventDetails();
-  }
-
-  Future<void> _refreshEventDetails() async {
-    final response =
-        await ApiClient().get(ApiConstants.eventDetail(_event.id));
-    if (!mounted) return;
-    if (response.success && response.data is Map<String, dynamic>) {
-      setState(() {
-        _event = EventModel.fromJson(response.data as Map<String, dynamic>);
-      });
+    _event = widget.initialEvent ?? widget.event;
+    _errorMessage = widget.initialErrorMessage;
+    if (_hasFixtureData) {
+      _isLoading = false;
+    } else if (_event != null) {
+      _isLoading = false;
+      _refreshEventDetails();
+    } else {
+      _isLoading = true;
+      _refreshEventDetails();
     }
   }
 
-  Future<void> _handleRegister() async {
-    setState(() => _isLoading = true);
-    final response =
-        await ApiClient().post(ApiConstants.registerEvent(_event.id), {});
+  @override
+  void didUpdateWidget(covariant EventDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialEvent != oldWidget.initialEvent ||
+        widget.event != oldWidget.event ||
+        widget.initialErrorMessage != oldWidget.initialErrorMessage) {
+      _event = widget.initialEvent ?? widget.event;
+      _errorMessage = widget.initialErrorMessage;
+      if (_hasFixtureData) {
+        _isLoading = false;
+      }
+    }
+  }
+
+  Future<void> _refreshEventDetails() async {
+    if (_hasFixtureData && widget.initialEvent != null) {
+      setState(() {
+        _event = widget.initialEvent;
+        _errorMessage = null;
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final id = _resolvedEventId;
+    if (id <= 0) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage ??= 'Unable to load event details.';
+      });
+      return;
+    }
+
+    if (_event == null) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
+    final response = await ApiClient().get(ApiConstants.eventDetail(id));
     if (!mounted) return;
-    setState(() => _isLoading = false);
+    setState(() {
+      _isLoading = false;
+      if (response.success && response.data is Map) {
+        _event = EventModel.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        );
+        _errorMessage = null;
+      } else if (_event == null) {
+        _errorMessage = response.message ?? 'Unable to load event details.';
+      }
+    });
+  }
+
+  Future<void> _handleRegister() async {
+    final event = _event;
+    if (event == null) return;
+    final d = context.design;
+
+    setState(() => _isSubmitting = true);
+    final response =
+        await ApiClient().post(ApiConstants.registerEvent(event.id), {});
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
 
     if (response.success) {
       await _refreshEventDetails();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.present,
+          backgroundColor: d.success,
           content: Text(response.message ?? 'Registration successful!'),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.absent,
+          backgroundColor: d.destructive,
           content: Text(response.message ?? 'Registration failed.'),
         ),
       );
@@ -63,233 +145,360 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   Future<void> _handleCancelRegistration() async {
+    final event = _event;
+    if (event == null) return;
+    final d = context.design;
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('Cancel Registration?'),
         content: const Text(
           'Are you sure you want to cancel your registration for this event? Your slot will be given to the next student on the waiting list.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Keep Registration'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.absent),
-            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: d.destructive,
+              foregroundColor: d.destructiveForeground,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Cancel Slot'),
           ),
         ],
       ),
     );
 
-    if (confirmed == true) {
-      setState(() => _isLoading = true);
-      final response =
-          await ApiClient().delete(ApiConstants.cancelRegistration(_event.id));
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+    if (confirmed != true || !mounted) return;
 
-      if (response.success) {
-        await _refreshEventDetails();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: AppColors.textSecondary,
-            content: Text('Your registration has been cancelled.'),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.absent,
-            content: Text(response.message ?? 'Cancellation failed.'),
-          ),
-        );
-      }
+    setState(() => _isSubmitting = true);
+    final response =
+        await ApiClient().delete(ApiConstants.cancelRegistration(event.id));
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (response.success) {
+      await _refreshEventDetails();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: d.mutedForeground,
+          content: const Text('Your registration has been cancelled.'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: d.destructive,
+          content: Text(response.message ?? 'Cancellation failed.'),
+        ),
+      );
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final remaining = _event.remainingSlots;
-    final isFull = remaining != null && remaining <= 0;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_event.title),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Event Details',
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _refreshEventDetails,
+  Widget _buildMainDetails(BuildContext context, EventModel event) {
+    final d = context.design;
+    return Column(
+      key: const ValueKey('event-detail-main-pane'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: EdgeInsets.all(d.md),
+          decoration: BoxDecoration(
+            color: d.card,
+            borderRadius: BorderRadius.circular(d.radiusCard),
+            border: Border.all(color: d.border),
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.md + 4),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Event Overview Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _event.title,
-                              style: AppTypography.headline.copyWith(
-                                fontSize: 20,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          StatusBadge(status: _event.status),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm + 4),
-                      _EventInfoRow(
-                        icon: Icons.location_on_outlined,
-                        text: _event.venue,
-                      ),
-                      const SizedBox(height: AppSpacing.xs + 2),
-                      _EventInfoRow(
-                        icon: Icons.calendar_today_outlined,
-                        text:
-                            '${_event.eventDate} • ${_event.startTime} - ${_event.endTime}',
-                      ),
-                      const Divider(height: AppSpacing.lg),
-
-                      // Capacity indicator
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Remaining Capacity',
-                                style: AppTypography.caption,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                remaining == null
-                                    ? 'Unlimited Slots'
-                                    : '$remaining slots left',
-                                style: AppTypography.subtitle.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: isFull
-                                      ? AppColors.late
-                                      : AppColors.present,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_event.userRegistrationStatus != null)
-                            StatusBadge(
-                              status: _event.userRegistrationStatus!,
-                              label: _event.isRegistered
-                                  ? 'REGISTERED'
-                                  : 'WAITING LIST #${_event.userWaitingPosition ?? 1}',
-                            ),
-                        ],
-                      ),
-                    ],
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: d.sm,
+                runSpacing: d.xs,
+                children: [
+                  Text(
+                    event.title,
+                    style: d.sectionTitle,
                   ),
-                ),
+                  StatusBadge(status: event.status),
+                ],
               ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Description Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SectionHeader(title: 'About the Event'),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        _event.description,
-                        style: AppTypography.body,
-                      ),
-                      if (_event.walkInAllowed) ...[
-                        const SizedBox(height: AppSpacing.sm + 4),
-                        const _EventInfoRow(
-                          icon: Icons.check_circle_outline,
-                          iconColor: AppColors.present,
-                          text: 'Walk-in attendees permitted at venue',
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+              SizedBox(height: d.gap),
+              _EventInfoRow(
+                icon: Icons.location_on_outlined,
+                text: event.venue,
               ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // Action Buttons
-              if (_event.isRegistered || _event.isWaitingList) ...[
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.absent,
-                    side: const BorderSide(color: AppColors.absent),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: _isLoading ? null : _handleCancelRegistration,
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text('Cancel My Registration'),
-                ),
-              ] else ...[
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isFull ? AppColors.late : AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: _isLoading ? null : _handleRegister,
-                  icon: Icon(isFull ? Icons.queue : Icons.how_to_reg),
-                  label: Text(
-                    isFull ? 'Join Waiting List' : 'Register for Event',
-                  ),
+              SizedBox(height: d.sm),
+              _EventInfoRow(
+                icon: Icons.calendar_today_outlined,
+                text:
+                    '${event.eventDate} • ${event.startTime} - ${event.endTime}',
+              ),
+              SizedBox(height: d.sm),
+              _EventInfoRow(
+                icon: Icons.timer_outlined,
+                text:
+                    'Late grace period: ${event.lateGracePeriodMinutes} minutes',
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: d.md),
+        Container(
+          padding: EdgeInsets.all(d.md),
+          decoration: BoxDecoration(
+            color: d.card,
+            borderRadius: BorderRadius.circular(d.radiusCard),
+            border: Border.all(color: d.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SectionHeader(title: 'About the Event'),
+              SizedBox(height: d.sm),
+              Text(
+                event.description,
+                style: d.body,
+              ),
+              if (event.walkInAllowed) ...[
+                SizedBox(height: d.gap),
+                _EventInfoRow(
+                  icon: Icons.check_circle_outline,
+                  iconColor: d.success,
+                  text: 'Walk-in attendees permitted at venue',
                 ),
               ],
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildActionPane(BuildContext context, EventModel event) {
+    final d = context.design;
+    final remaining = event.remainingSlots;
+    final isFull = remaining != null && remaining <= 0;
+    final statusNormalized = event.status.trim().toLowerCase();
+    final isCancelled = statusNormalized == 'cancelled';
+    final isCompleted = statusNormalized == 'completed';
+
+    return Container(
+      key: const ValueKey('event-detail-action-pane'),
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SectionHeader(title: 'Registration & Capacity'),
+          SizedBox(height: d.gap),
+          Text('Remaining Capacity', style: d.supporting),
+          const SizedBox(height: 2),
+          Text(
+            remaining == null
+                ? 'Unlimited Slots'
+                : isFull
+                    ? '0 slots left (Full)'
+                    : '$remaining slots left',
+            style: d.cardTitle.copyWith(
+              color: isFull ? d.warning : d.success,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: d.xs),
+          Text(
+            'Registered: ${event.currentRegisteredCount}${event.maxParticipants != null ? ' / ${event.maxParticipants}' : ''}',
+            style: d.supporting,
+          ),
+          if (event.userRegistrationStatus != null) ...[
+            Divider(height: d.lg, color: d.border),
+            Text('Your Participation Status', style: d.supporting),
+            SizedBox(height: d.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: StatusBadge(
+                status: event.userRegistrationStatus!,
+                label: event.isRegistered
+                    ? 'REGISTERED'
+                    : event.isWaitingList
+                        ? 'WAITING LIST #${event.userWaitingPosition ?? 1}'
+                        : null,
+              ),
+            ),
+            SizedBox(height: d.xs),
+            Text(
+              event.isRegistered
+                  ? 'You have a confirmed slot for this event.'
+                  : event.isWaitingList
+                      ? 'You are on the waiting list (#${event.userWaitingPosition ?? 1}). You will be promoted automatically if a slot opens.'
+                      : 'Status updated by event server.',
+              style: d.supporting,
+            ),
+          ],
+          Divider(height: d.lg, color: d.border),
+          if (event.isRegistered || event.isWaitingList) ...[
+            AppButton(
+              key: const ValueKey('cancel-registration-button'),
+              variant: AppButtonVariant.destructive,
+              icon: Icons.cancel_outlined,
+              isLoading: _isSubmitting,
+              onPressed: (isCancelled || isCompleted)
+                  ? null
+                  : _handleCancelRegistration,
+              label: 'Cancel My Registration',
+            ),
+          ] else if (isCancelled) ...[
+            Text(
+              'Registration is closed because this event has been cancelled.',
+              style: d.supporting.copyWith(color: d.destructive),
+            ),
+            SizedBox(height: d.sm),
+            const AppButton(
+              key: ValueKey('register-event-button'),
+              variant: AppButtonVariant.outline,
+              icon: Icons.block,
+              onPressed: null,
+              label: 'Event Cancelled',
+            ),
+          ] else if (isCompleted) ...[
+            Text(
+              'Registration is closed because this event has been completed.',
+              style: d.supporting,
+            ),
+            SizedBox(height: d.sm),
+            const AppButton(
+              key: ValueKey('register-event-button'),
+              variant: AppButtonVariant.outline,
+              icon: Icons.task_alt,
+              onPressed: null,
+              label: 'Event Completed',
+            ),
+          ] else ...[
+            if (isFull) ...[
+              Text(
+                'Event capacity is full. Joining the waiting list places you in queue for automatic promotion.',
+                style: d.supporting,
+              ),
+              SizedBox(height: d.sm),
+            ],
+            AppButton(
+              key: const ValueKey('register-event-button'),
+              variant: AppButtonVariant.primary,
+              icon: isFull ? Icons.queue_rounded : Icons.how_to_reg,
+              isLoading: _isSubmitting,
+              onPressed: _handleRegister,
+              label: isFull ? 'Join Waiting List' : 'Register for Event',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    final event = _event;
+
+    return AppPageScaffold(
+      title: event?.title ?? 'Event Details',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh Event Details',
+          icon: const Icon(Icons.refresh),
+          onPressed: (_isLoading || _isSubmitting) ? null : _refreshEventDetails,
+        ),
+      ],
+      body: _isLoading && event == null
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null && event == null
+              ? ErrorStateView(
+                  message: _errorMessage!,
+                  onRetry: _refreshEventDetails,
+                )
+              : event == null
+                  ? ErrorStateView(
+                      message: 'Event details are unavailable.',
+                      onRetry: _refreshEventDetails,
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final textScale =
+                            MediaQuery.textScalerOf(context).scale(1);
+                        final useSidePane =
+                            constraints.maxWidth >= 960 && textScale < 1.5;
+
+                        if (useSidePane) {
+                          return SingleChildScrollView(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: _buildMainDetails(context, event),
+                                ),
+                                SizedBox(width: d.lg),
+                                SizedBox(
+                                  width: 320,
+                                  child: _buildActionPane(context, event),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildMainDetails(context, event),
+                              SizedBox(height: d.md),
+                              _buildActionPane(context, event),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
     );
   }
 }
 
 class _EventInfoRow extends StatelessWidget {
   final IconData icon;
-  final Color iconColor;
+  final Color? iconColor;
   final String text;
 
   const _EventInfoRow({
     required this.icon,
-    this.iconColor = AppColors.textSecondary,
+    this.iconColor,
     required this.text,
   });
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: iconColor),
-        const SizedBox(width: AppSpacing.xs + 2),
+        Icon(icon, size: 16, color: iconColor ?? d.mutedForeground),
+        SizedBox(width: d.xs + 2),
         Expanded(
           child: Text(
             text,
-            style: AppTypography.bodyMuted,
+            style: d.supporting,
+            softWrap: true,
           ),
         ),
       ],

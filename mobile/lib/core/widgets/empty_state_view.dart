@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../theme/app_theme.dart';
+import 'app_button.dart';
 
 /// Reusable empty state placeholder with icon, title, message, and optional action.
 class EmptyStateView extends StatelessWidget {
@@ -11,7 +13,7 @@ class EmptyStateView extends StatelessWidget {
 
   const EmptyStateView({
     super.key,
-    this.icon = Icons.event_busy_outlined,
+    this.icon = LucideIcons.calendarX2,
     required this.title,
     this.message = '',
     this.actionLabel,
@@ -20,44 +22,47 @@ class EmptyStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(d.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: const BoxDecoration(
-                color: AppColors.primaryLight,
-                shape: BoxShape.circle,
+              padding: EdgeInsets.all(d.md),
+              decoration: BoxDecoration(
+                color: d.selection,
+                borderRadius: BorderRadius.circular(d.radiusCard),
+                border: Border.all(color: d.primary.withValues(alpha: 0.16)),
               ),
               child: Icon(
                 icon,
-                size: 44,
-                color: AppColors.primary,
+                size: 28,
+                weight: 300,
+                color: d.primary,
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
+            SizedBox(height: d.md),
             Text(
               title,
-              style: AppTypography.subtitle,
+              style: d.sectionTitle,
               textAlign: TextAlign.center,
             ),
             if (message.trim().isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xs),
+              SizedBox(height: d.xs),
               Text(
                 message,
-                style: AppTypography.bodyMuted,
+                style: d.supporting,
                 textAlign: TextAlign.center,
               ),
             ],
             if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: AppSpacing.md),
-              ElevatedButton(
+              SizedBox(height: d.md),
+              AppButton(
                 onPressed: onAction,
-                child: Text(actionLabel!),
+                label: actionLabel!,
               ),
             ],
           ],
@@ -66,3 +71,4 @@ class EmptyStateView extends StatelessWidget {
     );
   }
 }
+

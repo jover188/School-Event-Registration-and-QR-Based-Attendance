@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/stat_metric_card.dart';
@@ -11,12 +15,16 @@ class LiveAttendanceScreen extends StatefulWidget {
   final int eventId;
   final String eventTitle;
   final bool canCorrect;
+  final List<Map<String, dynamic>>? initialAttendances;
+  final Map<String, int>? initialStats;
 
   const LiveAttendanceScreen({
     super.key,
     required this.eventId,
     required this.eventTitle,
     this.canCorrect = true,
+    this.initialAttendances,
+    this.initialStats,
   });
 
   @override
@@ -39,10 +47,21 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
     'excused': 0,
   };
 
+  bool get _hasFixtures =>
+      widget.initialAttendances != null || widget.initialStats != null;
+
   @override
   void initState() {
     super.initState();
-    _fetchAttendance();
+    if (_hasFixtures) {
+      _isLoading = false;
+      _attendances = List<Map<String, dynamic>>.from(
+        widget.initialAttendances ?? const [],
+      );
+      _summary = _computeSummary(_attendances, widget.initialStats);
+    } else {
+      _fetchAttendance();
+    }
   }
 
   @override
@@ -50,6 +69,31 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  static Map<String, int> _computeSummary(
+    List<Map<String, dynamic>> records, [
+    Map<String, int>? overrideStats,
+  ]) {
+    if (overrideStats != null) {
+      return {
+        'total_checked_in': overrideStats['total_checked_in'] ?? records.length,
+        'present': overrideStats['present'] ?? 0,
+        'late': overrideStats['late'] ?? 0,
+        'walk_in': overrideStats['walk_in'] ?? 0,
+        'excused': overrideStats['excused'] ?? 0,
+      };
+    }
+    return {
+      'total_checked_in': records.length,
+      'present':
+          records.where((r) => r['status']?.toString() == 'present').length,
+      'late': records.where((r) => r['status']?.toString() == 'late').length,
+      'walk_in':
+          records.where((r) => r['status']?.toString() == 'walk_in').length,
+      'excused':
+          records.where((r) => r['status']?.toString() == 'excused').length,
+    };
   }
 
   Future<void> _fetchAttendance() async {
@@ -113,26 +157,32 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
             'excused': (rawSummary['excused'] as num?)?.toInt() ?? 0,
           };
         } else if (_selectedStatus == 'all' && search.isEmpty) {
-          _summary = {
-            'total_checked_in': records.length,
-            'present': records
-                .where((r) => r['status']?.toString() == 'present')
-                .length,
-            'late':
-                records.where((r) => r['status']?.toString() == 'late').length,
-            'walk_in': records
-                .where((r) => r['status']?.toString() == 'walk_in')
-                .length,
-            'excused': records
-                .where((r) => r['status']?.toString() == 'excused')
-                .length,
-          };
+          _summary = _computeSummary(records);
         }
-      } else {
+      } else if (_attendances.isEmpty) {
         _errorMessage =
-            response.message ?? 'Failed to load live attendance records.';
+            response.message ?? 'Failed to load attendance records.';
       }
     });
+  }
+
+  List<Map<String, dynamic>> get _filteredAttendances {
+    final query = _searchController.text.trim().toLowerCase();
+    return _attendances.where((record) {
+      final status = record['status']?.toString().toLowerCase() ?? 'present';
+      final matchesStatus =
+          _selectedStatus == 'all' || status == _selectedStatus;
+      if (!matchesStatus) return false;
+      if (query.isEmpty) return true;
+      final student = (record['student'] as Map<String, dynamic>?) ?? {};
+      final fullName = _resolveStudentName(student).toLowerCase();
+      final studentId =
+          student['student_id_number']?.toString().toLowerCase() ?? '';
+      final course = student['course']?.toString().toLowerCase() ?? '';
+      return fullName.contains(query) ||
+          studentId.contains(query) ||
+          course.contains(query);
+    }).toList();
   }
 
   Future<void> _openCorrectDialog(Map<String, dynamic> attendance) async {
@@ -241,212 +291,194 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Live Attendance: ${widget.eventTitle}'),
-        actions: [
-          if (widget.canCorrect)
-            IconButton(
-              tooltip: 'Mark Student Attendance',
-              icon: const Icon(Icons.person_add_alt_1_outlined),
-              onPressed: _openMarkAttendanceDialog,
-            ),
+    final d = context.design;
+    final visibleAttendances = _filteredAttendances;
+
+    return AppPageScaffold(
+      title: 'Attendance — ${widget.eventTitle}',
+      actions: [
+        if (widget.canCorrect)
           IconButton(
-            tooltip: 'Refresh Attendance',
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetchAttendance,
+            tooltip: 'Mark Student Attendance',
+            icon: const Icon(Icons.person_add_alt_1_outlined),
+            onPressed: _openMarkAttendanceDialog,
           ),
-        ],
-      ),
+        IconButton(
+          tooltip: 'Refresh Attendance',
+          icon: const Icon(Icons.refresh),
+          onPressed: _isLoading ? null : _fetchAttendance,
+        ),
+      ],
       floatingActionButton: widget.canCorrect
           ? FloatingActionButton.extended(
               key: const ValueKey<String>('mark-student-attendance-fab'),
               onPressed: _openMarkAttendanceDialog,
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
+              backgroundColor: d.primary,
+              foregroundColor: d.primaryForeground,
               icon: const Icon(Icons.fact_check_outlined),
               label: const Text('Mark Attendance'),
             )
           : null,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!widget.canCorrect)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
-                ),
-                color: AppColors.primaryLight,
-                child: const Row(
-                  children: [
-                    Icon(
-                      Icons.visibility_outlined,
-                      size: 18,
-                      color: AppColors.primary,
+      body: RefreshIndicator(
+        onRefresh: _fetchAttendance,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(bottom: widget.canCorrect ? 88 : d.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!widget.canCorrect) ...[
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: d.md,
+                    vertical: d.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: d.selection,
+                    borderRadius: BorderRadius.circular(d.radiusControl),
+                    border: Border.all(
+                      color: d.primary.withValues(alpha: 0.25),
                     ),
-                    SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        'Read-Only View: Attendance corrections are disabled for School Management.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primary,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.visibility_outlined,
+                        size: 18,
+                        color: d.primary,
+                      ),
+                      SizedBox(width: d.sm),
+                      Expanded(
+                        child: Text(
+                          'Read-Only View: Attendance corrections are disabled for School Management.',
+                          style: d.supporting.copyWith(
+                            color: d.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.xs,
-              ),
-              child: _AttendanceSummaryMetricsRow(summary: _summary),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.xs,
-              ),
-              child: TextField(
+                SizedBox(height: d.md),
+              ],
+              _AttendanceSummaryMetricsGrid(summary: _summary),
+              SizedBox(height: d.md),
+              TextField(
                 key: const ValueKey<String>('attendance-search-field'),
                 controller: _searchController,
                 focusNode: _searchFocus,
                 textInputAction: TextInputAction.search,
-                onSubmitted: (_) => _fetchAttendance(),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) {
+                  if (!_hasFixtures) {
+                    _fetchAttendance();
+                  }
+                },
                 decoration: InputDecoration(
-                  labelText: 'Search Student Name or ID',
-                  hintText: 'Type name or student ID and press search',
+                  hintText: 'Search student name, ID, or course',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: IconButton(
                     tooltip: 'Search Attendance',
                     icon: const Icon(Icons.arrow_forward),
-                    onPressed: _fetchAttendance,
+                    onPressed: () {
+                      if (_hasFixtures) {
+                        setState(() {});
+                      } else {
+                        _fetchAttendance();
+                      }
+                    },
                   ),
                 ),
               ),
-            ),
-            _AttendanceStatusFilterBar(
-              selectedStatus: _selectedStatus,
-              onSelectStatus: (status) {
-                setState(() => _selectedStatus = status);
-                _fetchAttendance();
-              },
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
-                      ? ErrorStateView(
-                          message: _errorMessage!,
-                          onRetry: _fetchAttendance,
-                        )
-                      : _attendances.isEmpty
-                          ? EmptyStateView(
-                              icon: Icons.fact_check_outlined,
-                              title: 'No attendance records found.',
-                              message:
-                                  'Checked-in students and attendance records will appear here.',
-                              actionLabel: 'Refresh',
-                              onAction: _fetchAttendance,
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _fetchAttendance,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(
-                                  AppSpacing.md,
-                                  AppSpacing.md,
-                                  AppSpacing.md,
-                                  88,
-                                ),
-                                itemCount: _attendances.length,
-                                itemBuilder: (context, index) {
-                                  final record = _attendances[index];
-                                  return _AttendanceRecordCard(
-                                    record: record,
-                                    canCorrect: widget.canCorrect,
-                                    onCorrect: () => _openCorrectDialog(record),
-                                  );
-                                },
-                              ),
-                            ),
-            ),
-          ],
+              SizedBox(height: d.sm),
+              _AttendanceStatusFilterBar(
+                selectedStatus: _selectedStatus,
+                onSelectStatus: (status) {
+                  setState(() => _selectedStatus = status);
+                  if (!_hasFixtures) {
+                    _fetchAttendance();
+                  }
+                },
+              ),
+              SizedBox(height: d.md),
+              if (_isLoading && _attendances.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_errorMessage != null && _attendances.isEmpty)
+                ErrorStateView(
+                  message: _errorMessage!,
+                  onRetry: _fetchAttendance,
+                )
+              else if (visibleAttendances.isEmpty)
+                EmptyStateView(
+                  icon: Icons.fact_check_outlined,
+                  title: 'No attendance records found.',
+                  message:
+                      'Checked-in students and attendance records will appear here.',
+                  actionLabel: 'Refresh',
+                  onAction: _fetchAttendance,
+                )
+              else
+                for (final record in visibleAttendances)
+                  _AttendanceRecordCard(
+                    record: record,
+                    canCorrect: widget.canCorrect,
+                    onCorrect: () => _openCorrectDialog(record),
+                  ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _AttendanceSummaryMetricsRow extends StatelessWidget {
+class _AttendanceSummaryMetricsGrid extends StatelessWidget {
   final Map<String, int> summary;
 
-  const _AttendanceSummaryMetricsRow({required this.summary});
+  const _AttendanceSummaryMetricsGrid({required this.summary});
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          SizedBox(
-            width: 112,
-            child: StatMetricCard(
-              label: 'Checked In',
-              value: '${summary['total_checked_in'] ?? 0}',
-              icon: Icons.how_to_reg_outlined,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          SizedBox(
-            width: 104,
-            child: StatMetricCard(
-              label: 'Present',
-              value: '${summary['present'] ?? 0}',
-              icon: Icons.check_circle_outline,
-              color: AppColors.present,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          SizedBox(
-            width: 104,
-            child: StatMetricCard(
-              label: 'Late',
-              value: '${summary['late'] ?? 0}',
-              icon: Icons.schedule,
-              color: AppColors.late,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          SizedBox(
-            width: 104,
-            child: StatMetricCard(
-              label: 'Walk-In',
-              value: '${summary['walk_in'] ?? 0}',
-              icon: Icons.directions_walk,
-              color: AppColors.walkIn,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          SizedBox(
-            width: 104,
-            child: StatMetricCard(
-              label: 'Excused',
-              value: '${summary['excused'] ?? 0}',
-              icon: Icons.assignment_turned_in_outlined,
-              color: AppColors.excused,
-            ),
-          ),
-        ],
-      ),
+    final d = context.design;
+    return ResponsiveGrid(
+      minItemWidth: 150,
+      maxColumns: 4,
+      children: [
+        StatMetricCard(
+          label: 'Checked In',
+          value: '${summary['total_checked_in'] ?? 0}',
+          icon: Icons.how_to_reg_outlined,
+          color: d.primary,
+        ),
+        StatMetricCard(
+          label: 'Present',
+          value: '${summary['present'] ?? 0}',
+          icon: Icons.check_circle_outline,
+          color: d.success,
+        ),
+        StatMetricCard(
+          label: 'Late',
+          value: '${summary['late'] ?? 0}',
+          icon: Icons.schedule,
+          color: d.warning,
+        ),
+        StatMetricCard(
+          label: 'Walk-In',
+          value: '${summary['walk_in'] ?? 0}',
+          icon: Icons.directions_walk,
+          color: d.information,
+        ),
+        StatMetricCard(
+          label: 'Excused',
+          value: '${summary['excused'] ?? 0}',
+          icon: Icons.assignment_turned_in_outlined,
+          color: d.excused,
+        ),
+      ],
     );
   }
 }
@@ -471,26 +503,42 @@ class _AttendanceStatusFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          for (final filter in _filters)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.sm),
-              child: ChoiceChip(
-                key: ValueKey<String>('att-filter-${filter.value}'),
-                label: Text(filter.label),
-                selected: selectedStatus == filter.value,
-                onSelected: (_) => onSelectStatus(filter.value),
+    final d = context.design;
+    return Wrap(
+      spacing: d.sm,
+      runSpacing: d.xs,
+      children: [
+        for (final filter in _filters)
+          AppPressable(
+            key: ValueKey<String>('att-filter-${filter.value}'),
+            semanticLabel: filter.label,
+            selected: selectedStatus == filter.value,
+            onPressed: () => onSelectStatus(filter.value),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 40),
+              padding: EdgeInsets.symmetric(
+                horizontal: d.gap,
+                vertical: d.xs + 2,
+              ),
+              decoration: BoxDecoration(
+                color: selectedStatus == filter.value ? d.selection : d.card,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                border: Border.all(
+                  color:
+                      selectedStatus == filter.value ? d.primary : d.border,
+                ),
+              ),
+              child: Text(
+                filter.label,
+                style: d.badge.copyWith(
+                  color: selectedStatus == filter.value
+                      ? d.primary
+                      : d.foreground,
+                ),
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -508,6 +556,8 @@ class _AttendanceRecordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
+    final recordId = record['id'];
     final student = (record['student'] as Map<String, dynamic>?) ?? {};
     final fullName = _LiveAttendanceScreenState._resolveStudentName(student);
     final studentIdNumber =
@@ -517,66 +567,67 @@ class _AttendanceRecordCard extends StatelessWidget {
     final checkInTime = record['check_in_time']?.toString() ?? '';
     final checkOutTime = record['check_out_time']?.toString() ?? '';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          fullName,
-                          style: AppTypography.subtitle.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      StatusBadge(status: status),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'ID: $studentIdNumber${course.isNotEmpty ? ' • $course' : ''}',
-                    style: AppTypography.bodyMuted,
-                  ),
-                  if (checkInTime.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'Check-In: ${checkInTime.replaceAll('T', ' ').split('.').first}',
-                      style: AppTypography.caption,
-                    ),
-                  ],
-                  if (checkOutTime.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'Check-Out: ${checkOutTime.replaceAll('T', ' ').split('.').first}',
-                      style: AppTypography.caption,
-                    ),
-                  ],
-                ],
+    return Container(
+      margin: EdgeInsets.only(bottom: d.gap),
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: d.sm,
+            runSpacing: d.xs,
+            children: [
+              Text(
+                fullName,
+                style: d.cardTitle,
+                softWrap: true,
               ),
+              StatusBadge(status: status),
+            ],
+          ),
+          SizedBox(height: d.xs),
+          Text(
+            'ID: $studentIdNumber${course.isNotEmpty ? ' • $course' : ''}',
+            style: d.supporting.copyWith(
+              color: d.foreground,
+              fontWeight: FontWeight.w500,
             ),
-            if (canCorrect) ...[
-              const SizedBox(width: AppSpacing.xs),
-              IconButton(
-                tooltip: 'Correct Attendance Status',
-                icon: const Icon(
-                  Icons.edit_note_outlined,
-                  color: AppColors.primary,
-                ),
+          ),
+          if (checkInTime.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Check-In: ${checkInTime.replaceAll('T', ' ').split('.').first}',
+              style: d.supporting,
+            ),
+          ],
+          if (checkOutTime.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Check-Out: ${checkOutTime.replaceAll('T', ' ').split('.').first}',
+              style: d.supporting,
+            ),
+          ],
+          if (canCorrect) ...[
+            SizedBox(height: d.gap),
+            Align(
+              alignment: Alignment.centerRight,
+              child: AppButton(
+                key: ValueKey<String>('correct-attendance-$recordId'),
+                variant: AppButtonVariant.outline,
+                icon: Icons.edit_note_outlined,
+                label: 'Correct Attendance Status',
                 onPressed: onCorrect,
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -642,63 +693,84 @@ class _CorrectAttendanceDialogState extends State<_CorrectAttendanceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return AlertDialog(
       title: Text('Correct Attendance: ${widget.studentName}'),
-      content: FocusTraversalGroup(
-        child: AutofillGroup(
-          child: Form(
-            key: _formKey,
-            autovalidateMode: _autovalidateMode,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DropdownButtonFormField<String>(
-                    key: const ValueKey<String>('correct-status-dropdown'),
-                    initialValue: _selectedStatus,
-                    decoration: const InputDecoration(
-                      labelText: 'New Attendance Status',
-                      helperText: ' ',
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: FocusTraversalGroup(
+          child: AutofillGroup(
+            child: Form(
+              key: _formKey,
+              autovalidateMode: _autovalidateMode,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'New Attendance Status',
+                      style: d.supporting.copyWith(
+                        color: d.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    items: _validStatuses
-                        .map(
-                          (s) => DropdownMenuItem<String>(
-                            value: s,
-                            child: Text(s.replaceAll('_', ' ').toUpperCase()),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _selectedStatus = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('correct-reason-field'),
-                    controller: _reasonController,
-                    focusNode: _reasonFocus,
-                    autofocus: true,
-                    maxLines: 3,
-                    textInputAction: TextInputAction.done,
-                    keyboardType: TextInputType.text,
-                    autofillHints: const [AutofillHints.name],
-                    onFieldSubmitted: (_) => _submit(),
-                    decoration: const InputDecoration(
-                      labelText: 'Correction Reason (Mandatory)',
-                      hintText: 'Minimum 5 characters explaining the change',
-                      helperText: 'Logged in audit trail & attendance corrections',
+                    SizedBox(height: d.xs),
+                    DropdownButtonFormField<String>(
+                      key: const ValueKey<String>('correct-status-dropdown'),
+                      initialValue: _selectedStatus,
+                      decoration: const InputDecoration(
+                        helperText: ' ',
+                      ),
+                      items: _validStatuses
+                          .map(
+                            (s) => DropdownMenuItem<String>(
+                              value: s,
+                              child: Text(s.replaceAll('_', ' ').toUpperCase()),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedStatus = val);
+                        }
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().length < 5) {
-                        return 'Reason must be at least 5 characters.';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
+                    SizedBox(height: d.xs),
+                    Text(
+                      'Correction Reason (Mandatory)',
+                      style: d.supporting.copyWith(
+                        color: d.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: d.xs),
+                    TextFormField(
+                      key: const ValueKey<String>('correct-reason-field'),
+                      controller: _reasonController,
+                      focusNode: _reasonFocus,
+                      autofocus: true,
+                      maxLines: 3,
+                      textInputAction: TextInputAction.done,
+                      keyboardType: TextInputType.text,
+                      autofillHints: const [AutofillHints.name],
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: const InputDecoration(
+                        hintText: 'Minimum 5 characters explaining the change',
+                        helperText:
+                            'Logged in audit trail & attendance corrections',
+                        helperMaxLines: 2,
+                        errorMaxLines: 3,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().length < 5) {
+                          return 'Reason must be at least 5 characters.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -778,85 +850,112 @@ class _MarkAttendanceDialogState extends State<_MarkAttendanceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final d = context.design;
     return AlertDialog(
       title: const Text('Mark Student Attendance'),
-      content: FocusTraversalGroup(
-        child: AutofillGroup(
-          child: Form(
-            key: _formKey,
-            autovalidateMode: _autovalidateMode,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextFormField(
-                    key: const ValueKey<String>('mark-student-id-field'),
-                    controller: _studentIdController,
-                    focusNode: _studentIdFocus,
-                    autofocus: true,
-                    textInputAction: TextInputAction.next,
-                    keyboardType: TextInputType.number,
-                    autofillHints: const [AutofillHints.username],
-                    decoration: const InputDecoration(
-                      labelText: 'Student Record ID (Numeric)',
-                      hintText: 'e.g. 1',
-                      prefixIcon: Icon(Icons.badge_outlined),
-                      helperText: ' ',
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: FocusTraversalGroup(
+          child: AutofillGroup(
+            child: Form(
+              key: _formKey,
+              autovalidateMode: _autovalidateMode,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Student Record ID (Numeric)',
+                      style: d.supporting.copyWith(
+                        color: d.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    validator: (value) {
-                      final parsed = int.tryParse(value?.trim() ?? '');
-                      if (parsed == null || parsed < 1) {
-                        return 'Enter a valid numeric student ID.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  DropdownButtonFormField<String>(
-                    key: const ValueKey<String>('mark-status-dropdown'),
-                    initialValue: _selectedStatus,
-                    decoration: const InputDecoration(
-                      labelText: 'Attendance Status',
-                      helperText: ' ',
+                    SizedBox(height: d.xs),
+                    TextFormField(
+                      key: const ValueKey<String>('mark-student-id-field'),
+                      controller: _studentIdController,
+                      focusNode: _studentIdFocus,
+                      autofocus: true,
+                      textInputAction: TextInputAction.next,
+                      keyboardType: TextInputType.number,
+                      autofillHints: const [AutofillHints.username],
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. 1',
+                        prefixIcon: Icon(Icons.badge_outlined),
+                        helperText: ' ',
+                        errorMaxLines: 2,
+                      ),
+                      validator: (value) {
+                        final parsed = int.tryParse(value?.trim() ?? '');
+                        if (parsed == null || parsed < 1) {
+                          return 'Enter a valid numeric student ID.';
+                        }
+                        return null;
+                      },
                     ),
-                    items: _validStatuses
-                        .map(
-                          (s) => DropdownMenuItem<String>(
-                            value: s,
-                            child: Text(s.replaceAll('_', ' ').toUpperCase()),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _selectedStatus = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextFormField(
-                    key: const ValueKey<String>('mark-reason-field'),
-                    controller: _reasonController,
-                    focusNode: _reasonFocus,
-                    maxLines: 2,
-                    textInputAction: TextInputAction.done,
-                    keyboardType: TextInputType.text,
-                    autofillHints: const [AutofillHints.name],
-                    onFieldSubmitted: (_) => _submit(),
-                    decoration: const InputDecoration(
-                      labelText: 'Reason (Mandatory)',
-                      hintText: 'Minimum 5 characters',
-                      helperText: ' ',
+                    SizedBox(height: d.xs),
+                    Text(
+                      'Attendance Status',
+                      style: d.supporting.copyWith(
+                        color: d.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().length < 5) {
-                        return 'Reason must be at least 5 characters.';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
+                    SizedBox(height: d.xs),
+                    DropdownButtonFormField<String>(
+                      key: const ValueKey<String>('mark-status-dropdown'),
+                      initialValue: _selectedStatus,
+                      decoration: const InputDecoration(
+                        helperText: ' ',
+                      ),
+                      items: _validStatuses
+                          .map(
+                            (s) => DropdownMenuItem<String>(
+                              value: s,
+                              child: Text(s.replaceAll('_', ' ').toUpperCase()),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedStatus = val);
+                        }
+                      },
+                    ),
+                    SizedBox(height: d.xs),
+                    Text(
+                      'Reason (Mandatory)',
+                      style: d.supporting.copyWith(
+                        color: d.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: d.xs),
+                    TextFormField(
+                      key: const ValueKey<String>('mark-reason-field'),
+                      controller: _reasonController,
+                      focusNode: _reasonFocus,
+                      maxLines: 2,
+                      textInputAction: TextInputAction.done,
+                      keyboardType: TextInputType.text,
+                      autofillHints: const [AutofillHints.name],
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: const InputDecoration(
+                        hintText: 'Minimum 5 characters',
+                        helperText: ' ',
+                        errorMaxLines: 3,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().length < 5) {
+                          return 'Reason must be at least 5 characters.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

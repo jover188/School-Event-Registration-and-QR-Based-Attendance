@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../theme/app_theme.dart';
 
 /// Semantic status pill badge for events, registrations, attendance, and users.
@@ -22,23 +23,23 @@ class StatusBadge extends StatelessWidget {
       'present' ||
       'active' ||
       'approved' =>
-        Icons.check_circle_outline,
-      'ongoing' => Icons.sensors,
-      'completed' => Icons.task_alt,
-      'walk_in' || 'walk-in' => Icons.directions_walk,
-      'late' => Icons.schedule,
-      'pending_approval' || 'pending' => Icons.hourglass_top_rounded,
-      'waiting_list' || 'waiting' => Icons.queue_rounded,
-      'excused' => Icons.assignment_turned_in_outlined,
+        LucideIcons.circleCheck,
+      'ongoing' => LucideIcons.radio,
+      'completed' => LucideIcons.checkCheck,
+      'walk_in' || 'walk-in' => LucideIcons.footprints,
+      'late' => LucideIcons.clock,
+      'pending_approval' || 'pending' => LucideIcons.hourglass,
+      'waiting_list' || 'waiting' => LucideIcons.listOrdered,
+      'excused' => LucideIcons.fileCheck,
       'cancelled' ||
       'absent' ||
       'rejected' ||
       'revoked' ||
       'inactive' ||
       'suspended' =>
-        Icons.cancel_outlined,
-      'draft' => Icons.edit_note_rounded,
-      _ => Icons.info_outline,
+        LucideIcons.circleX,
+      'draft' => LucideIcons.filePenLine,
+      _ => LucideIcons.info,
     };
   }
 
@@ -51,22 +52,23 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fgColor = AppColors.statusColor(status);
-    final bgColor = AppColors.statusBackgroundColor(status);
+    final d = context.design;
+    final fgColor = d.statusColor(status);
+    final bgColor = d.statusBackgroundColor(status);
     final displayText = _displayText;
 
     return Semantics(
       container: true,
       label: 'Status: $displayText',
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm + 2,
-          vertical: AppSpacing.xs,
+        padding: EdgeInsets.symmetric(
+          horizontal: d.sm + 2,
+          vertical: 3,
         ),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(AppRadius.full),
-          border: Border.all(color: fgColor.withValues(alpha: 0.35)),
+          border: Border.all(color: fgColor.withValues(alpha: 0.24)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -75,15 +77,17 @@ class StatusBadge extends StatelessWidget {
               Icon(
                 _iconForStatus(status),
                 size: 13,
+                weight: 300,
                 color: fgColor,
               ),
-              const SizedBox(width: AppSpacing.xs),
+              SizedBox(width: d.xs),
             ],
             Flexible(
               child: Text(
                 displayText,
-                style: AppTypography.badge.copyWith(color: fgColor),
+                style: d.badge.copyWith(color: fgColor),
                 overflow: TextOverflow.ellipsis,
+                maxLines: 2,
               ),
             ),
           ],
@@ -92,3 +96,4 @@ class StatusBadge extends StatelessWidget {
     );
   }
 }
+
