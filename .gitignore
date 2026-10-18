@@ -19,6 +19,7 @@ mobile/build/
 mobile/build.bak/
 mobile/android/.kotlin/
 mobile/.packages
+mobile/linux/
 
 # Backups & Temporary
 *.bak
