@@ -42,6 +42,24 @@ class ApiClient {
 
   VoidCallback? onSessionTerminated;
 
+  static bool _checkedAndroidHost = false;
+
+  Future<void> _ensureAndroidHost() async {
+    if (_checkedAndroidHost || kIsWeb || !Platform.isAndroid) return;
+    _checkedAndroidHost = true;
+    if (ApiConstants.customBaseUrl != null) return;
+
+    try {
+      final socket = await Socket.connect('127.0.0.1', 8000,
+          timeout: const Duration(milliseconds: 400));
+      socket.destroy();
+      ApiConstants.customBaseUrl = 'http://127.0.0.1:8000/api/v1';
+    } catch (_) {
+      // 127.0.0.1 not reachable; fallback to 10.0.2.2 for Android QEMU emulator
+      ApiConstants.customBaseUrl = 'http://10.0.2.2:8000/api/v1';
+    }
+  }
+
   Future<String?> getToken() async {
     try {
       final secureToken = await _secureStorage.read(key: _tokenKey);
@@ -151,6 +169,7 @@ class ApiClient {
     Map<String, String>? queryParams,
   }) async {
     try {
+      await _ensureAndroidHost();
       var uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
       if (queryParams != null && queryParams.isNotEmpty) {
         uri = uri.replace(queryParameters: queryParams);
@@ -174,6 +193,7 @@ class ApiClient {
     Map<String, dynamic> body,
   ) async {
     try {
+      await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
       final headers = await _getHeaders();
       final response = await http
@@ -198,6 +218,7 @@ class ApiClient {
     Map<String, dynamic> body,
   ) async {
     try {
+      await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
       final headers = await _getHeaders();
       final response = await http
@@ -222,6 +243,7 @@ class ApiClient {
     Map<String, dynamic> body,
   ) async {
     try {
+      await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
       final headers = await _getHeaders();
       final response = await http
@@ -243,6 +265,7 @@ class ApiClient {
 
   Future<ApiResponse> delete(String endpoint) async {
     try {
+      await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
       final headers = await _getHeaders();
       final response = await http
@@ -266,6 +289,7 @@ class ApiClient {
     String fileField = 'profile_photo',
   }) async {
     try {
+      await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
       final request = http.MultipartRequest('POST', uri);
       final token = await getToken();
@@ -307,6 +331,7 @@ class ApiClient {
     String? fileName,
   }) async {
     try {
+      await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
       final request = http.MultipartRequest('POST', uri);
       final token = await getToken();

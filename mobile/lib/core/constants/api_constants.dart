@@ -4,15 +4,24 @@ import 'package:flutter/foundation.dart';
 class ApiConstants {
   const ApiConstants._();
 
+  /// Dynamically configurable API base URL (e.g. for physical devices, custom environments, or automated detection).
+  static String? customBaseUrl;
+
   /// Base URL for API v1 requests.
-  /// Uses 10.0.2.2 for Android Emulator, or 127.0.0.1 for iOS/desktop/web.
+  /// 1. Uses API_BASE_URL dart-define if provided.
+  /// 2. Uses customBaseUrl if dynamically resolved.
+  /// 3. Defaults to 127.0.0.1:8000 (standard for USB-tethered physical devices with adb reverse, iOS, Web, desktop).
+  /// 4. On Android emulator without adb reverse, 10.0.2.2:8000 is supported via automated fallback.
   static String get baseUrl {
     const override = String.fromEnvironment('API_BASE_URL');
     if (override.isNotEmpty) {
       return override;
     }
+    if (customBaseUrl != null && customBaseUrl!.isNotEmpty) {
+      return customBaseUrl!;
+    }
     if (!kIsWeb && Platform.isAndroid) {
-      return 'http://10.0.2.2:8000/api/v1';
+      return 'http://127.0.0.1:8000/api/v1';
     }
     return 'http://127.0.0.1:8000/api/v1';
   }
