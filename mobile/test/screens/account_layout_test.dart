@@ -10,7 +10,7 @@ import '../support/app_test_host.dart';
 
 void main() {
   testWidgets(
-    'login matches the supplied Attendify card layout on desktop and mobile',
+    'login renders full-screen stretched layout on desktop and mobile',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(1440, 900);
@@ -22,22 +22,14 @@ void main() {
 
       final surface = find.byKey(const ValueKey('login-surface'));
       expect(surface, findsOneWidget);
-      expect(tester.getSize(surface).width, lessThanOrEqualTo(420));
       final surfaceDecoration =
           tester.widget<Container>(surface).decoration! as BoxDecoration;
       expect(surfaceDecoration.color, const Color(0xFFF6F6F4));
-      expect(
-        surfaceDecoration.borderRadius,
-        BorderRadius.circular(36),
-      );
-      expect(surfaceDecoration.boxShadow, isNotEmpty);
-      expect(tester.getSize(surface).width, 420);
-      expect(tester.getSize(surface).height, 663);
-      expect(tester.getTopLeft(surface).dx, (1440 - 420) / 2);
-      expect(tester.getTopLeft(surface).dy, closeTo((900 - 663) / 2, 1));
+      expect(tester.getSize(surface).width, 1440);
+      expect(tester.getTopLeft(surface).dx, 0);
 
       final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-      expect(scaffold.backgroundColor, const Color(0xFFE6E6E4));
+      expect(scaffold.backgroundColor, const Color(0xFFF6F6F4));
 
       final header = find.byKey(const ValueKey('login-header'));
       final headerBackground = find.descendant(
@@ -116,12 +108,11 @@ void main() {
       tester.view.viewInsets = FakeViewPadding.zero;
       await tester.pumpAndSettle();
 
-      expect(tester.getTopLeft(surface).dx, 16);
-      expect(tester.getTopLeft(surface).dy,
-          closeTo((844 - tester.getSize(surface).height) / 2, 1));
-      expect(tester.getSize(surface).width, 358);
-      expect(tester.getSize(header).width, 358);
-      expect(tester.getSize(header).height, closeTo(230.14, 0.01));
+      expect(tester.getTopLeft(surface).dx, 0);
+      expect(tester.getTopLeft(surface).dy, 0);
+      expect(tester.getSize(surface).width, 390);
+      expect(tester.getSize(header).width, 390);
+      expect(tester.getSize(header).height, 270);
 
       tester.view.physicalSize = const Size(320, 640);
       tester.view.viewInsets = const FakeViewPadding(bottom: 280);

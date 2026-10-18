@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -108,10 +106,11 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final d = context.design;
     final viewPadding = MediaQuery.viewPaddingOf(context);
-    final overlayStyle =
-        ThemeData.estimateBrightnessForColor(d.authPage) == Brightness.dark
-            ? SystemUiOverlayStyle.light
-            : SystemUiOverlayStyle.dark;
+    final overlayStyle = SystemUiOverlayStyle.light.copyWith(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+    );
     final fieldDecoration = ShadDecoration(
       color: d.authLight,
       border: ShadBorder.all(
@@ -150,90 +149,63 @@ class _LoginScreenState extends State<LoginScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
       child: Scaffold(
-        backgroundColor: d.authPage,
+        backgroundColor: d.authSurface,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final leftInset = math.max(d.md, viewPadding.left);
-            final rightInset = math.max(d.md, viewPadding.right);
-            final topInset = d.md + viewPadding.top;
-            final bottomInset = d.md + viewPadding.bottom;
-            final surfaceWidth = math.max(
-              0.0,
-              math.min(
-                d.authSurfaceMaxWidth,
-                constraints.maxWidth - leftInset - rightInset,
-              ),
-            );
-            final isNarrowCard = surfaceWidth <= 400;
-            final isVeryNarrowCard = surfaceWidth < 320;
-            final headerHeight = surfaceWidth * d.authHeaderAspectRatio;
-            final availableHeight = math.max(
-              0.0,
-              constraints.maxHeight - topInset - bottomInset,
-            );
-            final surfaceRadius = BorderRadius.circular(d.authSurfaceRadius);
+            final screenWidth = constraints.maxWidth;
+            final isNarrowCard = screenWidth <= 400;
+            final isVeryNarrowCard = screenWidth < 320;
+            final headerHeight = 270.0 + viewPadding.top;
+            final horizontalPadding = isVeryNarrowCard
+                ? d.sm
+                : isNarrowCard
+                    ? d.lg
+                    : d.xl;
 
             return SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.fromLTRB(
-                leftInset,
-                topInset,
-                rightInset,
-                bottomInset,
-              ),
+              padding: EdgeInsets.zero,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: availableHeight,
+                  minHeight: constraints.maxHeight,
                 ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints:
-                        BoxConstraints(maxWidth: d.authSurfaceMaxWidth),
-                    child: FocusTraversalGroup(
-                      child: AutofillGroup(
-                        child: Form(
-                          key: _formKey,
-                          autovalidateMode: _autovalidateMode,
-                          child: Container(
-                            key: const ValueKey<String>('login-surface'),
-                            width: surfaceWidth,
-                            clipBehavior: Clip.antiAlias,
-                            decoration: BoxDecoration(
-                              color: d.authSurface,
-                              borderRadius: surfaceRadius,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: d.authDark.withValues(alpha: 0.18),
-                                  offset: const Offset(0, 24),
-                                  blurRadius: 60,
+                child: Container(
+                  key: const ValueKey<String>('login-surface'),
+                  width: screenWidth,
+                  decoration: BoxDecoration(
+                    color: d.authSurface,
+                  ),
+                  child: FocusTraversalGroup(
+                    child: AutofillGroup(
+                      child: Form(
+                        key: _formKey,
+                        autovalidateMode: _autovalidateMode,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SizedBox(
+                              key: const ValueKey<String>('login-header'),
+                              height: headerHeight,
+                              child: CustomPaint(
+                                painter: AttendifyHeaderPainter(
+                                  color: d.authDark,
                                 ),
-                              ],
-                            ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              SizedBox(
-                                key: const ValueKey<String>('login-header'),
-                                height: headerHeight,
-                                child: CustomPaint(
-                                  painter: AttendifyHeaderPainter(
-                                    color: d.authDark,
+                                child: Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                    horizontalPadding,
+                                    viewPadding.top +
+                                        (isVeryNarrowCard
+                                            ? d.sm
+                                            : isNarrowCard
+                                                ? d.lg + d.xs
+                                                : d.xl + d.xs),
+                                    horizontalPadding,
+                                    0,
                                   ),
-                                  child: Padding(
-                                    padding: EdgeInsets.fromLTRB(
-                                      isNarrowCard ? d.lg : d.xl,
-                                      isVeryNarrowCard
-                                          ? d.md
-                                          : isNarrowCard
-                                              ? d.lg + d.xs
-                                              : d.xl + d.xs,
-                                      isNarrowCard ? d.lg : d.xl,
-                                      0,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
                                         SvgPicture.asset(
                                           'assets/images/logo_icon.svg',
                                           key: const ValueKey<String>(
@@ -281,10 +253,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               Padding(
                                 padding: EdgeInsets.fromLTRB(
-                                  isNarrowCard ? d.lg : d.xl,
+                                  horizontalPadding,
                                   d.sm,
-                                  isNarrowCard ? d.lg : d.xl,
-                                  d.xl + d.sm,
+                                  horizontalPadding,
+                                  d.xl + d.sm + viewPadding.bottom,
                                 ),
                                 child: Column(
                                   crossAxisAlignment:
@@ -528,10 +500,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
+              );
+          },
         ),
       ),
     );
