@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/status_badge.dart';
@@ -105,18 +106,17 @@ class _NotificationPreferencesScreenState
       _isSaving = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor:
-            response.success ? AppColors.present : AppColors.absent,
-        content: Text(
-          response.message ??
-              (response.success
-                  ? 'Notification preferences updated.'
-                  : 'Failed to save preferences.'),
-        ),
-      ),
-    );
+    if (response.success) {
+      AppToast.success(
+        context,
+        response.message ?? 'Notification preferences updated.',
+      );
+    } else {
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to save preferences.',
+      );
+    }
   }
 
   @override
@@ -125,13 +125,6 @@ class _NotificationPreferencesScreenState
     return AppPageScaffold(
       title: 'Notification Preferences',
       maxWidth: 720,
-      actions: [
-        IconButton(
-          tooltip: 'Refresh Preferences',
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
-          onPressed: _isLoading ? null : _fetchPreferences,
-        ),
-      ],
       body: _isLoading
           ? Center(child: AppSpinner(color: d.authDark, size: 28))
           : _errorMessage != null

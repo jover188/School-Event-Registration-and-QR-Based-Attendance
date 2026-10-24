@@ -50,6 +50,10 @@ void main() {
 
         final qrFinder = find.byType(QrImageView);
         expect(qrFinder, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('student-qr-wallet-header')),
+          findsOneWidget,
+        );
 
         final qrSize320 = tester.getSize(qrFinder);
         expect(qrSize320.width, greaterThanOrEqualTo(180));

@@ -594,6 +594,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
       onDestinationSelected: (id) {
         setState(() => _selectedDestination = id);
       },
+      onLogout: _logout,
       actions: [
         IconButton(
           icon: const Icon(LucideIcons.bell, size: 20),
@@ -614,16 +615,6 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
               MaterialPageRoute(builder: (_) => const ProfileScreen()),
             );
           },
-        ),
-        IconButton(
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
-          tooltip: 'Refresh Metrics',
-          onPressed: _isLoading ? null : _fetchData,
-        ),
-        IconButton(
-          icon: const Icon(LucideIcons.logOut, size: 20),
-          tooltip: 'Logout',
-          onPressed: _logout,
         ),
       ],
       body: AppDestinationStack(

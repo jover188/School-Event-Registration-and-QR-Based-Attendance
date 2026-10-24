@@ -10,6 +10,8 @@ import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../models/event_model.dart';
+import 'event_detail_screen.dart';
 
 class MyRegistrationsScreen extends StatefulWidget {
   final bool embedded;
@@ -99,63 +101,34 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
     });
   }
 
-  Future<void> _confirmCancelRegistration(
-    int eventId,
-    String eventTitle,
+  Future<void> _openRegistrationEventDetail(
+    Map<String, dynamic> registration,
   ) async {
-    final d = context.design;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        scrollable: true,
-        title: const Text('Cancel Registration?'),
-        content: Text(
-          'Are you sure you want to cancel your registration for "$eventTitle"? If you hold a confirmed slot, the next student on the waiting list will be automatically promoted.',
+    final eventMap = Map<String, dynamic>.from(
+      (registration['event'] as Map?) ?? const {},
+    );
+    final eventId =
+        (registration['event_id'] as num? ?? eventMap['id'] as num? ?? 0)
+            .toInt();
+    if (eventId <= 0 && eventMap.isEmpty) return;
+
+    eventMap['id'] ??= eventId;
+    eventMap['user_registration_status'] ??= registration['status'];
+    eventMap['user_waiting_position'] ??= registration['waiting_list_position'];
+    final model = EventModel.fromJson(eventMap);
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventDetailScreen(
+          eventId: eventId > 0 ? eventId : model.id,
+          event: model,
+          initialEvent: _hasFixtureData ? model : null,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep Slot'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: d.destructive,
-              foregroundColor: d.destructiveForeground,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cancel Registration'),
-          ),
-        ],
       ),
     );
-
-    if (confirmed != true || !mounted) return;
-
-    final response =
-        await ApiClient().delete(ApiConstants.cancelRegistration(eventId));
-
     if (!mounted) return;
-
-    if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.success,
-          content: Text(
-            response.message ?? 'Registration cancelled successfully.',
-          ),
-        ),
-      );
-      _fetchRegistrations();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(
-            response.message ?? 'Could not cancel registration.',
-          ),
-        ),
-      );
-    }
+    _fetchRegistrations();
   }
 
   @override
@@ -166,48 +139,46 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
     return AppPageScaffold(
       title: 'My Registrations',
       embedded: widget.embedded,
-      actions: [
-        IconButton(
-          tooltip: 'Refresh Registrations',
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
-          onPressed: _isLoading ? null : _fetchRegistrations,
-        ),
-      ],
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.only(bottom: d.gap),
-            child: Row(
-              children: _filters.map((filter) {
-                final isSelected = _selectedFilter == filter.value;
-                return Padding(
-                  padding: EdgeInsets.only(right: d.sm),
-                  child: ChoiceChip(
-                    label: Text(filter.label),
-                    selected: isSelected,
-                    selectedColor: d.authDark,
-                    backgroundColor: d.card,
-                    labelStyle: d.badge.copyWith(
-                      color: isSelected ? d.authLight : d.foreground,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          Material(
+            type: MaterialType.transparency,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.only(bottom: d.gap),
+              child: Row(
+                children: _filters.map((filter) {
+                  final isSelected = _selectedFilter == filter.value;
+                  return Padding(
+                    padding: EdgeInsets.only(right: d.sm),
+                    child: ChoiceChip(
+                      key: ValueKey('registration-filter-${filter.value}'),
+                      label: Text(filter.label),
+                      selected: isSelected,
+                      selectedColor: d.buttonPrimary,
+                      backgroundColor: d.card,
+                      labelStyle: d.supporting.copyWith(
+                        color: isSelected
+                            ? d.buttonPrimaryForeground
+                            : d.foreground,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                      side: BorderSide(
+                        color: isSelected ? d.buttonPrimary : d.border,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(d.radiusControl),
+                      ),
+                      showCheckmark: false,
+                      onSelected: (_) {
+                        setState(() => _selectedFilter = filter.value);
+                      },
                     ),
-                    side: BorderSide(
-                      color: isSelected
-                          ? d.authDark
-                          : d.authDark.withValues(alpha: 0.08),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(d.radiusPill),
-                    ),
-                    showCheckmark: false,
-                    onSelected: (_) {
-                      setState(() => _selectedFilter = filter.value);
-                    },
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
           ),
           Expanded(
@@ -228,10 +199,8 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                             icon: LucideIcons.calendarX2,
                             title: 'No registrations found',
                             message: _selectedFilter == 'all'
-                                ? 'Browse campus events to register or join a waiting list.'
-                                : 'No registrations match the selected status filter.',
-                            actionLabel: 'Refresh',
-                            onAction: _fetchRegistrations,
+                                ? 'Browse events to register or join a waiting list.'
+                                : 'No registrations with this status.',
                           )
                         : RefreshIndicator(
                             onRefresh: _fetchRegistrations,
@@ -245,11 +214,8 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                                     final reg = items[index];
                                     return _RegistrationItemCard(
                                       registration: reg,
-                                      onCancel: (eventId, title) =>
-                                          _confirmCancelRegistration(
-                                        eventId,
-                                        title,
-                                      ),
+                                      onViewDetails: () =>
+                                          _openRegistrationEventDetail(reg),
                                     );
                                   },
                                 ),
@@ -265,11 +231,11 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
 
 class _RegistrationItemCard extends StatelessWidget {
   final Map<String, dynamic> registration;
-  final void Function(int eventId, String eventTitle) onCancel;
+  final VoidCallback? onViewDetails;
 
   const _RegistrationItemCard({
     required this.registration,
-    required this.onCancel,
+    this.onViewDetails,
   });
 
   @override
@@ -284,7 +250,6 @@ class _RegistrationItemCard extends StatelessWidget {
     final venue = event['venue']?.toString() ?? 'Campus Venue';
     final eventDate = event['event_date']?.toString() ?? '';
     final startTime = event['start_time']?.toString() ?? '';
-    final canCancel = status == 'registered' || status == 'waiting_list';
 
     final badgeLabel = status == 'waiting_list' && waitPos != null
         ? 'WAITING LIST #$waitPos'
@@ -295,7 +260,7 @@ class _RegistrationItemCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+        border: Border.all(color: d.border, width: 1),
         boxShadow: [
           BoxShadow(
             color: d.authDark.withValues(alpha: 0.04),
@@ -308,16 +273,22 @@ class _RegistrationItemCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: d.sm,
-            runSpacing: d.xs,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                title,
-                style: d.cardTitle.copyWith(fontWeight: FontWeight.w600),
+              Icon(
+                LucideIcons.calendarCheck,
+                size: 18,
+                color: d.primary,
               ),
+              SizedBox(width: d.sm),
+              Expanded(
+                child: Text(
+                  title,
+                  style: d.cardTitle.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              SizedBox(width: d.sm),
               StatusBadge(
                 status: status,
                 label: badgeLabel,
@@ -326,14 +297,14 @@ class _RegistrationItemCard extends StatelessWidget {
           ),
           SizedBox(height: d.sm),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(
                 LucideIcons.mapPin,
                 size: 16,
-                color: d.mutedForeground,
+                color: d.primary,
               ),
-              SizedBox(width: d.xs),
+              SizedBox(width: d.sm),
               Expanded(
                 child: Text(
                   venue,
@@ -346,14 +317,14 @@ class _RegistrationItemCard extends StatelessWidget {
           if (eventDate.isNotEmpty) ...[
             SizedBox(height: d.xs),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Icon(
                   LucideIcons.calendar,
                   size: 16,
-                  color: d.mutedForeground,
+                  color: d.primary,
                 ),
-                SizedBox(width: d.xs),
+                SizedBox(width: d.sm),
                 Expanded(
                   child: Text(
                     startTime.isNotEmpty
@@ -366,16 +337,17 @@ class _RegistrationItemCard extends StatelessWidget {
               ],
             ),
           ],
-          if (canCancel && eventId > 0) ...[
-            Divider(height: d.lg, color: d.authDark.withValues(alpha: 0.08)),
+          if (eventId > 0 && onViewDetails != null) ...[
+            Divider(height: d.lg, color: d.border),
             Align(
               alignment: Alignment.centerRight,
               child: AppButton(
-                variant: AppButtonVariant.destructive,
+                key: ValueKey('view-registration-event-$eventId'),
+                variant: AppButtonVariant.outline,
                 pill: true,
-                icon: LucideIcons.xCircle,
-                onPressed: () => onCancel(eventId, title),
-                label: 'Cancel Registration',
+                icon: LucideIcons.arrowUpRight,
+                onPressed: onViewDetails,
+                label: 'View Details',
               ),
             ),
           ],

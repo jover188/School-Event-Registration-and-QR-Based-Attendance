@@ -9,6 +9,13 @@
 **Mobile Framework:** Flutter 3.x (Dart 3.x) — Android 8.0+ / iOS 13+  
 **External Services:** Firebase Cloud Messaging (FCM)
 
+> **Connected Project Documentation & Rules:**
+> - [`context.md`](./context.md) — High-level system context, repository structure, seeded credentials, and implementation status.
+> - [`AGENTS.md`](./AGENTS.md) & [`.agents/rules/`](./.agents/rules/) — Mandatory architectural invariants and modular workspace rules.
+> - [`School_Event_Attendance_SRS_v1.0.md`](./School_Event_Attendance_SRS_v1.0.md) — Finalized Software Requirements Specification (v1.1 baseline).
+> - [`REST_API_Specification.md`](./REST_API_Specification.md) & [`openapi.yaml`](./openapi.yaml) — Canonical `/api/v1/*` REST API routes and payload envelopes.
+> - [`Project_Plan.md`](./Project_Plan.md) & [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) — 6-week Agile sprint plan and task breakdown.
+
 ---
 
 # 1. System Architecture

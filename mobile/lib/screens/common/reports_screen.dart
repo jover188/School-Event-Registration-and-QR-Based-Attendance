@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -363,24 +364,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
         result.statusCode < 300 &&
         result.bytes.isNotEmpty) {
       final bytes = result.bytes;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: context.design.success,
-          content: Text(
-            '$upperFormat report generated (${bytes.length} bytes received).',
-          ),
-        ),
+      AppToast.success(
+        context,
+        '$upperFormat report generated (${bytes.length} bytes received).',
       );
       await _showExportPreviewDialog(upperFormat, bytes);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: context.design.destructive,
-          content: Text(
-            result.errorMessage ??
-                'Export not available for $_selectedReportType in $upperFormat format.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        result.errorMessage ??
+            'Export not available for $_selectedReportType in $upperFormat format.',
       );
     }
   }
@@ -604,13 +597,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return AppPageScaffold(
       title: 'Attendance & Event Reports',
       embedded: widget.embedded,
-      actions: [
-        IconButton(
-          tooltip: 'Refresh Report',
-          icon: const Icon(LucideIcons.refreshCw, size: 18),
-          onPressed: _isLoadingReport ? null : _generateReport,
-        ),
-      ],
       body: FocusTraversalGroup(
         child: SingleChildScrollView(
           child: Column(

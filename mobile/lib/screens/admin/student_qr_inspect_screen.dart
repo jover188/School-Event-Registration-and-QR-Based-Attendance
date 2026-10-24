@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -151,13 +152,9 @@ class _StudentQrInspectScreenState extends State<StudentQrInspectScreen> {
           },
         };
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: context.design.success,
-          content: const Text(
-            'Permanent QR code reissued and previous token revoked.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        'Permanent QR code reissued and previous token revoked.',
       );
       return;
     }
@@ -172,26 +169,17 @@ class _StudentQrInspectScreenState extends State<StudentQrInspectScreen> {
     if (!mounted) return;
     setState(() => _isReissuing = false);
 
-    final d = context.design;
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.success,
-          content: Text(
-            response.message ??
-                'Permanent QR code reissued and previous token revoked.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ??
+            'Permanent QR code reissued and previous token revoked.',
       );
       _fetchQrDetails();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(
-            response.message ?? 'Failed to reissue student QR code.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to reissue student QR code.',
       );
     }
   }
@@ -421,14 +409,6 @@ class _ActiveQrInspectorCard extends StatelessWidget {
             runSpacing: d.sm,
             alignment: WrapAlignment.end,
             children: [
-              if (onRefresh != null)
-                AppButton(
-                  variant: AppButtonVariant.outline,
-                  pill: true,
-                  icon: LucideIcons.refreshCw,
-                  label: 'Refresh Status',
-                  onPressed: onRefresh,
-                ),
               AppButton(
                 key: const ValueKey<String>('force-reissue-qr-button'),
                 variant: AppButtonVariant.destructive,

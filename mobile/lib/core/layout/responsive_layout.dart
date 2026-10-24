@@ -69,8 +69,11 @@ class ResponsiveGrid extends StatelessWidget {
               children: [
                 for (var column = 0; column < columns; column++) ...[
                   if (column > 0) SizedBox(width: spacing),
-                  Expanded(child: offset + column < children.length
-                      ? children[offset + column] : const SizedBox.shrink()),
+                  Expanded(
+                    child: offset + column < children.length
+                        ? children[offset + column]
+                        : const SizedBox.shrink(),
+                  ),
                 ],
               ],
             ),
@@ -88,11 +91,13 @@ class ResponsiveCardSliver extends StatelessWidget {
     required this.itemBuilder,
     this.minItemWidth = 300,
     this.maxColumns = 3,
+    this.equalRowHeight = false,
   });
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
   final double minItemWidth;
   final int maxColumns;
+  final bool equalRowHeight;
 
   @override
   Widget build(BuildContext context) => SliverLayoutBuilder(
@@ -102,17 +107,27 @@ class ResponsiveCardSliver extends StatelessWidget {
           minItemWidth, maxColumns, gap);
       return SliverList.builder(
         itemCount: (itemCount / columns).ceil(),
-        itemBuilder: (context, row) => Padding(
-          padding: const EdgeInsets.only(bottom: gap),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            for (var column = 0; column < columns; column++) ...[
-              if (column > 0) const SizedBox(width: gap),
-              Expanded(child: row * columns + column < itemCount
-                  ? itemBuilder(context, row * columns + column)
-                  : const SizedBox.shrink()),
+        itemBuilder: (context, row) {
+          final rowWidget = Row(
+            crossAxisAlignment: equalRowHeight
+                ? CrossAxisAlignment.stretch
+                : CrossAxisAlignment.start,
+            children: [
+              for (var column = 0; column < columns; column++) ...[
+                if (column > 0) const SizedBox(width: gap),
+                Expanded(
+                  child: row * columns + column < itemCount
+                      ? itemBuilder(context, row * columns + column)
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ],
-          ]),
-        ),
+          );
+          return Padding(
+            padding: const EdgeInsets.only(bottom: gap),
+            child: equalRowHeight ? IntrinsicHeight(child: rowWidget) : rowWidget,
+          );
+        },
       );
     },
   );

@@ -90,13 +90,27 @@ void main() {
     expect(find.textContaining(monthName), findsAtLeastNWidgets(1));
   });
 
-  // 5. Month ↔ Week format toggle
+  // 5. Month ↔ Week format toggle and centered labels
   testWidgets('CalendarScreen toggles between month and week format',
       (tester) async {
     await tester.pumpWidget(
       const AppTestHost(child: CalendarScreen(initialEvents: [])),
     );
     await tester.pumpAndSettle();
+
+    final monthTabCenter = tester.getCenter(
+      find.byKey(const ValueKey('calendar-format-month')),
+    );
+    final monthTextCenter = tester.getCenter(find.text('Month'));
+    expect(monthTextCenter.dx, closeTo(monthTabCenter.dx, 1.0));
+    expect(monthTextCenter.dy, closeTo(monthTabCenter.dy, 1.0));
+
+    final weekTabCenter = tester.getCenter(
+      find.byKey(const ValueKey('calendar-format-week')),
+    );
+    final weekTextCenter = tester.getCenter(find.text('Week'));
+    expect(weekTextCenter.dx, closeTo(weekTabCenter.dx, 1.0));
+    expect(weekTextCenter.dy, closeTo(weekTabCenter.dy, 1.0));
 
     await tester.tap(find.text('Week'));
     await tester.pumpAndSettle();
@@ -240,7 +254,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Attendify'), findsOneWidget);
+    expect(find.text('Attendify'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('calendar-notifications-btn')),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
 
     final scrollViewFinder = find.byKey(const PageStorageKey<String>('calendar-scroll-view'));

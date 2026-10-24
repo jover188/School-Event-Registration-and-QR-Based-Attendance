@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
 
@@ -143,20 +144,14 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
         _status = data['status']?.toString() ?? _status;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.success,
-          content: const Text(
-            'Your permanent QR code has been successfully reissued!',
-          ),
-        ),
+      AppToast.success(
+        context,
+        'Your permanent QR code has been successfully reissued!',
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(response.message ?? 'Failed to reissue QR code.'),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to reissue QR code.',
       );
     }
   }
@@ -165,23 +160,17 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
   Widget build(BuildContext context) {
     final d = context.design;
     final activeStatus = _status ?? 'active';
+    final displayName = _studentName ?? 'Student';
 
     return AppPageScaffold(
-      title: 'Permanent Student QR',
+      title: 'My QR Code',
       embedded: widget.embedded,
       maxWidth: 640,
-      actions: [
-        IconButton(
-          tooltip: 'Refresh QR Code',
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
-          onPressed: (_isLoading || _isReissuing) ? null : _fetchQrData,
-        ),
-      ],
       body: _isLoading
           ? Center(
               child: AppSpinner(
                 size: 28,
-                color: d.authDark,
+                color: d.primary,
               ),
             )
           : _errorMessage != null && _qrToken == null
@@ -192,7 +181,7 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
               : LayoutBuilder(
                   builder: (context, constraints) {
                     final isNarrow = constraints.maxWidth < 340;
-                    final cardPadding = isNarrow ? d.sm : d.lg;
+                    final cardPadding = isNarrow ? d.sm : d.md;
 
                     return SingleChildScrollView(
                       child: Column(
@@ -203,7 +192,10 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
                             decoration: BoxDecoration(
                               color: d.card,
                               borderRadius: BorderRadius.circular(d.radiusCard),
-                              border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+                              border: Border.all(
+                                color: d.border,
+                                width: 1,
+                              ),
                               boxShadow: [
                                 BoxShadow(
                                   color: d.authDark.withValues(alpha: 0.04),
@@ -214,23 +206,74 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
                             ),
                             child: Column(
                               children: [
-                                Text(
-                                  _studentName ?? 'Student',
-                                  style: d.sectionTitle.copyWith(fontWeight: FontWeight.w700),
-                                  textAlign: TextAlign.center,
+                                Container(
+                                  key: const ValueKey(
+                                    'student-qr-wallet-header',
+                                  ),
+                                  padding: EdgeInsets.only(bottom: d.sm),
+                                  child: Wrap(
+                                    alignment: WrapAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    spacing: d.sm,
+                                    runSpacing: d.xs,
+                                    children: [
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Image.asset(
+                                            'assets/images/logo_mark.png',
+                                            height: 36,
+                                            fit: BoxFit.contain,
+                                            color:
+                                                d.isDark ? d.primary : null,
+                                            colorBlendMode: d.isDark
+                                                ? BlendMode.srcIn
+                                                : null,
+                                          ),
+                                          SizedBox(width: d.sm),
+                                          Flexible(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  displayName,
+                                                  style:
+                                                      d.sectionTitle.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'ID: ${_studentId ?? 'N/A'}',
+                                                  style: d.supporting.copyWith(
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      StatusBadge(
+                                        status: activeStatus,
+                                        label: activeStatus.toUpperCase(),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Divider(
+                                  height: d.md,
+                                  color: d.border,
                                 ),
                                 SizedBox(height: d.xs),
-                                Text(
-                                  'Student ID: ${_studentId ?? 'N/A'}',
-                                  style: d.supporting,
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: d.md),
                                 if (_qrToken != null)
                                   Semantics(
                                     container: true,
                                     label:
-                                        'Permanent student QR code for ${_studentName ?? 'Student'}',
+                                        'Permanent student QR code for $displayName',
                                     child: ResponsiveQrFrame(
                                       builder: (qrSize) => DecoratedBox(
                                         decoration: BoxDecoration(
@@ -238,7 +281,10 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
                                           borderRadius: BorderRadius.circular(
                                             d.radiusCard,
                                           ),
-                                          border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+                                          border: Border.all(
+                                            color: d.border,
+                                            width: 1,
+                                          ),
                                         ),
                                         child: QrImageView(
                                           data: _qrToken!,
@@ -262,28 +308,24 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
                                       ),
                                     ),
                                   ),
-                                SizedBox(height: d.md),
-                                StatusBadge(
-                                  status: activeStatus,
-                                  label:
-                                      'STATUS: ${activeStatus.toUpperCase()}',
-                                ),
-                                SizedBox(height: d.gap),
+                                SizedBox(height: d.sm),
                                 Text(
-                                  'Present this QR code to the event organizer for check-in and check-out.',
+                                  'Show this QR code to the organizer for check-in and check-out.',
                                   textAlign: TextAlign.center,
-                                  style: d.supporting,
+                                  style: d.body.copyWith(
+                                    color: d.mutedForeground,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                          SizedBox(height: d.lg),
+                          SizedBox(height: d.md),
                           Container(
                             padding: EdgeInsets.all(d.md),
                             decoration: BoxDecoration(
                               color: d.card,
                               borderRadius: BorderRadius.circular(d.radiusCard),
-                              border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+                              border: Border.all(color: d.border, width: 1),
                               boxShadow: [
                                 BoxShadow(
                                   color: d.authDark.withValues(alpha: 0.04),
@@ -302,11 +344,11 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
                                   icon: LucideIcons.refreshCw,
                                   isLoading: _isReissuing,
                                   onPressed: _confirmReissue,
-                                  label: 'Reissue Permanent QR Code',
+                                  label: 'Reissue QR Code',
                                 ),
                                 SizedBox(height: d.sm),
                                 Text(
-                                  'Lost device or compromised QR? Reissuing revokes the old code immediately.',
+                                  'Reissuing immediately deactivates your current QR code.',
                                   textAlign: TextAlign.center,
                                   style: d.supporting,
                                 ),

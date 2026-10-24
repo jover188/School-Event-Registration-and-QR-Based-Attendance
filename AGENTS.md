@@ -6,14 +6,25 @@ This document defines the mandatory architectural constraints, domain rules, cod
 
 ## 1. Authoritative Documentation & Context
 
-Before modifying code, schemas, or API contracts, consult the root specification files:
-- [`context.md`](./context.md) — High-level system context, database tables, roles, and current implementation status.
+Before modifying code, schemas, or API contracts, consult the root specification files and modular workspace rules:
+- [`context.md`](./context.md) — High-level system context, database tables, roles, current implementation status, and connected rules map.
 - [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) & [`Project_Plan.md`](./Project_Plan.md) — Completed deliverables ("Already Made") and prioritized remaining tasks ("Continuations").
 - [`School_Event_Attendance_SRS_v1.0.md`](./School_Event_Attendance_SRS_v1.0.md) — Finalized Software Requirements Specification (v1.1 baseline).
 - [`System_Architecture_and_Database_Design.md`](./System_Architecture_and_Database_Design.md) — ER diagram, state machines, sequence diagrams, and MySQL 8.0 DDL.
 - [`REST_API_Specification.md`](./REST_API_Specification.md) & [`openapi.yaml`](./openapi.yaml) — Canonical REST API v1 routes, request payloads, and response envelopes.
+- [`backend/README.md`](./backend/README.md) & [`mobile/README.md`](./mobile/README.md) — Backend and Mobile subsystem developer guides.
+- **Modular Workspace Rules (`.agents/rules/`):**
+  - [`.agents/rules/existing-project-inspection.md`](./.agents/rules/existing-project-inspection.md) — Repository inspection & stack discovery before edits.
+  - [`.agents/rules/architecture-code-organization.md`](./.agents/rules/architecture-code-organization.md) — Decoupled client-server architecture & module boundaries.
+  - [`.agents/rules/data-backend-security.md`](./.agents/rules/data-backend-security.md) — Data entities, RBAC, single-session auth, QR security, and audit logging.
+  - [`.agents/rules/flutter-development-standards.md`](./.agents/rules/flutter-development-standards.md) — Flutter/Dart conventions, **AetherUI** design system, and `ApiClient` usage.
+  - [`.agents/rules/ui-ux-rules.md`](./.agents/rules/ui-ux-rules.md) — 20-screen inventory, adaptive `AppShell` navigation, and accessibility rules.
+  - [`.agents/rules/dependencies-external-packages.md`](./.agents/rules/dependencies-external-packages.md) — Dependency approval and no-runtime-AI rules.
+  - [`.agents/rules/phased-development-workflow.md`](./.agents/rules/phased-development-workflow.md) — Sprint-aligned phased implementation workflow.
+  - [`.agents/rules/testing-quality.md`](./.agents/rules/testing-quality.md) — Backend SQLite `:memory:` and Flutter verification standards.
+  - [`.agents/rules/communication-reporting.md`](./.agents/rules/communication-reporting.md) — Evidence-backed reporting and documentation updates.
 
-Whenever an API route, request/response field, status enum, or database column changes, keep `REST_API_Specification.md`, `openapi.yaml`, `backend/routes/api.php`, and `mobile/lib/core/constants/api_constants.dart` synchronized.
+Whenever an API route, request/response field, status enum, or database column changes, keep `context.md`, `REST_API_Specification.md`, `openapi.yaml`, `backend/routes/api.php`, and `mobile/lib/core/constants/api_constants.dart` synchronized.
 
 ---
 

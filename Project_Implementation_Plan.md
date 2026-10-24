@@ -8,7 +8,7 @@
 
 **Tech Stack:** Laravel 11 (PHP 8.3+), Laravel Sanctum 4.x, `barryvdh/laravel-dompdf`, `maatwebsite/excel`, MySQL 8.0+ / MariaDB, Flutter 3.x (Dart 3.x), `qr_flutter`, `mobile_scanner`, `flutter_secure_storage`, `http`, `image_picker`, `cached_network_image`.
 
-**Spec:** [`School_Event_Attendance_SRS_v1.0.md`](./School_Event_Attendance_SRS_v1.0.md), [`System_Architecture_and_Database_Design.md`](./System_Architecture_and_Database_Design.md), [`REST_API_Specification.md`](./REST_API_Specification.md), [`openapi.yaml`](./openapi.yaml)
+**Spec:** [`context.md`](./context.md), [`AGENTS.md`](./AGENTS.md), [`.agents/rules/`](./.agents/rules/), [`Project_Plan.md`](./Project_Plan.md), [`School_Event_Attendance_SRS_v1.0.md`](./School_Event_Attendance_SRS_v1.0.md), [`System_Architecture_and_Database_Design.md`](./System_Architecture_and_Database_Design.md), [`REST_API_Specification.md`](./REST_API_Specification.md), [`openapi.yaml`](./openapi.yaml)
 
 ## Responsive Mobile Redesign — 2026-10-17
 

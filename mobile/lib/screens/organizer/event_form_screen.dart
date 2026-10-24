@@ -7,6 +7,7 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/event_model.dart';
@@ -276,16 +277,12 @@ class _EventFormScreenState extends State<EventFormScreen> {
     setState(() => _isSaving = false);
 
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.present,
-          content: Text(
-            response.message ??
-                (_isEditing
-                    ? 'Event updated successfully.'
-                    : 'Event draft created successfully.'),
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ??
+            (_isEditing
+                ? 'Event updated successfully.'
+                : 'Event draft created successfully.'),
       );
       Navigator.pop(context, true);
     } else {
@@ -301,11 +298,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
           );
         });
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.absent,
-          content: Text(response.message ?? 'Failed to save event.'),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to save event.',
       );
     }
   }
@@ -325,24 +320,16 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
     if (response.success) {
       setState(() => _currentStatus = 'pending_approval');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.present,
-          content: Text(
-            response.message ??
-                'Event submitted for administrator review and approval.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ??
+            'Event submitted for administrator review and approval.',
       );
       Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.absent,
-          content: Text(
-            response.message ?? 'Failed to submit event for approval.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to submit event for approval.',
       );
     }
   }
@@ -368,24 +355,16 @@ class _EventFormScreenState extends State<EventFormScreen> {
     setState(() => _isSubmittingAction = false);
 
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.late,
-          content: Text(
-            response.message ??
-                'Cancellation request recorded. Awaiting administrator approval.',
-          ),
-        ),
+      AppToast.warning(
+        context,
+        response.message ??
+            'Cancellation request recorded. Awaiting administrator approval.',
       );
       Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.absent,
-          content: Text(
-            response.message ?? 'Failed to request event cancellation.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to request event cancellation.',
       );
     }
   }

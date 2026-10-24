@@ -8,6 +8,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/stat_metric_card.dart';
@@ -217,23 +218,15 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
     if (!mounted) return;
 
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.present,
-          content: Text(
-            response.message ?? 'Attendance status corrected successfully.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ?? 'Attendance status corrected successfully.',
       );
       _fetchAttendance();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.absent,
-          content: Text(
-            response.message ?? 'Failed to correct attendance status.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to correct attendance status.',
       );
     }
   }
@@ -261,23 +254,15 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
     if (!mounted) return;
 
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.present,
-          content: Text(
-            response.message ?? 'Student attendance marked successfully.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ?? 'Student attendance marked successfully.',
       );
       _fetchAttendance();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.absent,
-          content: Text(
-            response.message ?? 'Failed to manually mark attendance.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to manually mark attendance.',
       );
     }
   }
@@ -305,11 +290,6 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
             icon: const Icon(LucideIcons.userPlus, size: 20),
             onPressed: _openMarkAttendanceDialog,
           ),
-        IconButton(
-          tooltip: 'Refresh Attendance',
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
-          onPressed: _isLoading ? null : _fetchAttendance,
-        ),
       ],
       floatingActionButton: widget.canCorrect
           ? FloatingActionButton.extended(

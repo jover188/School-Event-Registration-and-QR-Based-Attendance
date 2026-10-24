@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -249,17 +250,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _stats['pending_event_approvals'] = _pendingEvents.length;
         }
       });
-      final d = context.design;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: action == 'approved' ? d.success : d.mutedForeground,
-          content: Text(
-            remarks.isEmpty
-                ? 'Event publishing has been $action.'
-                : 'Event publishing has been $action: $remarks',
-          ),
-        ),
-      );
+      if (action == 'approved') {
+        AppToast.success(
+          context,
+          remarks.isEmpty
+              ? 'Event publishing has been $action.'
+              : 'Event publishing has been $action: $remarks',
+        );
+      } else {
+        AppToast.info(
+          context,
+          remarks.isEmpty
+              ? 'Event publishing has been $action.'
+              : 'Event publishing has been $action: $remarks',
+        );
+      }
       return;
     }
 
@@ -273,21 +278,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     if (!mounted) return;
 
-    final d = context.design;
     if (response.success) {
       _fetchAdminData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: action == 'approved' ? d.success : d.mutedForeground,
-          content: Text('Event publishing has been $action.'),
-        ),
-      );
+      if (action == 'approved') {
+        AppToast.success(context, 'Event publishing has been $action.');
+      } else {
+        AppToast.info(context, 'Event publishing has been $action.');
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(response.message ?? 'Failed to review event.'),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to review event.',
       );
     }
   }
@@ -302,13 +303,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (payload == null || !mounted) return;
 
     if (_hasInitialFixtures) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: context.design.success,
-          content: Text(
-            'Announcement "${payload.title}" queued for ${payload.targetRole}.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        'Announcement "${payload.title}" queued for ${payload.targetRole}.',
       );
       return;
     }
@@ -324,24 +321,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     if (!mounted) return;
 
-    final d = context.design;
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.success,
-          content: Text(
-            response.message ?? 'System announcement broadcast successfully.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ?? 'System announcement broadcast successfully.',
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(
-            response.message ?? 'Failed to broadcast announcement.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to broadcast announcement.',
       );
     }
   }
@@ -614,6 +602,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       destinations: _destinations,
       selectedId: _selectedDestinationId,
       onDestinationSelected: _selectDestination,
+      onLogout: _logout,
       actions: [
         IconButton(
           icon: const Icon(LucideIcons.bell, size: 20),
@@ -624,11 +613,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             );
           },
-        ),
-        IconButton(
-          icon: const Icon(LucideIcons.refreshCw, size: 18),
-          tooltip: 'Refresh Console',
-          onPressed: _isLoading ? null : _fetchAdminData,
         ),
         PopupMenuButton<String>(
           key: const ValueKey<String>('admin-account-menu'),

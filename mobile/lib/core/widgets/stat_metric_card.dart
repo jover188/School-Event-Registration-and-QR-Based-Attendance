@@ -33,7 +33,7 @@ class StatMetricCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+        border: Border.all(color: d.border, width: 1),
         boxShadow: [
           BoxShadow(
             color: d.authDark.withValues(alpha: 0.04),
@@ -43,15 +43,31 @@ class StatMetricCard extends StatelessWidget {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: EdgeInsets.all(d.sm),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(d.radiusControl),
-            ),
-            child: Icon(icon, size: 20, weight: 300, color: color),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                key: ValueKey('stat-icon-$label'),
+                size: 18,
+                weight: 300,
+                color: d.primary,
+              ),
+              SizedBox(width: d.sm),
+              Expanded(
+                child: Text(
+                  label,
+                  style: d.supporting.copyWith(
+                    color: d.mutedForeground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  softWrap: true,
+                ),
+              ),
+            ],
           ),
           SizedBox(height: d.sm),
           Text(
@@ -62,17 +78,6 @@ class StatMetricCard extends StatelessWidget {
               color: d.foreground,
               letterSpacing: -0.3,
             ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: d.xs),
-          Text(
-            label,
-            style: d.supporting.copyWith(
-              color: d.mutedForeground,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-            softWrap: true,
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 2),
@@ -82,7 +87,6 @@ class StatMetricCard extends StatelessWidget {
                 color: d.mutedForeground,
                 fontWeight: FontWeight.w400,
               ),
-              textAlign: TextAlign.center,
               softWrap: true,
             ),
           ],

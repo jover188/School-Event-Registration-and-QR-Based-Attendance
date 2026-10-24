@@ -9,6 +9,14 @@
 **Associated SRS Version:** 1.1 Finalized Baseline  
 **Date:** 2026-10-08  
 
+> **Connected Project Documentation & Rules:**
+> - [`context.md`](./context.md) — System context, 13 database tables, 4 RBAC roles, and implementation status.
+> - [`AGENTS.md`](./AGENTS.md) & [`.agents/rules/`](./.agents/rules/) — Workspace rules and API synchronization requirements (`backend/routes/api.php` ↔ `mobile/lib/core/constants/api_constants.dart`).
+> - [`openapi.yaml`](./openapi.yaml) — Machine-readable OpenAPI 3.0.3 schema corresponding to this specification.
+> - [`School_Event_Attendance_SRS_v1.0.md`](./School_Event_Attendance_SRS_v1.0.md) — Finalized Software Requirements Specification (v1.1 baseline).
+> - [`System_Architecture_and_Database_Design.md`](./System_Architecture_and_Database_Design.md) — ER diagram, state machines, sequence diagrams, and MySQL 8.0+ DDL.
+> - [`Project_Plan.md`](./Project_Plan.md) & [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) — Agile sprint plan and implementation tracker.
+
 ---
 
 # 1. Global API Standards

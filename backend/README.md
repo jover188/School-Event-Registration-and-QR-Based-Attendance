@@ -1,5 +1,19 @@
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
+## School Event Registration & QR-Based Attendance — Backend API (`backend/`)
+
+> **Connected Project Context & Workspace Rules:**
+> - [`../context.md`](../context.md) — System overview, 13 domain tables, 4 RBAC roles & demo credentials, and implementation status.
+> - [`../AGENTS.md`](../AGENTS.md) & [`../.agents/rules/`](../.agents/rules/) — Non-negotiable domain invariants, backend conventions (`ActivityLog::log`, standard JSON envelope), and SQLite `:memory:` test safety rules.
+> - [`../REST_API_Specification.md`](../REST_API_Specification.md) & [`../openapi.yaml`](../openapi.yaml) — Complete `/api/v1/*` REST API specification.
+> - [`../System_Architecture_and_Database_Design.md`](../System_Architecture_and_Database_Design.md) — ER diagram, sequence/state diagrams, and MySQL 8.0+ DDL.
+> - [`../School_Event_Attendance_SRS_v1.0.md`](../School_Event_Attendance_SRS_v1.0.md) — Software Requirements Specification (v1.1 baseline).
+> - [`../Project_Plan.md`](../Project_Plan.md) & [`../Project_Implementation_Plan.md`](../Project_Implementation_Plan.md) — Agile sprint status & implementation plan.
+
+### Quick Commands
+- **Start local API server:** `php artisan serve --host=127.0.0.1 --port=8000`
+- **Run test suite (SQLite `:memory:`):** `php artisan test`
+
 <p align="center">
 <a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>

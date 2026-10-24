@@ -140,17 +140,10 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  SectionHeader(
+                  const SectionHeader(
                     title: 'Audit Trail & Activity Logs',
                     subtitle:
                         'Inspect state-changing operations across authentication, events, QR identity, and attendance',
-                    trailing: AppButton(
-                      pill: true,
-                      variant: AppButtonVariant.outline,
-                      onPressed: _isLoading ? null : _fetchLogs,
-                      icon: LucideIcons.refreshCw,
-                      label: 'Refresh',
-                    ),
                   ),
                   SizedBox(height: d.gap),
                   AccountInput(

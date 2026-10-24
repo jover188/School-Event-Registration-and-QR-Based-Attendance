@@ -50,28 +50,18 @@ class AppButton extends StatelessWidget {
           AppButtonVariant.destructive => d.destructive,
         };
 
-    final radius = BorderRadius.circular(pill ? d.radiusPill : d.radiusControl);
+    final radius = BorderRadius.circular(d.radiusControl);
 
     final effectiveBorderColor =
         borderColor ?? (variant == AppButtonVariant.outline ? d.border : null);
 
-    final effectiveDecoration = effectiveBorderColor != null
-        ? ShadDecoration(
-            border: ShadBorder.all(
-              color: effectiveBorderColor,
-              width: 1,
-              radius: radius,
-            ),
-          )
-        : (pill
-            ? ShadDecoration(
-                border: ShadBorder.all(
-                  color: Colors.transparent,
-                  width: 0,
-                  radius: radius,
-                ),
-              )
-            : null);
+    final effectiveDecoration = ShadDecoration(
+      border: ShadBorder.all(
+        color: effectiveBorderColor ?? Colors.transparent,
+        width: effectiveBorderColor != null ? 1 : 0,
+        radius: radius,
+      ),
+    );
 
     final button = ShadButton.raw(
       variant: switch (variant) {
@@ -88,14 +78,14 @@ class AppButton extends StatelessWidget {
       height: 0,
       padding: EdgeInsets.symmetric(
         horizontal: d.md,
-        vertical: pill ? d.md : d.gap,
+        vertical: 10,
       ),
       enabled: onPressed != null && !isLoading,
       onPressed: isLoading ? null : onPressed,
       child: Flexible(
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            minHeight: d.minimumTarget - (2 * d.gap),
+            minHeight: 20,
             minWidth: d.minimumTarget - (2 * d.md),
           ),
           child: Semantics(

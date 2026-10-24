@@ -30,7 +30,7 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppRadius {
-  static const sm = 8.0, md = 10.0, lg = 12.0, xl = 16.0, full = 999.0;
+  static const sm = 15.0, md = 15.0, lg = 15.0, xl = 15.0, full = 999.0;
 }
 
 abstract final class AppTypography {
@@ -180,7 +180,7 @@ abstract final class AppTheme {
       highlightColor: Colors.transparent,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: d.background,
-      iconTheme: IconThemeData(color: d.foreground, size: 18, weight: 300),
+      iconTheme: IconThemeData(color: d.primary, size: 18, weight: 300),
       textTheme: TextTheme(
         headlineLarge: d.pageTitle,
         headlineMedium: d.compactPageTitle,
@@ -199,7 +199,7 @@ abstract final class AppTheme {
         elevation: 0,
         centerTitle: false,
         titleTextStyle: d.cardTitle,
-        iconTheme: IconThemeData(color: d.cardForeground, size: 20, weight: 300),
+        iconTheme: IconThemeData(color: d.primary, size: 20, weight: 300),
       ),
       cardTheme: CardThemeData(
         color: d.card,
@@ -207,14 +207,14 @@ abstract final class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(d.radiusCard),
-          side: BorderSide(color: d.authDark.withValues(alpha: 0.08)),
+          side: BorderSide(color: d.border, width: 1),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: d.popover,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(d.radiusOverlay),
-          side: BorderSide(color: d.authDark.withValues(alpha: 0.08)),
+          side: BorderSide(color: d.border, width: 1),
         ),
         titleTextStyle: d.sectionTitle.copyWith(color: d.popoverForeground),
         contentTextStyle: d.body.copyWith(color: d.popoverForeground),
@@ -232,30 +232,32 @@ abstract final class AppTheme {
           foregroundColor: d.authLight,
           elevation: 0,
           minimumSize: Size(d.minimumTarget, d.minimumTarget),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.radiusPill)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.radiusControl)),
           textStyle: d.body.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: d.foreground,
-          side: BorderSide(color: d.authDark.withValues(alpha: 0.12)),
+          backgroundColor: d.card,
+          side: BorderSide(color: d.border, width: 1),
           minimumSize: Size(d.minimumTarget, d.minimumTarget),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.radiusPill)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.radiusControl)),
           textStyle: d.body.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           minimumSize: Size(d.minimumTarget, d.minimumTarget),
-          foregroundColor: d.authDark,
+          foregroundColor: d.foreground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.radiusControl)),
           textStyle: d.body.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           minimumSize: Size(d.minimumTarget, d.minimumTarget),
-          foregroundColor: d.mutedForeground,
+          foregroundColor: d.primary,
           iconSize: 18,
         ),
       ),
@@ -268,15 +270,15 @@ abstract final class AppTheme {
         labelStyle: d.supporting.copyWith(color: d.authDark.withValues(alpha: 0.62)),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(d.radiusCard),
-          borderSide: BorderSide(color: d.authDark.withValues(alpha: 0.08)),
+          borderSide: BorderSide(color: d.border, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(d.radiusCard),
-          borderSide: BorderSide(color: d.authDark.withValues(alpha: 0.08)),
+          borderSide: BorderSide(color: d.border, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(d.radiusCard),
-          borderSide: BorderSide(color: d.authDark, width: 1.5),
+          borderSide: BorderSide(color: d.primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(d.radiusCard),

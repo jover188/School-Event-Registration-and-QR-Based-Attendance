@@ -8,6 +8,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/stat_metric_card.dart';
@@ -162,23 +163,42 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cancel Student Registration?'),
-        content: Text(
-          'Cancel registration for $fullName? If this student holds an active slot, the next waiting-list student will be automatically promoted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep Registration'),
+      builder: (ctx) {
+        final d = ctx.design;
+        return AlertDialog(
+          title: const Text('Cancel Student Registration?'),
+          content: Text(
+            'Cancel registration for $fullName? If this student holds an active slot, the next waiting-list student will be automatically promoted.',
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.absent),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cancel Registration'),
-          ),
-        ],
-      ),
+          actions: [
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: d.foreground,
+                backgroundColor: d.card,
+                side: BorderSide(color: d.border, width: 1),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(d.radiusControl),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: d.md, vertical: 10),
+              ),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep Registration'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: d.destructive,
+                foregroundColor: d.destructiveForeground,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(d.radiusControl),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: d.md, vertical: 10),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Cancel Registration'),
+            ),
+          ],
+        );
+      },
     );
 
     if (confirmed != true || !mounted) return;
@@ -190,23 +210,15 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
     if (!mounted) return;
 
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.present,
-          content: Text(
-            response.message ?? 'Student registration cancelled successfully.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ?? 'Student registration cancelled successfully.',
       );
       _fetchRegistrations();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.absent,
-          content: Text(
-            response.message ?? 'Failed to cancel student registration.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to cancel student registration.',
       );
     }
   }
@@ -227,13 +239,6 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
 
     return AppPageScaffold(
       title: 'Registrations — ${widget.eventTitle}',
-      actions: [
-        IconButton(
-          tooltip: 'Refresh Registrations',
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
-          onPressed: _isLoading ? null : _fetchRegistrations,
-        ),
-      ],
       body: RefreshIndicator(
         onRefresh: _fetchRegistrations,
         child: SingleChildScrollView(

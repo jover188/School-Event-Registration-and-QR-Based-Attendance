@@ -40,6 +40,9 @@ class ApiClient {
 
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
 
+  static Future<ApiResponse> Function(String method, String endpoint, dynamic body)?
+      mockHandler;
+
   VoidCallback? onSessionTerminated;
 
   static bool _checkedAndroidHost = false;
@@ -168,6 +171,9 @@ class ApiClient {
     String endpoint, {
     Map<String, String>? queryParams,
   }) async {
+    if (mockHandler != null) {
+      return mockHandler!('GET', endpoint, queryParams);
+    }
     try {
       await _ensureAndroidHost();
       var uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
@@ -192,6 +198,9 @@ class ApiClient {
     String endpoint,
     Map<String, dynamic> body,
   ) async {
+    if (mockHandler != null) {
+      return mockHandler!('POST', endpoint, body);
+    }
     try {
       await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
@@ -217,6 +226,9 @@ class ApiClient {
     String endpoint,
     Map<String, dynamic> body,
   ) async {
+    if (mockHandler != null) {
+      return mockHandler!('PUT', endpoint, body);
+    }
     try {
       await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
@@ -242,6 +254,9 @@ class ApiClient {
     String endpoint,
     Map<String, dynamic> body,
   ) async {
+    if (mockHandler != null) {
+      return mockHandler!('PATCH', endpoint, body);
+    }
     try {
       await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
@@ -264,6 +279,9 @@ class ApiClient {
   }
 
   Future<ApiResponse> delete(String endpoint) async {
+    if (mockHandler != null) {
+      return mockHandler!('DELETE', endpoint, null);
+    }
     try {
       await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');

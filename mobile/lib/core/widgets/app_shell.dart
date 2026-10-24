@@ -15,6 +15,8 @@ class AppShell extends StatelessWidget {
     required this.onDestinationSelected,
     required this.body,
     this.actions = const [],
+    this.onLogout,
+    this.showCompactMore = true,
   });
   final String title;
   final List<AppDestination> destinations;
@@ -22,27 +24,28 @@ class AppShell extends StatelessWidget {
   final ValueChanged<String> onDestinationSelected;
   final Widget body;
   final List<Widget> actions;
+  final VoidCallback? onLogout;
+  final bool showCompactMore;
 
-  Widget _buildBrandBadge(AppDesignTokens d, {double size = 32}) {
-    return Container(
-      width: size,
-      height: size,
-      padding: EdgeInsets.all(d.xs),
-      decoration: BoxDecoration(
-        color: d.sidebarPrimary,
-        borderRadius: BorderRadius.circular(d.sm),
-      ),
-      child: Image.asset(
-        'assets/images/logo_mark.png',
-        fit: BoxFit.contain,
-        color: d.sidebarPrimaryForeground,
-        colorBlendMode: BlendMode.srcIn,
-        errorBuilder: (_, __, ___) => Icon(
-          LucideIcons.scanLine,
-          color: d.sidebarPrimaryForeground,
-          size: size * 0.56,
-        ),
-      ),
+  static const AppDestination _logoutDestination = AppDestination(
+    id: 'logout',
+    label: 'Logout',
+    icon: LucideIcons.logOut,
+    compactPrimary: false,
+  );
+
+  Widget _buildBrandBadge(
+    AppDesignTokens d, {
+    double height = 48,
+    Key? key,
+  }) {
+    return Image.asset(
+      'assets/images/logo_mark.png',
+      key: key,
+      height: height,
+      fit: BoxFit.contain,
+      color: d.isDark ? d.sidebarForeground : null,
+      colorBlendMode: d.isDark ? BlendMode.srcIn : null,
     );
   }
 
@@ -81,11 +84,11 @@ class AppShell extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          _buildBrandBadge(d, size: 32),
+                          _buildBrandBadge(d, height: 48),
                           SizedBox(width: d.gap),
                           Expanded(
                             child: Text(
-                              'Navigate',
+                              'Attendify',
                               style: d.cardTitle.copyWith(
                                 color: d.sidebarForeground,
                               ),
@@ -99,7 +102,7 @@ class AppShell extends StatelessWidget {
                             icon: Icon(
                               LucideIcons.x,
                               size: 18,
-                              color: d.mutedForeground,
+                              color: d.primary,
                             ),
                           ),
                         ],
@@ -112,23 +115,35 @@ class AppShell extends StatelessWidget {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: items
-                              .map(
-                                (item) => _destination(
-                                  dialogContext,
-                                  item,
-                                  horizontal: true,
-                                  keyPrefix: keyPrefix,
-                                  onTap: () {
-                                    Navigator.of(dialogContext).pop();
-                                    onDestinationSelected(item.id);
-                                  },
-                                ),
-                              )
-                              .toList(),
+                          children: _buildCategorizedDestinations(
+                            dialogContext,
+                            items,
+                            horizontal: true,
+                            keyPrefix: keyPrefix,
+                            onItemTap: (item) {
+                              Navigator.of(dialogContext).pop();
+                              onDestinationSelected(item.id);
+                            },
+                          ),
                         ),
                       ),
                     ),
+                    if (onLogout != null) ...[
+                      Divider(height: 1, color: d.sidebarBorder),
+                      Padding(
+                        padding: EdgeInsets.all(d.sm),
+                        child: _destination(
+                          dialogContext,
+                          _logoutDestination,
+                          horizontal: true,
+                          keyPrefix: keyPrefix,
+                          onTap: () {
+                            Navigator.of(dialogContext).pop();
+                            onLogout!();
+                          },
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -158,6 +173,73 @@ class AppShell extends StatelessWidget {
     );
   }
 
+  List<Widget> _buildCategorizedDestinations(
+    BuildContext context,
+    List<AppDestination> items, {
+    required bool horizontal,
+    String keyPrefix = 'destination',
+    void Function(AppDestination item)? onItemTap,
+  }) {
+    final d = context.design;
+    final widgets = <Widget>[];
+    String? lastCategory;
+
+    for (final item in items) {
+      final category = item.category?.trim();
+      if (category != null && category.isNotEmpty && category != lastCategory) {
+        final isFirst = lastCategory == null;
+        if (horizontal) {
+          widgets.add(
+            Padding(
+              padding: EdgeInsets.only(
+                left: d.gap,
+                right: d.gap,
+                top: isFirst ? d.xs : d.md,
+                bottom: d.xs,
+              ),
+              child: Text(
+                category.toUpperCase(),
+                key: ValueKey(
+                  '$keyPrefix-category-${category.toLowerCase().replaceAll(' ', '-')}',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: d.badge.copyWith(
+                  color: d.mutedForeground,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          );
+        } else if (!isFirst) {
+          widgets.add(
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: d.sm,
+                vertical: d.xs,
+              ),
+              child: Divider(height: 1, color: d.sidebarBorder),
+            ),
+          );
+        }
+        lastCategory = category;
+      }
+
+      widgets.add(
+        _destination(
+          context,
+          item,
+          horizontal: horizontal,
+          keyPrefix: keyPrefix,
+          onTap: onItemTap != null ? () => onItemTap(item) : null,
+        ),
+      );
+    }
+
+    return widgets;
+  }
+
   Widget _destination(
     BuildContext context,
     AppDestination item, {
@@ -175,6 +257,7 @@ class AppShell extends StatelessWidget {
         semanticLabel: item.label,
         onPressed: onTap ?? () => onDestinationSelected(item.id),
         child: Container(
+          key: ValueKey('$keyPrefix-${item.id}-surface'),
           constraints: const BoxConstraints(minHeight: 48),
           padding: EdgeInsets.symmetric(
             horizontal: horizontal ? d.gap : d.sm,
@@ -182,11 +265,15 @@ class AppShell extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: selected
-                ? (horizontal ? d.authDark : d.authDark.withValues(alpha: 0.08))
+                ? (horizontal
+                    ? d.sidebarPrimary
+                    : d.primary.withValues(alpha: d.isDark ? 0.14 : 0.08))
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(horizontal ? d.radiusControl : d.radiusPill),
+            borderRadius: BorderRadius.circular(d.radiusControl),
             border: selected && !horizontal
-                ? Border.all(color: d.authDark.withValues(alpha: 0.08))
+                ? Border.all(
+                    color: d.primary.withValues(alpha: d.isDark ? 0.24 : 0.12),
+                  )
                 : null,
           ),
           child: horizontal
@@ -197,17 +284,18 @@ class AppShell extends StatelessWidget {
                       size: 18,
                       weight: 300,
                       color: selected
-                          ? d.authLight
-                          : d.mutedForeground,
+                          ? d.sidebarPrimaryForeground
+                          : d.primary,
                     ),
                     SizedBox(width: d.gap),
                     Expanded(
                       child: Text(
                         item.label,
                         style: d.body.copyWith(
-                          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight:
+                              selected ? FontWeight.w600 : FontWeight.w500,
                           color: selected
-                              ? d.authLight
+                              ? d.sidebarPrimaryForeground
                               : d.sidebarForeground,
                         ),
                       ),
@@ -217,7 +305,7 @@ class AppShell extends StatelessWidget {
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: d.authLight,
+                          color: d.sidebarPrimaryForeground,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -231,21 +319,21 @@ class AppShell extends StatelessWidget {
                       item.icon,
                       size: 20,
                       weight: 300,
-                      color: selected
-                          ? d.authDark
-                          : d.mutedForeground,
+                      color: d.primary,
                     ),
                     const SizedBox(height: 3),
                     Text(
                       item.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.35),
+                      textScaler: MediaQuery.textScalerOf(context)
+                          .clamp(maxScaleFactor: 1.35),
                       textAlign: TextAlign.center,
                       style: d.badge.copyWith(
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.w500,
                         color: selected
-                            ? d.authDark
+                            ? d.primary
                             : d.mutedForeground,
                       ),
                     ),
@@ -305,7 +393,13 @@ class AppShell extends StatelessWidget {
                             child: expanded
                                 ? Row(
                                     children: [
-                                      _buildBrandBadge(d, size: 32),
+                                      _buildBrandBadge(
+                                        d,
+                                        height: 48,
+                                        key: const ValueKey(
+                                          'sidebar-brand-logo',
+                                        ),
+                                      ),
                                       SizedBox(width: d.gap),
                                       Expanded(
                                         child: Text(
@@ -320,7 +414,11 @@ class AppShell extends StatelessWidget {
                                     ],
                                   )
                                 : Center(
-                                    child: _buildBrandBadge(d, size: 36),
+                                    child: _buildBrandBadge(
+                                      d,
+                                      height: 48,
+                                      key: const ValueKey('sidebar-brand-logo'),
+                                    ),
                                   ),
                           ),
                           Expanded(
@@ -329,17 +427,28 @@ class AppShell extends StatelessWidget {
                                 horizontal: d.sm,
                                 vertical: d.sm,
                               ),
-                              children: destinations
-                                  .map(
-                                    (item) => _destination(
-                                      context,
-                                      item,
-                                      horizontal: expanded,
-                                    ),
-                                  )
-                                  .toList(),
+                              children: _buildCategorizedDestinations(
+                                context,
+                                destinations,
+                                horizontal: expanded,
+                              ),
                             ),
                           ),
+                          if (onLogout != null) ...[
+                            Divider(height: 1, color: d.sidebarBorder),
+                            Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: d.sm,
+                                vertical: d.sm,
+                              ),
+                              child: _destination(
+                                context,
+                                _logoutDestination,
+                                horizontal: expanded,
+                                onTap: onLogout,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     )
@@ -356,7 +465,7 @@ class AppShell extends StatelessWidget {
                         constraints: const BoxConstraints(minHeight: 64),
                         decoration: BoxDecoration(
                           color: d.card.withValues(alpha: 0.92),
-                          border: Border(bottom: BorderSide(color: d.authDark.withValues(alpha: 0.08))),
+                          border: Border(bottom: BorderSide(color: d.border)),
                         ),
                         padding: EdgeInsets.symmetric(
                           horizontal: d.md,
@@ -370,6 +479,7 @@ class AppShell extends StatelessWidget {
                           children: [
                             Row(
                               mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 if (!side) ...[
                                   IconButton(
@@ -380,10 +490,15 @@ class AppShell extends StatelessWidget {
                                       destinations,
                                       keyPrefix: 'drawer-destination',
                                     ),
-                                    icon: Icon(
-                                      LucideIcons.panelLeft,
-                                      size: 20,
-                                      color: d.foreground,
+                                    icon: Image.asset(
+                                      'assets/images/logo_mark.png',
+                                      key: const ValueKey('mobile-drawer-logo'),
+                                      width: 24,
+                                      height: 24,
+                                      fit: BoxFit.contain,
+                                      color: d.isDark ? d.foreground : null,
+                                      colorBlendMode:
+                                          d.isDark ? BlendMode.srcIn : null,
                                     ),
                                   ),
                                   SizedBox(width: d.xs),
@@ -432,14 +547,14 @@ class AppShell extends StatelessWidget {
                 constraints: const BoxConstraints(minHeight: 56), // h-14
                 decoration: BoxDecoration(
                   color: d.card,
-                  border: Border(top: BorderSide(color: d.authDark.withValues(alpha: 0.08))),
+                  border: Border(top: BorderSide(color: d.border)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     for (final item in primary)
                       Expanded(child: _destination(context, item)),
-                    if (more.isNotEmpty)
+                    if (showCompactMore && more.isNotEmpty)
                       Expanded(
                         child: _destination(
                           context,

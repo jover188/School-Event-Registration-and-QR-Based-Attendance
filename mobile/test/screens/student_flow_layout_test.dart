@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:school_event_attendance/core/network/api_client.dart';
+import 'package:school_event_attendance/core/widgets/app_toast.dart';
 import 'package:school_event_attendance/models/event_model.dart';
 import 'package:school_event_attendance/screens/student/event_detail_screen.dart';
+import 'package:school_event_attendance/screens/student/my_attendance_history_screen.dart';
+import 'package:school_event_attendance/screens/student/my_registrations_screen.dart';
+import 'package:school_event_attendance/screens/student/permanent_qr_screen.dart';
 import 'package:school_event_attendance/screens/student/student_dashboard_screen.dart';
 import '../support/app_test_host.dart';
 
@@ -162,6 +167,61 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('destination-events')));
         await tester.pumpAndSettle();
         expect(find.text('Cybersecurity'), findsOneWidget);
+
+        // Verify My Profile is at the very top of the sidebar above all pages, categorized with labels, and Logout is at bottom.
+        final accountCategoryFinder = find.byKey(
+          const ValueKey('destination-category-account'),
+        );
+        final eventsCategoryFinder = find.byKey(
+          const ValueKey('destination-category-events'),
+        );
+        final attendanceCategoryFinder = find.byKey(
+          const ValueKey('destination-category-attendance'),
+        );
+        final profileFinder = find.byKey(const ValueKey('destination-profile'));
+        final eventsNavFinder = find.byKey(const ValueKey('destination-events'));
+        final calendarNavFinder = find.byKey(
+          const ValueKey('destination-calendar'),
+        );
+        final registrationsFinder = find.byKey(
+          const ValueKey('destination-registrations'),
+        );
+        final historyFinder = find.byKey(const ValueKey('destination-history'));
+        final logoutFinder = find.byKey(const ValueKey('destination-logout'));
+
+        expect(accountCategoryFinder, findsOneWidget);
+        expect(eventsCategoryFinder, findsOneWidget);
+        expect(attendanceCategoryFinder, findsOneWidget);
+        expect(profileFinder, findsOneWidget);
+        expect(eventsNavFinder, findsOneWidget);
+        expect(calendarNavFinder, findsOneWidget);
+        expect(registrationsFinder, findsOneWidget);
+        expect(logoutFinder, findsOneWidget);
+        expect(
+          tester.getTopLeft(accountCategoryFinder).dy,
+          lessThan(tester.getTopLeft(profileFinder).dy),
+        );
+        expect(
+          tester.getTopLeft(profileFinder).dy,
+          lessThan(tester.getTopLeft(eventsCategoryFinder).dy),
+        );
+        expect(
+          tester.getTopLeft(eventsCategoryFinder).dy,
+          lessThan(tester.getTopLeft(eventsNavFinder).dy),
+        );
+        expect(
+          tester.getTopLeft(calendarNavFinder).dy,
+          lessThan(tester.getTopLeft(attendanceCategoryFinder).dy),
+        );
+        expect(
+          tester.getTopLeft(attendanceCategoryFinder).dy,
+          lessThan(tester.getTopLeft(registrationsFinder).dy),
+        );
+        expect(
+          tester.getTopLeft(logoutFinder).dy,
+          greaterThan(tester.getBottomLeft(historyFinder).dy),
+        );
+        expect(find.byTooltip('Refresh'), findsNothing);
       },
     );
 
@@ -217,6 +277,223 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('No upcoming events found.'), findsOneWidget);
         expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'mobile 390x844 shows 4 primary bottom tabs, 3-up metric strip, and unread notification badge',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final fixtures = _buildStudentEventFixtures();
+        await tester.pumpWidget(
+          AppTestHost(
+            child: StudentDashboardScreen(
+              initialEvents: fixtures,
+              initialStats: const {
+                'total_registered_events': 2,
+                'total_attended_events': 5,
+                'waiting_list_count': 1,
+                'unread_notifications': 3,
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 4 primary tabs on compact phone bottom bar (no redundant More button; History & Profile in drawer)
+        expect(find.byKey(const ValueKey('destination-events')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('destination-calendar')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('destination-registrations')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('destination-qr')), findsOneWidget);
+        expect(find.byKey(const ValueKey('destination-more')), findsNothing);
+        expect(find.byKey(const ValueKey('destination-history')), findsNothing);
+        expect(find.byKey(const ValueKey('destination-profile')), findsNothing);
+
+        // 3 summary metric cards aligned on a single horizontal row on 390px phone
+        final regTop = tester.getTopLeft(find.text('Registered')).dy;
+        final attTop = tester.getTopLeft(find.text('Attended')).dy;
+        final waitTop = tester.getTopLeft(find.text('Waiting List')).dy;
+        expect(regTop, closeTo(attTop, 2.0));
+        expect(attTop, closeTo(waitTop, 2.0));
+
+        // Unread notification badge shown on top header bell
+        expect(
+          find.byKey(const ValueKey('student-notifications-badge')),
+          findsOneWidget,
+        );
+        expect(find.text('3'), findsOneWidget);
+      },
+    );
+  });
+
+  group('MyRegistrationsScreen and MyAttendanceHistoryScreen mobile UX', () {
+    testWidgets(
+      'MyRegistrationsScreen renders View Details action and navigates to EventDetailScreen',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          const AppTestHost(
+            child: MyRegistrationsScreen(
+              embedded: true,
+              initialRegistrations: [
+                {
+                  'id': 10,
+                  'event_id': 1,
+                  'status': 'registered',
+                  'event': {
+                    'id': 1,
+                    'title': 'Annual AI & Robotics Summit',
+                    'description': 'Hands-on AI symposium.',
+                    'venue': 'Main Auditorium',
+                    'event_date': '2026-10-15',
+                    'start_time': '09:00:00',
+                    'end_time': '12:00:00',
+                    'status': 'published',
+                  },
+                },
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final viewDetailsBtn = find.byKey(
+          const ValueKey('view-registration-event-1'),
+        );
+        expect(viewDetailsBtn, findsOneWidget);
+        expect(find.text('Cancel Registration'), findsNothing);
+
+        await tester.tap(viewDetailsBtn);
+        await tester.pumpAndSettle();
+        expect(find.byType(EventDetailScreen), findsOneWidget);
+        expect(find.text('Annual AI & Robotics Summit'), findsWidgets);
+        expect(find.text('Cancel My Registration'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'MyAttendanceHistoryScreen filters by status chip and opens EventDetailScreen on card tap',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          const AppTestHost(
+            child: MyAttendanceHistoryScreen(
+              embedded: true,
+              initialRecords: [
+                {
+                  'id': 101,
+                  'status': 'present',
+                  'check_in_time': '2026-10-02 08:54:00',
+                  'check_out_time': '2026-10-02 12:01:00',
+                  'event': {
+                    'id': 11,
+                    'title': 'Cybersecurity Workshop',
+                    'description': 'Campus security lab.',
+                    'venue': 'Lab 201',
+                    'event_date': '2026-10-02',
+                    'start_time': '09:00:00',
+                    'end_time': '12:00:00',
+                    'status': 'completed',
+                  },
+                },
+                {
+                  'id': 102,
+                  'status': 'late',
+                  'check_in_time': '2026-09-25 09:22:00',
+                  'check_out_time': null,
+                  'event': {
+                    'id': 12,
+                    'title': 'Cloud Computing Seminar',
+                    'description': 'Cloud architecture overview.',
+                    'venue': 'Room 302',
+                    'event_date': '2026-09-25',
+                    'start_time': '09:00:00',
+                    'end_time': '11:45:00',
+                    'status': 'completed',
+                  },
+                },
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Both records initially visible
+        expect(find.text('Cybersecurity Workshop'), findsOneWidget);
+        expect(find.text('Cloud Computing Seminar'), findsOneWidget);
+
+        // Filter by Late chip
+        await tester.tap(
+          find.byKey(const ValueKey('attendance-filter-late')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Cybersecurity Workshop'), findsNothing);
+        expect(find.text('Cloud Computing Seminar'), findsOneWidget);
+
+        // Tapping history card opens EventDetailScreen
+        await tester.tap(find.text('Cloud Computing Seminar'));
+        await tester.pumpAndSettle();
+        expect(find.byType(EventDetailScreen), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'highlighted filter chips in student screens adapt between light and dark modes',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          const AppTestHost(
+            themeMode: ThemeMode.light,
+            child: MyAttendanceHistoryScreen(
+              embedded: true,
+              initialRecords: [],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final lightChip = tester.widget<ChoiceChip>(
+          find.byKey(const ValueKey('attendance-filter-all')),
+        );
+        expect(lightChip.selectedColor, const Color(0xFF18181B));
+
+        await tester.pumpWidget(
+          const AppTestHost(
+            themeMode: ThemeMode.dark,
+            child: MyAttendanceHistoryScreen(
+              embedded: true,
+              initialRecords: [],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final darkChip = tester.widget<ChoiceChip>(
+          find.byKey(const ValueKey('attendance-filter-all')),
+        );
+        expect(darkChip.selectedColor, const Color(0xFFFFFFFF));
       },
     );
   });
@@ -344,6 +621,285 @@ void main() {
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'enforces consistent typography tokens and concise labels across student pages',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        // 1. MyRegistrationsScreen filter chips use 13px supporting token
+        await tester.pumpWidget(
+          const AppTestHost(
+            child: MyRegistrationsScreen(
+              embedded: true,
+              initialRegistrations: [],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final regChip = tester.widget<ChoiceChip>(
+          find.byKey(const ValueKey('registration-filter-all')),
+        );
+        expect(regChip.labelStyle?.fontSize, 13);
+        expect(find.text('Refresh'), findsNothing);
+
+        // 2. MyAttendanceHistoryScreen filter chips use 13px supporting token and concise Check-In / Check-Out labels
+        await tester.pumpWidget(
+          const AppTestHost(
+            child: MyAttendanceHistoryScreen(
+              embedded: true,
+              initialRecords: [
+                {
+                  'id': 1,
+                  'status': 'present',
+                  'check_in_time': '2026-10-02 08:54:00',
+                  'check_out_time': '2026-10-02 12:01:00',
+                  'event': {
+                    'id': 11,
+                    'title': 'Cybersecurity Workshop',
+                    'venue': 'Lab 201',
+                    'event_date': '2026-10-02',
+                  },
+                },
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final attChip = tester.widget<ChoiceChip>(
+          find.byKey(const ValueKey('attendance-filter-all')),
+        );
+        expect(attChip.labelStyle?.fontSize, 13);
+        expect(find.text('Check-In'), findsOneWidget);
+        expect(find.text('Check-Out'), findsOneWidget);
+        expect(find.text('Check-In Time'), findsNothing);
+        expect(find.text('Check-Out Time'), findsNothing);
+
+        // 3. PermanentQrScreen uses ACTIVE badge without redundant STATUS: prefix
+        await tester.pumpWidget(
+          const AppTestHost(
+            child: PermanentQrScreen(
+              embedded: true,
+              initialQrData: {
+                'qr_token':
+                    'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
+                'full_name': 'Juan M. Dela Cruz',
+                'student_id_number': '20260001',
+                'status': 'active',
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('ACTIVE'), findsOneWidget);
+        expect(find.text('STATUS: ACTIVE'), findsNothing);
+
+        // 4. EventDetailScreen uses 14px body text for info rows and concise labels
+        final fixtures = _buildStudentEventFixtures();
+        await tester.pumpWidget(
+          AppTestHost(
+            child: EventDetailScreen(
+              eventId: fixtures[0].id,
+              initialEvent: fixtures[0],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final venueText = tester.widget<Text>(
+          find.text('Main University Auditorium'),
+        );
+        expect(venueText.style?.fontSize, 14);
+        expect(find.text('Available Slots'), findsOneWidget);
+        expect(find.text('Your Status'), findsOneWidget);
+        expect(find.text('Walk-ins allowed'), findsOneWidget);
+
+        // 5. 15px border radius on buttons & cards, primary icon colors, and top-left icon alignment
+        expect(regChip.shape, RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)));
+
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(1440, 900);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          AppTestHost(
+            child: StudentDashboardScreen(
+              initialEvents: fixtures,
+              initialStats: const {
+                'total_registered_events': 2,
+                'total_attended_events': 5,
+                'waiting_list_count': 1,
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Verify StatMetricCard icon is top-left and vertically centered with 'Registered' title
+        final regTitleCenter = tester.getCenter(find.text('Registered'));
+        final regCardIcon = find.byKey(const ValueKey('stat-icon-Registered'));
+        expect(regCardIcon, findsOneWidget);
+        final regIconWidget = tester.widget<Icon>(regCardIcon);
+        expect(regIconWidget.color, const Color(0xFF18181B));
+        final regIconCenter = tester.getCenter(regCardIcon);
+        expect(regIconCenter.dx, lessThan(regTitleCenter.dx));
+        expect(regIconCenter.dy, closeTo(regTitleCenter.dy, 2.0));
+
+        // 6. Verify EventCard grid equal card heights, clean time format, and standardized action buttons
+        expect(find.text('08:00 AM - 12:00 PM'), findsOneWidget);
+        expect(find.text('01:00 PM - 05:00 PM'), findsOneWidget);
+        expect(find.textContaining('2026-11-10'), findsNothing);
+
+        final timeTextWidget = tester.widget<Text>(
+          find.text('08:00 AM - 12:00 PM'),
+        );
+        expect(timeTextWidget.style?.fontSize, 14);
+        expect(timeTextWidget.style?.fontWeight, FontWeight.w500);
+
+        // Verify action buttons in the first 3-column grid row share identical height and baseline
+        final viewRegRect = tester.getRect(find.text('View Registration'));
+        final waitingListBtnRect = tester.getRect(find.text('WAITING LIST #3'));
+        final joinWaitingBtnRect = tester.getRect(find.text('Join Waiting List'));
+        expect(viewRegRect.center.dy, closeTo(waitingListBtnRect.center.dy, 1.0));
+        expect(viewRegRect.center.dy, closeTo(joinWaitingBtnRect.center.dy, 1.0));
+      },
+    );
+
+    testWidgets(
+      'Keep Registration button has contrasting styles in Dark mode and closes modal without API request',
+      (tester) async {
+        addTearDown(() {
+          ApiClient.mockHandler = null;
+          AppToast.dismiss(immediate: true);
+        });
+
+        bool apiCalled = false;
+        ApiClient.mockHandler = (method, endpoint, body) async {
+          apiCalled = true;
+          return ApiResponse(success: true, statusCode: 200);
+        };
+
+        final fixtures = _buildStudentEventFixtures();
+        final registeredEvent = fixtures.firstWhere((e) => e.isRegistered);
+
+        await tester.pumpWidget(
+          AppTestHost(
+            themeMode: ThemeMode.dark,
+            child: EventDetailScreen(
+              eventId: registeredEvent.id,
+              initialEvent: registeredEvent,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Find and tap Cancel My Registration button
+        final cancelBtn = find.byKey(const ValueKey('cancel-registration-button'));
+        expect(cancelBtn, findsOneWidget);
+        await tester.ensureVisible(cancelBtn);
+        await tester.tap(cancelBtn);
+        await tester.pumpAndSettle();
+
+        // Verify confirmation dialog opened
+        expect(find.text('Cancel Registration?'), findsOneWidget);
+
+        // Find Keep Registration button
+        final keepBtnFinder = find.byKey(const ValueKey('cancel-dialog-keep-button'));
+        expect(keepBtnFinder, findsOneWidget);
+
+        final keepBtnWidget = tester.widget<OutlinedButton>(keepBtnFinder);
+        // Verify styling: foreground color is high contrast white in dark mode, background is dark card
+        final style = keepBtnWidget.style;
+        final foregroundColor = style?.foregroundColor?.resolve({WidgetState.selected});
+        final backgroundColor = style?.backgroundColor?.resolve({WidgetState.selected});
+        expect(foregroundColor, const Color(0xFFFFFFFF));
+        expect(backgroundColor, const Color(0xFF121214));
+
+        // Tap Keep Registration button
+        await tester.tap(keepBtnFinder);
+        await tester.pumpAndSettle();
+
+        // Dialog should be dismissed
+        expect(find.text('Cancel Registration?'), findsNothing);
+
+        // API should NOT have been called
+        expect(apiCalled, isFalse);
+
+        // Status and remaining slots remain intact
+        expect(find.text('REGISTERED'), findsOneWidget);
+        expect(find.text('45 slots left'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Cancellation rejection displays top-center error toast and preserves registration',
+      (tester) async {
+        addTearDown(() {
+          ApiClient.mockHandler = null;
+          AppToast.dismiss(immediate: true);
+        });
+
+        const rejectionMessage =
+            'Registrations cannot be cancelled after the event has started.';
+
+        ApiClient.mockHandler = (method, endpoint, body) async {
+          if (method == 'DELETE') {
+            return ApiResponse(
+              success: false,
+              message: rejectionMessage,
+              statusCode: 422,
+            );
+          }
+          return ApiResponse(success: true, statusCode: 200);
+        };
+
+        final fixtures = _buildStudentEventFixtures();
+        final registeredEvent = fixtures.firstWhere((e) => e.isRegistered);
+
+        await tester.pumpWidget(
+          AppTestHost(
+            child: EventDetailScreen(
+              eventId: registeredEvent.id,
+              initialEvent: registeredEvent,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Tap Cancel My Registration
+        final cancelBtn = find.byKey(const ValueKey('cancel-registration-button'));
+        await tester.ensureVisible(cancelBtn);
+        await tester.tap(cancelBtn);
+        await tester.pumpAndSettle();
+
+        // Tap Cancel Slot in confirmation modal
+        final confirmBtn = find.byKey(const ValueKey('cancel-dialog-confirm-button'));
+        expect(confirmBtn, findsOneWidget);
+        await tester.tap(confirmBtn);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // Dialog should be closed
+        expect(find.text('Cancel Registration?'), findsNothing);
+
+        // Top-center error toast appears with rejection message
+        final toastContainer = find.byKey(const ValueKey('app-toast-container'));
+        expect(toastContainer, findsOneWidget);
+        expect(find.text(rejectionMessage), findsOneWidget);
+        expect(find.byKey(const ValueKey('app-toast-icon-error')), findsOneWidget);
+
+        // Toast is positioned at top center
+        final toastCenter = tester.getCenter(toastContainer);
+        expect(toastCenter.dy, lessThan(100.0));
+
+        // Registration status and slots remain intact
+        expect(find.text('REGISTERED'), findsOneWidget);
+        expect(find.text('45 slots left'), findsOneWidget);
       },
     );
   });

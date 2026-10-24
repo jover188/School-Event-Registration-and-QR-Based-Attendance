@@ -17,6 +17,13 @@ project decisions, and finalized requirement decisions (Section 33)
 > **Revision History:**
 > - **v1.0** — Initial Requirements Baseline (filename `School_Event_Attendance_SRS_v1.0.md` retained for cross-document link stability).
 > - **v1.1** — Finalized Requirements Baseline incorporating all resolved architectural and business rule decisions (Section 33).
+>
+> **Connected Project Documentation & Rules:**
+> - [`context.md`](./context.md) — System context, 13 database tables, 4 RBAC roles, and current implementation status.
+> - [`AGENTS.md`](./AGENTS.md) & [`.agents/rules/`](./.agents/rules/) — Mandatory workspace rules, domain invariants, and verification standards.
+> - [`System_Architecture_and_Database_Design.md`](./System_Architecture_and_Database_Design.md) — Multi-tier architecture, state machines, sequence diagrams, and MySQL 8.0+ DDL.
+> - [`REST_API_Specification.md`](./REST_API_Specification.md) & [`openapi.yaml`](./openapi.yaml) — Canonical `/api/v1/*` REST API endpoints and JSON contracts.
+> - [`Project_Plan.md`](./Project_Plan.md) & [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) — Agile sprint status tracker and implementation tasks.
 
 ------------------------------------------------------------------------
 

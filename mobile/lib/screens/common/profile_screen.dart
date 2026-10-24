@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../auth/account_input.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -16,8 +17,13 @@ import 'notification_preferences_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
+  final bool embedded;
 
-  const ProfileScreen({super.key, this.initialData});
+  const ProfileScreen({
+    super.key,
+    this.initialData,
+    this.embedded = false,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -166,18 +172,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _isSavingProfile = false);
 
-    final d = context.design;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: response.success ? d.success : d.destructive,
-        content: Text(
-          response.message ??
-              (response.success
-                  ? 'Profile updated successfully.'
-                  : 'Failed to update profile.'),
-        ),
-      ),
-    );
+    if (response.success) {
+      AppToast.success(
+        context,
+        response.message ?? 'Profile updated successfully.',
+      );
+    } else {
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to update profile.',
+      );
+    }
   }
 
   Future<void> _changePassword() async {
@@ -190,12 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     if (_newPasswordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: context.design.destructive,
-          content: const Text('New passwords do not match.'),
-        ),
-      );
+      AppToast.error(context, 'New passwords do not match.');
       return;
     }
 
@@ -218,18 +218,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _confirmPasswordController.clear();
     }
 
-    final d = context.design;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: response.success ? d.success : d.destructive,
-        content: Text(
-          response.message ??
-              (response.success
-                  ? 'Password updated successfully.'
-                  : 'Failed to update password.'),
-        ),
-      ),
-    );
+    if (response.success) {
+      AppToast.success(
+        context,
+        response.message ?? 'Password updated successfully.',
+      );
+    } else {
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to update password.',
+      );
+    }
   }
 
   @override
@@ -237,14 +236,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final d = context.design;
     return AppPageScaffold(
       title: 'My Profile & Settings',
+      embedded: widget.embedded,
       maxWidth: 720,
-      actions: [
-        IconButton(
-          tooltip: 'Refresh Profile',
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
-          onPressed: _isLoading ? null : _fetchProfile,
-        ),
-      ],
       body: SafeArea(
         child: _isLoading
             ? Center(child: AppSpinner(color: d.authDark, size: 28))
@@ -264,11 +257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           decoration: BoxDecoration(
                             color: d.card,
                             borderRadius: BorderRadius.circular(d.radiusCard),
-                            border: Border.all(
-                              color: d.isDark
-                                  ? d.border
-                                  : d.authDark.withValues(alpha: 0.08),
-                            ),
+                            border: Border.all(color: d.border, width: 1),
                             boxShadow: [
                               BoxShadow(
                                 color: d.authDark.withValues(alpha: 0.04),
@@ -281,50 +270,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: d.selection,
-                                      borderRadius: BorderRadius.circular(
-                                        d.radiusControl,
-                                      ),
-                                      border: Border.all(
-                                        color: d.primary.withValues(
-                                          alpha: 0.18,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      LucideIcons.user,
-                                      size: 22,
-                                      color: d.primary,
-                                    ),
+                                  Icon(
+                                    LucideIcons.user,
+                                    size: 18,
+                                    color: d.primary,
                                   ),
-                                  SizedBox(width: d.md),
+                                  SizedBox(width: d.sm),
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _email,
-                                          style: d.sectionTitle,
-                                        ),
-                                        if (_hasStudentProfile &&
-                                            _studentIdNumber.isNotEmpty) ...[
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'Student ID: $_studentIdNumber (Immutable)',
-                                            style: d.supporting,
-                                          ),
-                                        ],
-                                      ],
+                                    child: Text(
+                                      _email,
+                                      style: d.sectionTitle,
                                     ),
                                   ),
                                 ],
                               ),
+                              if (_hasStudentProfile &&
+                                  _studentIdNumber.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Student ID: $_studentIdNumber (Immutable)',
+                                  style: d.supporting,
+                                ),
+                              ],
                               Divider(height: d.lg, color: d.border),
                               Wrap(
                                 spacing: d.sm,
@@ -350,11 +319,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           decoration: BoxDecoration(
                             color: d.card,
                             borderRadius: BorderRadius.circular(d.radiusCard),
-                            border: Border.all(
-                              color: d.isDark
-                                  ? d.border
-                                  : d.authDark.withValues(alpha: 0.08),
-                            ),
+                            border: Border.all(color: d.border, width: 1),
                             boxShadow: [
                               BoxShadow(
                                 color: d.authDark.withValues(alpha: 0.04),
@@ -379,23 +344,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: Padding(
                                 padding: EdgeInsets.all(d.md),
                                 child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Icon(
-                                      LucideIcons.bell,
-                                      size: 20,
-                                      color: d.primary,
-                                    ),
-                                    SizedBox(width: d.md),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            'Notification Preferences',
-                                            style: d.cardTitle,
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                LucideIcons.bell,
+                                                size: 18,
+                                                color: d.primary,
+                                              ),
+                                              SizedBox(width: d.sm),
+                                              Expanded(
+                                                child: Text(
+                                                  'Notification Preferences',
+                                                  style: d.cardTitle,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          const SizedBox(height: 2),
+                                          const SizedBox(height: 4),
                                           Text(
                                             'Manage event reminders and mandatory campus alerts',
                                             style: d.supporting,
@@ -403,10 +377,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ],
                                       ),
                                     ),
+                                    SizedBox(width: d.sm),
                                     Icon(
                                       LucideIcons.chevronRight,
                                       size: 18,
-                                      color: d.mutedForeground,
+                                      color: d.primary,
                                     ),
                                   ],
                                 ),
@@ -429,11 +404,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             decoration: BoxDecoration(
                               color: d.card,
                               borderRadius: BorderRadius.circular(d.radiusCard),
-                              border: Border.all(
-                                color: d.isDark
-                                    ? d.border
-                                    : d.authDark.withValues(alpha: 0.08),
-                              ),
+                              border: Border.all(color: d.border, width: 1),
                               boxShadow: [
                                 BoxShadow(
                                   color: d.authDark.withValues(alpha: 0.04),

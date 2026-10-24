@@ -5,10 +5,13 @@ import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_page_scaffold.dart';
+import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../models/event_model.dart';
+import 'event_detail_screen.dart';
 
 class MyAttendanceHistoryScreen extends StatefulWidget {
   final bool embedded;
@@ -28,9 +31,25 @@ class MyAttendanceHistoryScreen extends StatefulWidget {
 }
 
 class _MyAttendanceHistoryScreenState extends State<MyAttendanceHistoryScreen> {
+  static const List<({String label, String value})> _filters = [
+    (label: 'All', value: 'all'),
+    (label: 'Present', value: 'present'),
+    (label: 'Late', value: 'late'),
+    (label: 'Walk-In', value: 'walk_in'),
+    (label: 'Excused', value: 'excused'),
+  ];
+
   bool _isLoading = true;
   String? _errorMessage;
+  String _selectedFilter = 'all';
   List<Map<String, dynamic>> _records = [];
+
+  List<Map<String, dynamic>> get _filteredRecords {
+    if (_selectedFilter == 'all') return _records;
+    return _records
+        .where((rec) => rec['status']?.toString() == _selectedFilter)
+        .toList();
+  }
 
   bool get _hasFixtureData =>
       widget.initialRecords != null || widget.initialErrorMessage != null;
@@ -84,65 +103,137 @@ class _MyAttendanceHistoryScreenState extends State<MyAttendanceHistoryScreen> {
     });
   }
 
+  Future<void> _openAttendanceEventDetail(Map<String, dynamic> record) async {
+    final eventMap = Map<String, dynamic>.from(
+      (record['event'] as Map?) ?? const {},
+    );
+    final eventId =
+        (record['event_id'] as num? ?? eventMap['id'] as num? ?? 0).toInt();
+    if (eventId <= 0 && eventMap.isEmpty) return;
+
+    eventMap['id'] ??= eventId;
+    final model = EventModel.fromJson(eventMap);
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventDetailScreen(
+          eventId: eventId > 0 ? eventId : model.id,
+          event: model,
+          initialEvent: _hasFixtureData ? model : null,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = context.design;
+    final items = _filteredRecords;
+
     return AppPageScaffold(
       title: 'Attendance History',
       embedded: widget.embedded,
-      actions: [
-        IconButton(
-          tooltip: 'Refresh Attendance History',
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
-          onPressed: _isLoading ? null : _fetchHistory,
-        ),
-      ],
-      body: _isLoading
-          ? Center(
-              child: AppSpinner(
-                size: 28,
-                color: d.authDark,
-              ),
-            )
-          : _errorMessage != null && _records.isEmpty
-              ? ErrorStateView(
-                  message: _errorMessage!,
-                  onRetry: _fetchHistory,
-                )
-              : _records.isEmpty
-                  ? EmptyStateView(
-                      icon: LucideIcons.clipboardCheck,
-                      title: 'No attendance records yet',
-                      message:
-                          'Present your permanent student QR code at campus events to record check-ins and check-outs.',
-                      actionLabel: 'Refresh',
-                      onAction: _fetchHistory,
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _fetchHistory,
-                      child: CustomScrollView(
-                        slivers: [
-                          ResponsiveCardSliver(
-                            itemCount: _records.length,
-                            minItemWidth: 340,
-                            maxColumns: 2,
-                            itemBuilder: (context, index) {
-                              return _AttendanceHistoryCard(
-                                record: _records[index],
-                              );
-                            },
-                          ),
-                        ],
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            type: MaterialType.transparency,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.only(bottom: d.gap),
+              child: Row(
+                children: _filters.map((filter) {
+                  final isSelected = _selectedFilter == filter.value;
+                  return Padding(
+                    padding: EdgeInsets.only(right: d.sm),
+                    child: ChoiceChip(
+                      key: ValueKey('attendance-filter-${filter.value}'),
+                      label: Text(filter.label),
+                      selected: isSelected,
+                      selectedColor: d.buttonPrimary,
+                      backgroundColor: d.card,
+                      labelStyle: d.supporting.copyWith(
+                        color: isSelected
+                            ? d.buttonPrimaryForeground
+                            : d.foreground,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
                       ),
+                      side: BorderSide(
+                        color: isSelected ? d.buttonPrimary : d.border,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(d.radiusControl),
+                      ),
+                      showCheckmark: false,
+                      onSelected: (_) {
+                        setState(() => _selectedFilter = filter.value);
+                      },
                     ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? Center(
+                    child: AppSpinner(
+                      size: 28,
+                      color: d.authDark,
+                    ),
+                  )
+                : _errorMessage != null && _records.isEmpty
+                    ? ErrorStateView(
+                        message: _errorMessage!,
+                        onRetry: _fetchHistory,
+                      )
+                    : items.isEmpty
+                        ? EmptyStateView(
+                            icon: LucideIcons.clipboardCheck,
+                            title: _selectedFilter == 'all'
+                                ? 'No attendance records yet'
+                                : 'No matching attendance records',
+                            message: _selectedFilter == 'all'
+                                ? 'Show your QR code at events to record attendance.'
+                                : 'No records with this status.',
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _fetchHistory,
+                            child: CustomScrollView(
+                              slivers: [
+                                ResponsiveCardSliver(
+                                  itemCount: items.length,
+                                  minItemWidth: 340,
+                                  maxColumns: 2,
+                                  itemBuilder: (context, index) {
+                                    final record = items[index];
+                                    return _AttendanceHistoryCard(
+                                      record: record,
+                                      onTap: () =>
+                                          _openAttendanceEventDetail(record),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _AttendanceHistoryCard extends StatelessWidget {
   final Map<String, dynamic> record;
+  final VoidCallback? onTap;
 
-  const _AttendanceHistoryCard({required this.record});
+  const _AttendanceHistoryCard({
+    required this.record,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -156,14 +247,12 @@ class _AttendanceHistoryCard extends StatelessWidget {
     final venue = event['venue']?.toString() ?? 'Campus Venue';
     final eventDate = event['event_date']?.toString() ?? '';
 
-    return Container(
+    final cardContent = Container(
       padding: EdgeInsets.all(d.md),
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(
-          color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
-        ),
+        border: Border.all(color: d.border, width: 1),
         boxShadow: [
           BoxShadow(
             color: d.authDark.withValues(alpha: 0.04),
@@ -176,29 +265,35 @@ class _AttendanceHistoryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: d.sm,
-            runSpacing: d.xs,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                title,
-                style: d.cardTitle,
+              Icon(
+                LucideIcons.clipboardCheck,
+                size: 18,
+                color: d.primary,
               ),
+              SizedBox(width: d.sm),
+              Expanded(
+                child: Text(
+                  title,
+                  style: d.cardTitle,
+                ),
+              ),
+              SizedBox(width: d.sm),
               StatusBadge(status: status),
             ],
           ),
           SizedBox(height: d.sm),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(
                 LucideIcons.mapPin,
-                size: 15,
-                color: d.mutedForeground,
+                size: 16,
+                color: d.primary,
               ),
-              SizedBox(width: d.xs),
+              SizedBox(width: d.sm),
               Expanded(
                 child: Text(
                   eventDate.isNotEmpty ? '$eventDate • $venue' : venue,
@@ -210,7 +305,7 @@ class _AttendanceHistoryCard extends StatelessWidget {
           ),
           Divider(
             height: d.lg,
-            color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
+            color: d.border,
           ),
           ResponsiveGrid(
             minItemWidth: 160,
@@ -220,7 +315,7 @@ class _AttendanceHistoryCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Check-In Time', style: d.supporting),
+                  Text('Check-In', style: d.supporting),
                   const SizedBox(height: 2),
                   Text(
                     checkInTime,
@@ -231,7 +326,7 @@ class _AttendanceHistoryCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Check-Out Time', style: d.supporting),
+                  Text('Check-Out', style: d.supporting),
                   const SizedBox(height: 2),
                   Text(
                     hasCheckOut ? checkOutTime : 'Not checked out',
@@ -247,5 +342,15 @@ class _AttendanceHistoryCard extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap != null) {
+      return AppPressable(
+        semanticLabel: '$title, $status',
+        onPressed: onTap,
+        child: cardContent,
+      );
+    }
+
+    return cardContent;
   }
 }

@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
@@ -179,12 +180,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         });
         _users = _applyLocalFilters(_fixtureUsers!);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: context.design.success,
-          content: const Text('Staff user account created successfully.'),
-        ),
-      );
+      AppToast.success(context, 'Staff user account created successfully.');
       return;
     }
 
@@ -196,25 +192,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     if (!mounted) return;
 
-    final d = context.design;
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.success,
-          content: Text(
-            response.message ?? 'Staff user account created successfully.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ?? 'Staff user account created successfully.',
       );
       _fetchUsers();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(
-            response.message ?? 'Failed to create staff user account.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to create staff user account.',
       );
     }
   }
@@ -251,12 +238,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         }
         _users = _applyLocalFilters(_fixtureUsers!);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: context.design.success,
-          content: Text('User status updated to $nextStatus.'),
-        ),
-      );
+      AppToast.success(context, 'User status updated to $nextStatus.');
       return;
     }
 
@@ -267,25 +249,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     if (!mounted) return;
 
-    final d = context.design;
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.success,
-          content: Text(
-            response.message ?? 'User status updated successfully.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ?? 'User status updated successfully.',
       );
       _fetchUsers();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(
-            response.message ?? 'Failed to update user account status.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to update user account status.',
       );
     }
   }
@@ -303,13 +276,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     if (newPassword == null || newPassword.isEmpty || !mounted) return;
 
     if (_fixtureUsers != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: context.design.success,
-          content: Text(
-            'Password reset for $email and prior sessions revoked.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        'Password reset for $email and prior sessions revoked.',
       );
       return;
     }
@@ -321,24 +290,15 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     if (!mounted) return;
 
-    final d = context.design;
     if (response.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.success,
-          content: Text(
-            response.message ?? 'Password reset and sessions revoked.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        response.message ?? 'Password reset and sessions revoked.',
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(
-            response.message ?? 'Failed to reset user password.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Failed to reset user password.',
       );
     }
   }
@@ -396,13 +356,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                             icon: LucideIcons.userPlus,
                             label: 'Create Staff User',
                           ),
-                        AppButton(
-                          pill: true,
-                          variant: AppButtonVariant.outline,
-                          onPressed: _isLoading ? null : _fetchUsers,
-                          icon: LucideIcons.refreshCw,
-                          label: 'Refresh',
-                        ),
                       ],
                     ),
                   ),

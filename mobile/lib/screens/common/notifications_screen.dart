@@ -9,6 +9,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
@@ -127,12 +128,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .map((item) => {...item, 'is_read': true})
             .toList();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFF09090B),
-          content: Text('All notifications marked as read.'),
-        ),
-      );
+      AppToast.info(context, 'All notifications marked as read.');
     }
   }
 

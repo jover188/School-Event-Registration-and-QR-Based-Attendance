@@ -5,7 +5,8 @@
 > **Duration:** 6 Weeks (Agile Sprints 1–6)  
 > **Team Size:** Individual / Small Team  
 > **Stack:** Laravel 11 / PHP 8.3+ (Backend API) · Flutter 3.x / Dart 3.x (Mobile & Desktop) · MySQL 8.0+ / MariaDB (Production) · SQLite `:memory:` (Automated Testing)  
-> **Detailed Task Plan:** See [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) and [`context.md`](./context.md)
+> **Detailed Task Plan:** See [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) and [`context.md`](./context.md)  
+> **Workspace Rules & Specs:** [`AGENTS.md`](./AGENTS.md), [`.agents/rules/`](./.agents/rules/), [`School_Event_Attendance_SRS_v1.0.md`](./School_Event_Attendance_SRS_v1.0.md), [`System_Architecture_and_Database_Design.md`](./System_Architecture_and_Database_Design.md), [`REST_API_Specification.md`](./REST_API_Specification.md), [`openapi.yaml`](./openapi.yaml)
 
 ---
 

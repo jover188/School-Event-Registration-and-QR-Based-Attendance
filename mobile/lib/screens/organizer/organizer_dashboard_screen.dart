@@ -434,6 +434,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       selectedId: _selectedDestinationId,
       onDestinationSelected: (id) =>
           setState(() => _selectedDestinationId = id),
+      onLogout: _logout,
       actions: [
         IconButton(
           icon: const Icon(LucideIcons.bell, size: 20),
@@ -454,16 +455,6 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
               MaterialPageRoute(builder: (_) => const ProfileScreen()),
             );
           },
-        ),
-        IconButton(
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
-          tooltip: 'Refresh Dashboard',
-          onPressed: _isLoading ? null : _fetchDashboardData,
-        ),
-        IconButton(
-          icon: const Icon(LucideIcons.logOut, size: 20),
-          tooltip: 'Logout',
-          onPressed: _logout,
         ),
       ],
       body: AppDestinationStack(

@@ -13,7 +13,6 @@ import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/event_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/stat_metric_card.dart';
-import '../../core/widgets/status_badge.dart';
 import '../../models/event_model.dart';
 import '../auth/login_screen.dart';
 import '../common/calendar_screen.dart';
@@ -49,31 +48,44 @@ class StudentDashboardScreen extends StatefulWidget {
 class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   static const List<AppDestination> _destinations = [
     AppDestination(
+      id: 'profile',
+      label: 'My Profile',
+      icon: LucideIcons.user,
+      compactPrimary: false,
+      category: 'ACCOUNT',
+    ),
+    AppDestination(
       id: 'events',
       label: 'Events',
       icon: LucideIcons.calendar,
       essential: true,
+      category: 'EVENTS',
     ),
     AppDestination(
       id: 'calendar',
       label: 'Calendar',
       icon: LucideIcons.calendarDays,
+      category: 'EVENTS',
     ),
     AppDestination(
       id: 'registrations',
       label: 'My Registrations',
       icon: LucideIcons.clipboardCheck,
+      category: 'ATTENDANCE',
     ),
     AppDestination(
       id: 'qr',
       label: 'My QR',
       icon: LucideIcons.qrCode,
       essential: true,
+      category: 'ATTENDANCE',
     ),
     AppDestination(
       id: 'history',
       label: 'History',
       icon: LucideIcons.history,
+      compactPrimary: false,
+      category: 'ATTENDANCE',
     ),
   ];
 
@@ -232,10 +244,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
   String get _currentTitle => switch (_selectedId) {
         'calendar' => 'Event Calendar',
+        'profile' => 'My Profile',
         'registrations' => 'My Registrations',
-        'qr' => 'Permanent Student QR',
+        'qr' => 'My QR Code',
         'history' => 'Attendance History',
-        _ => 'Campus Events',
+        _ => 'Events',
       };
 
   Widget _buildEventTrailingAction(BuildContext context, EventModel event) {
@@ -244,39 +257,38 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     final normalizedStatus = event.status.trim().toLowerCase();
 
     if (normalizedStatus == 'cancelled') {
-      return const StatusBadge(
-        status: 'cancelled',
+      return const AppButton(
+        variant: AppButtonVariant.outline,
+        onPressed: null,
         label: 'CANCELLED',
       );
     }
     if (event.isRegistered) {
       return AppButton(
         variant: AppButtonVariant.outline,
-        pill: true,
         onPressed: () => _openEventDetail(event),
-        label: 'Manage Registration',
+        label: 'View Registration',
       );
     }
     if (event.isWaitingList) {
-      return StatusBadge(
-        status: 'waiting_list',
+      return AppButton(
+        variant: AppButtonVariant.outline,
+        onPressed: () => _openEventDetail(event),
         label: 'WAITING LIST #${event.userWaitingPosition ?? 1}',
       );
     }
     if (isFull) {
       return AppButton(
         variant: AppButtonVariant.outline,
-        pill: true,
         icon: LucideIcons.listOrdered,
         onPressed: () => _openEventDetail(event),
         label: 'Join Waiting List',
       );
     }
     return AppButton(
-      variant: AppButtonVariant.ghost,
-      pill: true,
+      variant: AppButtonVariant.outline,
       onPressed: () => _openEventDetail(event),
-      label: 'View Event',
+      label: 'View Details',
     );
   }
 
@@ -345,7 +357,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   ],
                   if (_stats != null) ...[
                     ResponsiveGrid(
-                      minItemWidth: 150,
+                      minItemWidth: 100,
                       maxColumns: 3,
                       spacing: d.gap,
                       children: [
@@ -363,15 +375,15 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                           value:
                               '${(_stats!['total_attended_events'] ?? _stats!['attended'] ?? 0)}',
                           icon: LucideIcons.shieldCheck,
-                          color: d.success,
+                          color: d.primary,
                           onTap: () => setState(() => _selectedId = 'history'),
                         ),
                         StatMetricCard(
                           label: 'Waiting List',
                           value:
-                              '${(_stats!['waiting_list_count'] ?? _stats!['total_waiting_list'] ?? _stats!['waiting_list'] ?? _stats!['unread_notifications'] ?? 0)}',
+                              '${(_stats!['waiting_list_count'] ?? _stats!['total_waiting_list'] ?? _stats!['waiting_list'] ?? 0)}',
                           icon: LucideIcons.listOrdered,
-                          color: d.waiting,
+                          color: d.primary,
                           onTap: () =>
                               setState(() => _selectedId = 'registrations'),
                         ),
@@ -382,14 +394,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   TextField(
                     key: const ValueKey('student-events-search-input'),
                     controller: _searchController,
+                    style: d.body,
                     textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
-                      labelText: 'Search events by title or venue',
-                      hintText: 'Search events or venues...',
+                      hintText: 'Search events or venue...',
                       prefixIcon: Icon(
                         LucideIcons.search,
                         size: 18,
-                        color: d.authDark.withValues(alpha: 0.62),
+                        color: d.primary,
                       ),
                       suffixIcon: (_searchQuery.isNotEmpty ||
                               _searchController.text.isNotEmpty)
@@ -398,7 +410,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                               icon: Icon(
                                 LucideIcons.x,
                                 size: 18,
-                                color: d.authDark.withValues(alpha: 0.62),
+                                color: d.primary,
                               ),
                               onPressed: () {
                                 _searchController.clear();
@@ -418,10 +430,10 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   ),
                   SizedBox(height: d.md),
                   SectionHeader(
-                    title: 'Campus Events',
+                    title: 'Upcoming Events',
                     subtitle: _isLoading
                         ? null
-                        : '${_events.length} event${_events.length == 1 ? '' : 's'} available',
+                        : '${_events.length} available',
                   ),
                   SizedBox(height: d.gap),
                 ],
@@ -446,15 +458,13 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 ),
               )
             else if (_events.isEmpty)
-              SliverFillRemaining(
+              const SliverFillRemaining(
                 hasScrollBody: false,
                 child: EmptyStateView(
                   icon: LucideIcons.calendarX2,
                   title: 'No upcoming events found.',
                   message:
                       'Check back soon or adjust your search filters.',
-                  actionLabel: 'Refresh',
-                  onAction: _fetchEvents,
                 ),
               )
             else
@@ -462,6 +472,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 itemCount: _events.length,
                 minItemWidth: 300,
                 maxColumns: 3,
+                equalRowHeight: true,
                 itemBuilder: (context, index) {
                   final event = _events[index];
                   return EventCard(
@@ -482,6 +493,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final d = context.design;
+    final unreadCount =
+        (_stats?['unread_notifications'] as num?)?.toInt() ?? 0;
+
     return AppShell(
       title: _currentTitle,
       destinations: _destinations,
@@ -489,14 +503,18 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       onDestinationSelected: (id) {
         setState(() => _selectedId = id);
       },
+      onLogout: _logout,
+      showCompactMore: false,
       actions: [
         IconButton(
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
-          tooltip: 'Refresh',
-          onPressed: _isLoading ? null : _fetchEvents,
-        ),
-        IconButton(
-          icon: Icon(LucideIcons.bell, size: 18, color: d.foreground),
+          icon: Badge.count(
+            key: const ValueKey('student-notifications-badge'),
+            count: unreadCount,
+            isLabelVisible: unreadCount > 0,
+            backgroundColor: d.destructive,
+            textColor: d.destructiveForeground,
+            child: Icon(LucideIcons.bell, size: 18, color: d.primary),
+          ),
           tooltip: 'Notifications',
           onPressed: () async {
             await Navigator.push(
@@ -509,27 +527,13 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             _fetchEvents();
           },
         ),
-        IconButton(
-          icon: Icon(LucideIcons.user, size: 18, color: d.foreground),
-          tooltip: 'My Profile',
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            );
-          },
-        ),
-        IconButton(
-          icon: Icon(LucideIcons.logOut, size: 18, color: d.foreground),
-          tooltip: 'Logout',
-          onPressed: _logout,
-        ),
       ],
       body: AppDestinationStack(
         selectedId: _selectedId,
         builders: {
           'events': _buildEventsDestination,
           'calendar': (_) => const CalendarScreen(embedded: true),
+          'profile': (_) => const ProfileScreen(embedded: true),
           'registrations': (_) => MyRegistrationsScreen(
                 embedded: true,
                 initialRegistrations: widget.initialRegistrations,

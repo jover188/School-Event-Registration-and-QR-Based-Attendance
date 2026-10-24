@@ -40,7 +40,19 @@ It replaces manual paper/spreadsheet event workflows with:
 ## 3. Repository Structure
 
 ```text
-School-Event-Registration-and-QR-Based-Attendance/
+├── School-Event-Registration-and-QR-Based-Attendance/
+├── .agents/
+│   ├── rules/                                     # Modular workspace rules connected to context.md & AGENTS.md
+│   │   ├── architecture-code-organization.md      # Client-server boundaries & module organization
+│   │   ├── communication-reporting.md             # Progress reporting & spec synchronization rules
+│   │   ├── data-backend-security.md               # RBAC, Sanctum single-session, QR PII-free & audit rules
+│   │   ├── dependencies-external-packages.md      # Package vetting & no-runtime-AI constraints
+│   │   ├── existing-project-inspection.md         # Pre-modification inspection & stack discovery
+│   │   ├── flutter-development-standards.md       # AetherUI tokens, ApiClient & responsive standards
+│   │   ├── phased-development-workflow.md         # Sprint-aligned phased implementation workflow
+│   │   ├── testing-quality.md                     # SQLite :memory: safety & Flutter verification gates
+│   │   └── ui-ux-rules.md                         # 20-screen inventory, AppShell & accessibility rules
+│   └── skills/                                    # Specialized agent workflow & Flutter/Dart skills
 ├── AGENTS.md                                      # Workspace rules & conventions for AI coding agents
 ├── context.md                                     # System context, architecture, and status reference
 ├── Project_Plan.md                                # 6-Week Agile Sprint Plan & status tracker
@@ -132,4 +144,29 @@ The system enforces strict Role-Based Access Control (`CheckRole` middleware usi
     - Management: `ManagementDashboardScreen` (strictly Read-Only)
     - Admin: `AdminDashboardScreen`, `UserManagementScreen`, `ActivityLogsScreen`, `StudentQrInspectScreen`
   - 54 Flutter unit and widget tests passing across 13 test files with `0` analyzer issues and clean `flutter build web` compilation.
+
+---
+
+## 7. Connected Documentation & Workspace Rules Map
+
+All authoritative project documentation and `.agents/rules/` files are cross-linked and must remain synchronized:
+
+### Core Specification & Planning Documents
+- [`AGENTS.md`](./AGENTS.md) — Master workspace rules, domain invariants, backend/mobile conventions, and verification gates.
+- [`School_Event_Attendance_SRS_v1.0.md`](./School_Event_Attendance_SRS_v1.0.md) — Approved Software Requirements Specification (v1.1 baseline).
+- [`System_Architecture_and_Database_Design.md`](./System_Architecture_and_Database_Design.md) — Multi-tier architecture, sequence/state diagrams, ER diagram, and MySQL 8.0+ DDL.
+- [`REST_API_Specification.md`](./REST_API_Specification.md) & [`openapi.yaml`](./openapi.yaml) — Canonical `/api/v1/*` REST API contracts and response envelopes.
+- [`Project_Plan.md`](./Project_Plan.md) & [`Project_Implementation_Plan.md`](./Project_Implementation_Plan.md) — 6-Week Agile Sprint tracker, completed deliverables, and continuation tasks.
+- [`backend/README.md`](./backend/README.md) & [`mobile/README.md`](./mobile/README.md) — Subsystem setup, execution, and testing guides.
+
+### Modular Workspace Rules (`.agents/rules/`)
+- [`.agents/rules/existing-project-inspection.md`](./.agents/rules/existing-project-inspection.md) — Pre-change inspection of `context.md`, `AGENTS.md`, stack versions, and completed features.
+- [`.agents/rules/architecture-code-organization.md`](./.agents/rules/architecture-code-organization.md) — Decoupled Flutter (`mobile/`) ↔ Laravel (`backend/`) architecture and module boundaries.
+- [`.agents/rules/data-backend-security.md`](./.agents/rules/data-backend-security.md) — 13 domain tables, 4 RBAC roles, Sanctum single-session guard, 64-char hex QR token with zero PII, and audit logging.
+- [`.agents/rules/flutter-development-standards.md`](./.agents/rules/flutter-development-standards.md) — `shadcn_ui` + **AetherUI** design tokens, `ApiClient`, `ApiConstants`, and responsive layout standards.
+- [`.agents/rules/ui-ux-rules.md`](./.agents/rules/ui-ux-rules.md) — 20 role-based screens, adaptive `AppShell` navigation, accessibility, and strict read-only `management` UX.
+- [`.agents/rules/dependencies-external-packages.md`](./.agents/rules/dependencies-external-packages.md) — Package compatibility and prohibition of in-app runtime AI/LLM SDKs.
+- [`.agents/rules/phased-development-workflow.md`](./.agents/rules/phased-development-workflow.md) — Phased execution aligned with `Project_Plan.md` and `Project_Implementation_Plan.md`.
+- [`.agents/rules/testing-quality.md`](./.agents/rules/testing-quality.md) — SQLite `:memory:` test isolation (`php artisan test`) and Flutter static analysis/widget testing (`flutter analyze`, `flutter test`).
+- [`.agents/rules/communication-reporting.md`](./.agents/rules/communication-reporting.md) — Evidence-backed progress reporting and cross-document synchronization.
 

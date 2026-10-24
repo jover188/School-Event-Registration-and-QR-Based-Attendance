@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/status_badge.dart';
@@ -119,7 +120,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   Future<void> _handleRegister() async {
     final event = _event;
     if (event == null) return;
-    final d = context.design;
 
     setState(() => _isSubmitting = true);
     final response =
@@ -130,18 +130,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (response.success) {
       await _refreshEventDetails();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.success,
-          content: Text(response.message ?? 'Registration successful!'),
-        ),
+      AppToast.success(
+        context,
+        response.message ?? 'Registration successful!',
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(response.message ?? 'Registration failed.'),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Registration failed.',
       );
     }
   }
@@ -160,14 +156,29 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           'Are you sure you want to cancel your registration for this event? Your slot will be given to the next student on the waiting list.',
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
+            key: const ValueKey('cancel-dialog-keep-button'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: d.foreground,
+              backgroundColor: d.card,
+              side: BorderSide(color: d.border, width: 1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(d.radiusControl),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: d.md, vertical: 10),
+            ),
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Keep Registration'),
           ),
           ElevatedButton(
+            key: const ValueKey('cancel-dialog-confirm-button'),
             style: ElevatedButton.styleFrom(
               backgroundColor: d.destructive,
               foregroundColor: d.destructiveForeground,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(d.radiusControl),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: d.md, vertical: 10),
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Cancel Slot'),
@@ -187,18 +198,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (response.success) {
       await _refreshEventDetails();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.mutedForeground,
-          content: const Text('Your registration has been cancelled.'),
-        ),
+      AppToast.info(
+        context,
+        'Your registration has been cancelled.',
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: d.destructive,
-          content: Text(response.message ?? 'Cancellation failed.'),
-        ),
+      AppToast.error(
+        context,
+        response.message ?? 'Cancellation failed.',
       );
     }
   }
@@ -215,7 +222,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           decoration: BoxDecoration(
             color: d.card,
             borderRadius: BorderRadius.circular(d.radiusCard),
-            border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+            border: Border.all(color: d.border, width: 1),
             boxShadow: [
               BoxShadow(
                 color: d.authDark.withValues(alpha: 0.04),
@@ -227,16 +234,23 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: d.sm,
-                runSpacing: d.xs,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    event.title,
-                    style: d.sectionTitle.copyWith(fontWeight: FontWeight.w700),
+                  Icon(
+                    LucideIcons.calendar,
+                    size: 18,
+                    color: d.primary,
                   ),
+                  SizedBox(width: d.sm),
+                  Expanded(
+                    child: Text(
+                      event.title,
+                      style:
+                          d.sectionTitle.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  SizedBox(width: d.sm),
                   StatusBadge(status: event.status),
                 ],
               ),
@@ -254,8 +268,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               SizedBox(height: d.sm),
               _EventInfoRow(
                 icon: LucideIcons.clock,
-                text:
-                    'Late grace period: ${event.lateGracePeriodMinutes} minutes',
+                text: 'Late check-in after ${event.lateGracePeriodMinutes} mins',
               ),
             ],
           ),
@@ -266,7 +279,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           decoration: BoxDecoration(
             color: d.card,
             borderRadius: BorderRadius.circular(d.radiusCard),
-            border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+            border: Border.all(color: d.border, width: 1),
             boxShadow: [
               BoxShadow(
                 color: d.authDark.withValues(alpha: 0.04),
@@ -278,7 +291,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeader(title: 'About the Event'),
+              const SectionHeader(title: 'About'),
               SizedBox(height: d.sm),
               Text(
                 event.description,
@@ -288,8 +301,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 SizedBox(height: d.gap),
                 _EventInfoRow(
                   icon: LucideIcons.circleCheck,
-                  iconColor: d.success,
-                  text: 'Walk-in attendees permitted at venue',
+                  iconColor: d.primary,
+                  text: 'Walk-ins allowed',
                 ),
               ],
             ],
@@ -313,7 +326,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.authDark.withValues(alpha: 0.08)),
+        border: Border.all(color: d.border, width: 1),
         boxShadow: [
           BoxShadow(
             color: d.authDark.withValues(alpha: 0.04),
@@ -326,9 +339,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SectionHeader(title: 'Registration & Capacity'),
+          const SectionHeader(title: 'Registration'),
           SizedBox(height: d.gap),
-          Text('Remaining Capacity', style: d.supporting),
+          Text('Available Slots', style: d.supporting),
           const SizedBox(height: 2),
           Text(
             remaining == null
@@ -348,7 +361,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           ),
           if (event.userRegistrationStatus != null) ...[
             Divider(height: d.lg, color: d.authDark.withValues(alpha: 0.08)),
-            Text('Your Participation Status', style: d.supporting),
+            Text('Your Status', style: d.supporting),
             SizedBox(height: d.xs),
             Align(
               alignment: Alignment.centerLeft,
@@ -364,10 +377,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             SizedBox(height: d.xs),
             Text(
               event.isRegistered
-                  ? 'You have a confirmed slot for this event.'
+                  ? 'Your slot is confirmed.'
                   : event.isWaitingList
-                      ? 'You are on the waiting list (#${event.userWaitingPosition ?? 1}). You will be promoted automatically if a slot opens.'
-                      : 'Status updated by event server.',
+                      ? 'Queue position #${event.userWaitingPosition ?? 1}. Promoted automatically if a slot opens.'
+                      : 'Registration cancelled.',
               style: d.supporting,
             ),
           ],
@@ -442,13 +455,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
     return AppPageScaffold(
       title: event?.title ?? 'Event Details',
-      actions: [
-        IconButton(
-          tooltip: 'Refresh Event Details',
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
-          onPressed: (_isLoading || _isSubmitting) ? null : _refreshEventDetails,
-        ),
-      ],
       body: _isLoading && event == null
           ? Center(
               child: AppSpinner(
@@ -522,14 +528,14 @@ class _EventInfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final d = context.design;
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Icon(icon, size: 16, color: iconColor ?? d.mutedForeground),
-        SizedBox(width: d.xs + 2),
+        Icon(icon, size: 16, color: iconColor ?? d.primary),
+        SizedBox(width: d.sm),
         Expanded(
           child: Text(
             text,
-            style: d.supporting,
+            style: d.body,
             softWrap: true,
           ),
         ),

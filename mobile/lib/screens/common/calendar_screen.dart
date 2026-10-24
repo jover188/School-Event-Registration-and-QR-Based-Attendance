@@ -248,7 +248,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // ── Branded App Header ──────────────────────────────────────────
-              _buildAppHeader(context),
+              if (!widget.embedded) _buildAppHeader(context),
 
               // ── Calendar Toolbar & View Selector ─────────────────────────────
               _buildCalendarToolbar(context),
@@ -449,12 +449,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 visualDensity: VisualDensity.compact,
                 onPressed: _onPrevPage,
               ),
-              Text(
-                DateFormat('MMMM yyyy').format(_focusedDay),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
+              Flexible(
+                child: Text(
+                  DateFormat('MMMM yyyy').format(_focusedDay),
+                  style: d.cardTitle.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               IconButton(
@@ -474,11 +477,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
               color: isDark
                   ? CalendarBwPalette.darkModeBorders
                   : CalendarBwPalette.secondaryGray,
-              borderRadius: BorderRadius.circular(AppRadius.full),
+              borderRadius: BorderRadius.circular(d.radiusControl),
               border: Border.all(
                 color: isDark
                     ? CalendarBwPalette.darkModeBorders
                     : CalendarBwPalette.borders,
+                width: 1,
               ),
             ),
             padding: const EdgeInsets.all(3),
@@ -566,15 +570,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
       onPressed: onTap,
       semanticLabel: '$label view',
       child: Container(
+        key: ValueKey('calendar-format-${label.toLowerCase()}'),
+        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(AppRadius.full),
+          borderRadius: BorderRadius.circular(d.radiusControl),
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
+          textAlign: TextAlign.center,
+          style: d.supporting.copyWith(
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             color: fg,
           ),
@@ -594,8 +600,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
       margin: EdgeInsets.symmetric(horizontal: d.md),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cardBorder),
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: cardBorder, width: 1),
         boxShadow: [
           BoxShadow(
             color: CalendarBwPalette.primaryBlack.withValues(alpha: 0.03),
@@ -751,9 +757,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               Expanded(
                 child: Text(
                   dayHeader,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                  style: d.cardTitle.copyWith(
                     color: fg,
                   ),
                   maxLines: 1,
@@ -775,8 +779,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
                 child: Text(
                   '${events.length} EVENT${events.length == 1 ? '' : 'S'}',
-                  style: TextStyle(
-                    fontSize: 10,
+                  style: d.badge.copyWith(
                     fontWeight: FontWeight.w700,
                     color: fg,
                   ),
@@ -915,10 +918,10 @@ class _BwEventCard extends StatelessWidget {
         : '';
 
     return Container(
-      margin: EdgeInsets.only(bottom: d.sm + 4),
+      margin: EdgeInsets.only(bottom: d.gap),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(d.radiusCard),
         border: Border.all(color: cardBorder, width: 1.0),
         boxShadow: [
           BoxShadow(
@@ -934,32 +937,35 @@ class _BwEventCard extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.all(d.md),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Monochrome category icon badge
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: cardBorder),
-                ),
-                child: Center(
-                  child: Icon(
-                    icon,
-                    size: 20,
-                    color: primaryColor,
-                  ),
-                ),
-              ),
-              SizedBox(width: d.md),
-              // Event info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Top-left icon aligned and centered with title + badges
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(
+                          icon,
+                          size: 18,
+                          color: primaryColor,
+                        ),
+                        SizedBox(width: d.sm),
+                        Expanded(
+                          child: Text(
+                            event.title,
+                            style: d.cardTitle.copyWith(
+                              color: primaryColor,
+                            ),
+                            softWrap: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: d.xs),
                     // Category & Status row
                     Wrap(
                       spacing: 8,
@@ -968,8 +974,7 @@ class _BwEventCard extends StatelessWidget {
                       children: [
                         Text(
                           categoryLabel,
-                          style: const TextStyle(
-                            fontSize: 10,
+                          style: d.badge.copyWith(
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.6,
                             color: CalendarBwPalette.mutedText,
@@ -982,31 +987,18 @@ class _BwEventCard extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: badgeBg,
-                            borderRadius: BorderRadius.circular(AppRadius.full),
-                            border: Border.all(color: cardBorder),
+                            borderRadius: BorderRadius.circular(d.radiusControl),
+                            border: Border.all(color: cardBorder, width: 1),
                           ),
                           child: Text(
                             statusText,
-                            style: TextStyle(
-                              fontSize: 9,
+                            style: d.badge.copyWith(
                               fontWeight: FontWeight.w700,
                               color: primaryColor,
                             ),
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 4),
-                    // Title
-                    Text(
-                      event.title,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: primaryColor,
-                        height: 1.25,
-                      ),
-                      softWrap: true,
                     ),
                     const SizedBox(height: 6),
                     // Venue & Time
@@ -1019,17 +1011,16 @@ class _BwEventCard extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
+                              Icon(
                                 LucideIcons.clock,
-                                size: 13,
-                                color: CalendarBwPalette.mutedText,
+                                size: 14,
+                                color: primaryColor,
                               ),
-                              const SizedBox(width: 4),
+                              SizedBox(width: d.xs),
                               Flexible(
                                 child: Text(
                                   formattedTime,
-                                  style: const TextStyle(
-                                    fontSize: 12,
+                                  style: d.supporting.copyWith(
                                     color: CalendarBwPalette.mutedText,
                                   ),
                                   maxLines: 1,
@@ -1041,17 +1032,16 @@ class _BwEventCard extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               LucideIcons.mapPin,
-                              size: 13,
-                              color: CalendarBwPalette.mutedText,
+                              size: 14,
+                              color: primaryColor,
                             ),
-                            const SizedBox(width: 4),
+                            SizedBox(width: d.xs),
                             Flexible(
                               child: Text(
                                 event.venue,
-                                style: const TextStyle(
-                                  fontSize: 12,
+                                style: d.supporting.copyWith(
                                   color: CalendarBwPalette.mutedText,
                                 ),
                                 maxLines: 1,
@@ -1065,7 +1055,7 @@ class _BwEventCard extends StatelessWidget {
                     if (progress != null) ...[
                       const SizedBox(height: 8),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        borderRadius: BorderRadius.circular(d.radiusControl),
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 4,
@@ -1076,8 +1066,7 @@ class _BwEventCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Capacity: $registered / $maxCap',
-                        style: const TextStyle(
-                          fontSize: 11,
+                        style: d.supporting.copyWith(
                           fontWeight: FontWeight.w500,
                           color: CalendarBwPalette.mutedText,
                         ),
@@ -1086,14 +1075,12 @@ class _BwEventCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Chevron indicator
-              const Padding(
-                padding: EdgeInsets.only(top: 10, left: 6),
-                child: Icon(
-                  LucideIcons.chevronRight,
-                  size: 18,
-                  color: CalendarBwPalette.mutedText,
-                ),
+              SizedBox(width: d.sm),
+              // Chevron indicator matched to primary theme color
+              Icon(
+                LucideIcons.chevronRight,
+                size: 18,
+                color: primaryColor,
               ),
             ],
           ),
