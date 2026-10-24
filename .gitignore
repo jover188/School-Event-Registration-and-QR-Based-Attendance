@@ -36,3 +36,6 @@ build.bak/
 # OS
 .DS_Store
 Thumbs.db
+
+# Agent Temporary Workspaces
+.superpowers/
