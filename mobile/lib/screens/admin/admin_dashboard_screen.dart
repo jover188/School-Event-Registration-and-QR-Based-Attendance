@@ -17,6 +17,7 @@ import '../auth/account_input.dart';
 import '../auth/login_screen.dart';
 import '../common/notification_preferences_screen.dart';
 import '../common/notifications_screen.dart';
+import '../common/calendar_screen.dart';
 import '../common/profile_screen.dart';
 import '../common/reports_screen.dart';
 import '../organizer/event_form_screen.dart';
@@ -62,6 +63,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       label: 'Reviews',
       icon: LucideIcons.folderCheck,
       essential: true,
+    ),
+    AppDestination(
+      id: 'calendar',
+      label: 'Calendar',
+      icon: LucideIcons.calendarDays,
+      compactPrimary: false,
     ),
     AppDestination(
       id: 'users',
@@ -172,6 +179,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   String get _shellTitle => switch (_selectedDestinationId) {
         'reviews' => 'Publishing Reviews',
+        'calendar' => 'Event Calendar',
         'users' => 'User Management',
         'qr-records' => 'QR Records',
         'reports' => 'Reports',
@@ -665,6 +673,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         builders: {
           'overview': _buildOverviewTab,
           'reviews': _buildReviewsTab,
+          'calendar': (_) => const CalendarScreen(embedded: true),
           'users': (_) => UserManagementScreen(
                 key: const ValueKey<String>('admin-embedded-users'),
                 embedded: true,

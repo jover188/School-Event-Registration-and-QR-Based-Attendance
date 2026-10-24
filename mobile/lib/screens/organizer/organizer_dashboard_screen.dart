@@ -17,6 +17,7 @@ import '../../core/widgets/stat_metric_card.dart';
 import '../../models/event_model.dart';
 import '../auth/login_screen.dart';
 import '../common/notifications_screen.dart';
+import '../common/calendar_screen.dart';
 import '../common/profile_screen.dart';
 import '../common/reports_screen.dart';
 import 'event_form_screen.dart';
@@ -48,6 +49,11 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       label: 'Overview',
       icon: LucideIcons.layoutDashboard,
       essential: true,
+    ),
+    AppDestination(
+      id: 'calendar',
+      label: 'Calendar',
+      icon: LucideIcons.calendarDays,
     ),
     AppDestination(
       id: 'events',
@@ -208,6 +214,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   }
 
   String get _shellTitle => switch (_selectedDestinationId) {
+        'calendar' => 'Event Calendar',
         'events' => 'My Events',
         'reports' => 'Reports & Exports',
         _ => 'Organizer Portal',
@@ -464,6 +471,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
         builders: {
           'overview': _buildOverviewTab,
           'events': _buildMyEventsTab,
+          'calendar': (_) => const CalendarScreen(embedded: true),
           'reports': (_) => const ReportsScreen(embedded: true),
         },
       ),

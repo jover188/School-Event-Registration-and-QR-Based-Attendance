@@ -15,6 +15,7 @@ import '../../core/widgets/stat_metric_card.dart';
 import '../../core/widgets/status_badge.dart';
 import '../auth/login_screen.dart';
 import '../common/notifications_screen.dart';
+import '../common/calendar_screen.dart';
 import '../common/profile_screen.dart';
 import '../common/reports_screen.dart';
 import '../organizer/event_registrations_screen.dart';
@@ -51,6 +52,11 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
       id: 'events',
       label: 'Events',
       icon: LucideIcons.calendarRange,
+    ),
+    AppDestination(
+      id: 'calendar',
+      label: 'Calendar',
+      icon: LucideIcons.calendarDays,
     ),
     AppDestination(
       id: 'reports',
@@ -192,6 +198,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
   }
 
   String get _shellTitle => switch (_selectedDestination) {
+        'calendar' => 'Event Calendar',
         'events' => 'Campus Events (Read-Only)',
         'reports' => 'Reports & Analytics',
         _ => 'School Management (Read-Only)',
@@ -624,6 +631,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
         builders: {
           'overview': _buildOverviewDestination,
           'events': _buildEventsDestination,
+          'calendar': (_) => const CalendarScreen(embedded: true),
           'reports': (_) => ReportsScreen(
                 embedded: true,
                 initialEvents: _hasFixtures ? const [] : null,

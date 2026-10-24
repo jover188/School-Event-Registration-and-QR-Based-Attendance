@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:school_event_attendance/models/event_model.dart';
@@ -34,7 +33,7 @@ void main() {
   testWidgets('CalendarScreen renders calendar grid and month header',
       (tester) async {
     await tester.pumpWidget(
-      AppTestHost(child: CalendarScreen(initialEvents: const [])),
+      const AppTestHost(child: CalendarScreen(initialEvents: [])),
     );
     await tester.pumpAndSettle();
 
@@ -47,7 +46,7 @@ void main() {
   testWidgets('CalendarScreen shows select-a-day hint when no day selected',
       (tester) async {
     await tester.pumpWidget(
-      AppTestHost(child: CalendarScreen(initialEvents: const [])),
+      const AppTestHost(child: CalendarScreen(initialEvents: [])),
     );
     await tester.pumpAndSettle();
 
@@ -75,7 +74,7 @@ void main() {
   testWidgets('CalendarScreen Today button is tappable without error',
       (tester) async {
     await tester.pumpWidget(
-      AppTestHost(child: CalendarScreen(initialEvents: const [])),
+      const AppTestHost(child: CalendarScreen(initialEvents: [])),
     );
     await tester.pumpAndSettle();
 
@@ -90,7 +89,7 @@ void main() {
   testWidgets('CalendarScreen toggles between month and week format',
       (tester) async {
     await tester.pumpWidget(
-      AppTestHost(child: CalendarScreen(initialEvents: const [])),
+      const AppTestHost(child: CalendarScreen(initialEvents: [])),
     );
     await tester.pumpAndSettle();
 

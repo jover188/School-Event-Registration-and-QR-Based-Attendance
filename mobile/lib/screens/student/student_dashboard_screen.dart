@@ -16,6 +16,7 @@ import '../../core/widgets/stat_metric_card.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/event_model.dart';
 import '../auth/login_screen.dart';
+import '../common/calendar_screen.dart';
 import '../common/notifications_screen.dart';
 import '../common/profile_screen.dart';
 import 'event_detail_screen.dart';
@@ -52,6 +53,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       label: 'Events',
       icon: LucideIcons.calendar,
       essential: true,
+    ),
+    AppDestination(
+      id: 'calendar',
+      label: 'Calendar',
+      icon: LucideIcons.calendarDays,
     ),
     AppDestination(
       id: 'registrations',
@@ -225,6 +231,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   }
 
   String get _currentTitle => switch (_selectedId) {
+        'calendar' => 'Event Calendar',
         'registrations' => 'My Registrations',
         'qr' => 'Permanent Student QR',
         'history' => 'Attendance History',
@@ -522,6 +529,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         selectedId: _selectedId,
         builders: {
           'events': _buildEventsDestination,
+          'calendar': (_) => const CalendarScreen(embedded: true),
           'registrations': (_) => MyRegistrationsScreen(
                 embedded: true,
                 initialRegistrations: widget.initialRegistrations,

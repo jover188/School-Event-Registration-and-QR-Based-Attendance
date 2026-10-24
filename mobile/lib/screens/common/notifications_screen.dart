@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import '../student/event_detail_screen.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
@@ -63,6 +65,29 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _errorMessage = response.message ?? 'Failed to load notifications.';
       }
     });
+  }
+
+  Future<void> _handleNotificationTap(int index, Map<String, dynamic> item) async {
+    // Mark read first (fire-and-forget)
+    await _markSingleRead(index);
+    if (!mounted) return;
+    // Navigate to event detail if payload contains event_id
+    final rawPayload = item['payload'];
+    Map<String, dynamic>? payload;
+    if (rawPayload is Map<String, dynamic>) {
+      payload = rawPayload;
+    } else if (rawPayload is String && rawPayload.isNotEmpty) {
+      try { payload = jsonDecode(rawPayload) as Map<String, dynamic>?; } catch (_) {}
+    }
+    final eventId = (payload?['event_id'] as num?)?.toInt();
+    if (eventId != null && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EventDetailScreen(eventId: eventId),
+        ),
+      );
+    }
   }
 
   Future<void> _markSingleRead(int index) async {
@@ -223,7 +248,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 return _NotificationTile(
                                   notification: item,
                                   isRead: isRead,
-                                  onTap: () => _markSingleRead(index),
+                                  onTap: () => _handleNotificationTap(index, item),
                                 );
                               },
                             ),
