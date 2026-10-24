@@ -180,4 +180,73 @@ void main() {
     );
     expect(find.byKey(const ValueKey('calendar-notifications-btn')), findsOneWidget);
   });
+
+  // 9. Entire page scrolls vertically without nested scroll conflicts
+  testWidgets('CalendarScreen entire page scrolls vertically including calendar grid and event cards',
+      (tester) async {
+    final today = DateTime.now();
+    final todayStr = DateFormat('yyyy-MM-dd').format(today);
+    final events = List.generate(
+      10,
+      (i) => _makeEvent(
+        id: i + 1,
+        title: 'Event Number ${i + 1}',
+        eventDate: todayStr,
+      ),
+    );
+
+    await tester.pumpWidget(
+      AppTestHost(child: CalendarScreen(initialEvents: events)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Event Number 1'), findsOneWidget);
+
+    final scrollViewFinder = find.byKey(const PageStorageKey<String>('calendar-scroll-view'));
+    expect(scrollViewFinder, findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Event Number 10'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Event Number 10'), findsOneWidget);
+  });
+
+  // 10. Compact mobile viewport (320x568) renders and scrolls without overflow
+  testWidgets('CalendarScreen compact mobile viewport (320x568) renders and scrolls without overflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final today = DateTime.now();
+    final todayStr = DateFormat('yyyy-MM-dd').format(today);
+    final events = [
+      _makeEvent(id: 1, title: 'Compact Morning Session', eventDate: todayStr),
+      _makeEvent(id: 2, title: 'Compact Afternoon Session', eventDate: todayStr),
+    ];
+
+    await tester.pumpWidget(
+      AppTestHost(
+        child: CalendarScreen(
+          embedded: true,
+          initialEvents: events,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Attendify'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    final scrollViewFinder = find.byKey(const PageStorageKey<String>('calendar-scroll-view'));
+    await tester.drag(scrollViewFinder, const Offset(0, -200));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -1,8 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../core/constants/api_constants.dart';
-import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
@@ -239,26 +239,64 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final d = context.design;
     final isDark = d.isDark;
 
-    final content = Column(
-      children: [
-        // ── Branded App Header ──────────────────────────────────────────────
-        _buildAppHeader(context),
+    final scrollable = CustomScrollView(
+      key: const PageStorageKey<String>('calendar-scroll-view'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Branded App Header ──────────────────────────────────────────
+              _buildAppHeader(context),
 
-        // ── Calendar Toolbar & View Selector ─────────────────────────────────
-        _buildCalendarToolbar(context),
+              // ── Calendar Toolbar & View Selector ─────────────────────────────
+              _buildCalendarToolbar(context),
 
-        // ── 7-Column Calendar Grid ──────────────────────────────────────────
-        _buildCalendarGrid(context),
+              // ── 7-Column Calendar Grid ──────────────────────────────────────
+              _buildCalendarGrid(context),
 
-        // Divider
-        Divider(
-          height: 1,
-          color: isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.borders,
+              // Divider
+              Divider(
+                height: 1,
+                color: isDark
+                    ? CalendarBwPalette.darkModeBorders
+                    : CalendarBwPalette.borders,
+              ),
+            ],
+          ),
         ),
 
-        // ── Event list for selected date ────────────────────────────────────
-        Expanded(child: _buildEventList(context)),
+        // ── Event list for selected date (or empty/loading/error state) ───────
+        ..._buildEventSlivers(context),
+
+        // ── Bottom Clearance Padding ─────────────────────────────────────────
+        // Prevents bottom navigation bar from covering the last event card
+        SliverPadding(
+          padding: EdgeInsets.only(bottom: d.xl + 48),
+        ),
       ],
+    );
+
+    final scrollConfigured = ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(
+        scrollbars: true,
+        dragDevices: {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+          PointerDeviceKind.stylus,
+        },
+      ),
+      child: scrollable,
+    );
+
+    final content = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1080),
+        child: scrollConfigured,
+      ),
     );
 
     if (widget.embedded) {
@@ -271,10 +309,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return Scaffold(
       backgroundColor: isDark ? CalendarBwPalette.primaryBlack : CalendarBwPalette.lightBackground,
       body: SafeArea(
-        child: AppResponsivePage(
-          maxWidth: 1080,
-          child: content,
-        ),
+        child: content,
       ),
     );
   }
@@ -409,6 +444,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 key: const ValueKey('calendar-prev-btn'),
                 icon: Icon(LucideIcons.chevronLeft, size: 18, color: fg),
                 tooltip: 'Previous',
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                visualDensity: VisualDensity.compact,
                 onPressed: _onPrevPage,
               ),
               Text(
@@ -423,6 +461,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 key: const ValueKey('calendar-next-btn'),
                 icon: Icon(LucideIcons.chevronRight, size: 18, color: fg),
                 tooltip: 'Next',
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                visualDensity: VisualDensity.compact,
                 onPressed: _onNextPage,
               ),
             ],
@@ -462,8 +503,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     monthNav,
                     AppButton(
@@ -633,98 +677,129 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  Widget _buildEventList(BuildContext context) {
+  List<Widget> _buildEventSlivers(BuildContext context) {
     final d = context.design;
     final isDark = d.isDark;
     final fg = isDark ? CalendarBwPalette.primaryWhite : CalendarBwPalette.primaryBlack;
 
     if (_isLoading && _eventsByDay.isEmpty) {
-      return const Center(child: AppSpinner());
+      return const [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: Center(child: AppSpinner()),
+          ),
+        ),
+      ];
     }
 
     if (_errorMessage != null && _eventsByDay.isEmpty) {
-      return ErrorStateView(
-        message: _errorMessage!,
-        onRetry: () => _loadEventsForMonth(_focusedDay),
-      );
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(d.md),
+            child: ErrorStateView(
+              message: _errorMessage!,
+              onRetry: () => _loadEventsForMonth(_focusedDay),
+            ),
+          ),
+        ),
+      ];
     }
 
     if (_selectedDay == null) {
-      return const EmptyStateView(
-        icon: LucideIcons.calendarDays,
-        title: 'Select a Day',
-        message: 'Tap any date to view events.',
-      );
+      return const [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: EmptyStateView(
+              icon: LucideIcons.calendarDays,
+              title: 'Select a Day',
+              message: 'Tap any date to view events.',
+            ),
+          ),
+        ),
+      ];
     }
 
     final events = _getEventsForDay(_selectedDay!);
 
     if (events.isEmpty) {
-      return const EmptyStateView(
-        icon: LucideIcons.calendarX2,
-        title: 'No events',
-        message: 'No events scheduled on this day.',
-      );
+      return const [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: EmptyStateView(
+              icon: LucideIcons.calendarX2,
+              title: 'No events',
+              message: 'No events scheduled on this day.',
+            ),
+          ),
+        ),
+      ];
     }
 
     final dayHeader = DateFormat('EEEE, MMMM d, yyyy').format(_selectedDay!);
 
-    return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: d.md, vertical: d.sm),
-      itemCount: events.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: EdgeInsets.only(bottom: d.sm),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    dayHeader,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: fg,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: d.md, vertical: d.sm),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  dayHeader,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? CalendarBwPalette.darkModeBorders
+                      : CalendarBwPalette.secondaryGray,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                  border: Border.all(
                     color: isDark
                         ? CalendarBwPalette.darkModeBorders
-                        : CalendarBwPalette.secondaryGray,
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    border: Border.all(
-                      color: isDark
-                          ? CalendarBwPalette.darkModeBorders
-                          : CalendarBwPalette.borders,
-                    ),
-                  ),
-                  child: Text(
-                    '${events.length} EVENT${events.length == 1 ? '' : 'S'}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: fg,
-                    ),
+                        : CalendarBwPalette.borders,
                   ),
                 ),
-              ],
-            ),
-          );
-        }
-
-        final e = events[index - 1];
-        return _BwEventCard(
-          event: e,
-          onTap: () => _openEventDetail(e),
-        );
-      },
-    );
+                child: Text(
+                  '${events.length} EVENT${events.length == 1 ? '' : 'S'}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: d.md),
+        sliver: SliverList.builder(
+          itemCount: events.length,
+          itemBuilder: (context, index) {
+            final e = events[index];
+            return _BwEventCard(
+              event: e,
+              onTap: () => _openEventDetail(e),
+            );
+          },
+        ),
+      ),
+    ];
   }
 }
 
@@ -886,7 +961,10 @@ class _BwEventCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Category & Status row
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           categoryLabel,
@@ -897,7 +975,6 @@ class _BwEventCard extends StatelessWidget {
                             color: CalendarBwPalette.mutedText,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
@@ -933,40 +1010,55 @@ class _BwEventCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     // Venue & Time
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (formattedTime.isNotEmpty) ...[
-                          const Icon(
-                            LucideIcons.clock,
-                            size: 13,
-                            color: CalendarBwPalette.mutedText,
+                        if (formattedTime.isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                LucideIcons.clock,
+                                size: 13,
+                                color: CalendarBwPalette.mutedText,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  formattedTime,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: CalendarBwPalette.mutedText,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            formattedTime,
-                            style: const TextStyle(
-                              fontSize: 12,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              LucideIcons.mapPin,
+                              size: 13,
                               color: CalendarBwPalette.mutedText,
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                        ],
-                        const Icon(
-                          LucideIcons.mapPin,
-                          size: 13,
-                          color: CalendarBwPalette.mutedText,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            event.venue,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: CalendarBwPalette.mutedText,
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                event.venue,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: CalendarBwPalette.mutedText,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          ],
                         ),
                       ],
                     ),
