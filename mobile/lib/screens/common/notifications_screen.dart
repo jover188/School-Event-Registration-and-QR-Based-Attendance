@@ -129,7 +129,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: AppColors.present,
+          backgroundColor: Color(0xFF09090B),
           content: Text('All notifications marked as read.'),
         ),
       );

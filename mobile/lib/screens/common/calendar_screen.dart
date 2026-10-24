@@ -6,30 +6,51 @@ import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_spinner.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
-import '../../core/widgets/event_card.dart';
 import '../../models/event_model.dart';
 import '../student/event_detail_screen.dart';
+import 'notifications_screen.dart';
 
-/// A shared event calendar screen available to all roles.
+/// Strict monochrome color palette for the Attendify Calendar.
+abstract final class CalendarBwPalette {
+  static const primaryBlack = Color(0xFF09090B);
+  static const darkSurfaces = Color(0xFF121214);
+  static const primaryWhite = Color(0xFFFFFFFF);
+  static const lightBackground = Color(0xFFFAFAFA);
+  static const secondaryGray = Color(0xFFF4F4F5);
+  static const borders = Color(0xFFE4E4E7);
+  static const mutedText = Color(0xFF71717A);
+  static const darkModeBorders = Color(0xFF27272A);
+  static const subtleDarkGray = Color(0xFFA1A1AA);
+}
+
+/// A shared black-and-white event calendar screen available to all roles.
 ///
 /// When [initialEvents] is provided, the widget skips all API calls and
 /// uses the supplied events directly. This is intended for widget-test
 /// injection.
 ///
 /// Set [embedded] to `true` when embedding this screen inside a parent
-/// scaffold; the widget will then render a plain [Column] instead of
-/// wrapping itself in [AppResponsivePage].
+/// scaffold; the widget will then adapt its root layout cleanly.
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key, this.embedded = false, this.initialEvents});
+  const CalendarScreen({
+    super.key,
+    this.embedded = false,
+    this.initialEvents,
+    this.initialUnreadNotifications,
+  });
 
   /// Whether the screen is embedded inside another scaffold.
   final bool embedded;
 
   /// Pre-loaded events for widget-test injection — skips API calls entirely.
   final List<EventModel>? initialEvents;
+
+  /// Pre-loaded unread notifications count for widget-test injection.
+  final int? initialUnreadNotifications;
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -43,6 +64,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   String _currentMonthKey = '';
+  int _unreadNotifications = 0;
 
   // ──────────────────────────────────────────────────────────────────────────
   // Lifecycle
@@ -51,6 +73,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
+    _unreadNotifications = widget.initialUnreadNotifications ?? 0;
     if (widget.initialEvents != null) {
       _bucketEvents(widget.initialEvents!);
       // Auto-select today when there are events on today's date.
@@ -61,11 +84,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _isLoading = false;
     } else {
       _loadEventsForMonth(_focusedDay);
+      _fetchUnreadNotifications();
     }
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Helpers
+  // Helpers & Data loading
   // ──────────────────────────────────────────────────────────────────────────
 
   DateTime _dayKey(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -80,9 +104,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Data loading
-  // ──────────────────────────────────────────────────────────────────────────
+  Future<void> _fetchUnreadNotifications() async {
+    try {
+      final res = await ApiClient().get(ApiConstants.notifications);
+      if (res.success && res.data is List && mounted) {
+        final unread = (res.data as List)
+            .where((n) => n is Map && (n['is_read'] != true && n['is_read'] != 1))
+            .length;
+        setState(() => _unreadNotifications = unread);
+      }
+    } catch (_) {}
+  }
 
   Future<void> _loadEventsForMonth(DateTime month) async {
     final monthKey =
@@ -149,6 +181,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _loadEventsForMonth(focusedDay);
   }
 
+  void _onPrevPage() {
+    setState(() {
+      if (_calendarFormat == CalendarFormat.month) {
+        _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
+      } else {
+        _focusedDay = _focusedDay.subtract(const Duration(days: 7));
+      }
+    });
+    _loadEventsForMonth(_focusedDay);
+  }
+
+  void _onNextPage() {
+    setState(() {
+      if (_calendarFormat == CalendarFormat.month) {
+        _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
+      } else {
+        _focusedDay = _focusedDay.add(const Duration(days: 7));
+      }
+    });
+    _loadEventsForMonth(_focusedDay);
+  }
+
   void _goToToday() {
     setState(() {
       _focusedDay = DateTime.now();
@@ -166,6 +220,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  Future<void> _openNotifications() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+    );
+    if (mounted && widget.initialEvents == null) {
+      _fetchUnreadNotifications();
+    }
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   // Build
   // ──────────────────────────────────────────────────────────────────────────
@@ -173,40 +237,258 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final d = context.design;
+    final isDark = d.isDark;
 
     final content = Column(
       children: [
-        // ── Header ──────────────────────────────────────────────────────────
-        Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: d.md,
-            vertical: d.sm,
+        // ── Branded App Header ──────────────────────────────────────────────
+        _buildAppHeader(context),
+
+        // ── Calendar Toolbar & View Selector ─────────────────────────────────
+        _buildCalendarToolbar(context),
+
+        // ── 7-Column Calendar Grid ──────────────────────────────────────────
+        _buildCalendarGrid(context),
+
+        // Divider
+        Divider(
+          height: 1,
+          color: isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.borders,
+        ),
+
+        // ── Event list for selected date ────────────────────────────────────
+        Expanded(child: _buildEventList(context)),
+      ],
+    );
+
+    if (widget.embedded) {
+      return Container(
+        color: isDark ? CalendarBwPalette.primaryBlack : CalendarBwPalette.lightBackground,
+        child: content,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: isDark ? CalendarBwPalette.primaryBlack : CalendarBwPalette.lightBackground,
+      body: SafeArea(
+        child: AppResponsivePage(
+          maxWidth: 1080,
+          child: content,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppHeader(BuildContext context) {
+    final d = context.design;
+    final isDark = d.isDark;
+    final fg = isDark ? CalendarBwPalette.primaryWhite : CalendarBwPalette.primaryBlack;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: d.md, vertical: d.sm),
+      decoration: BoxDecoration(
+        color: isDark ? CalendarBwPalette.darkSurfaces : CalendarBwPalette.primaryWhite,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.borders,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Attendify Logo mark badge
+          Container(
+            width: 34,
+            height: 34,
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: fg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Image.asset(
+              'assets/images/logo_mark.png',
+              fit: BoxFit.contain,
+              color: isDark ? CalendarBwPalette.primaryBlack : CalendarBwPalette.primaryWhite,
+              colorBlendMode: BlendMode.srcIn,
+              errorBuilder: (_, __, ___) => Icon(
+                LucideIcons.calendarDays,
+                color: isDark ? CalendarBwPalette.primaryBlack : CalendarBwPalette.primaryWhite,
+                size: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Attendify',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: fg,
+                  ),
+                ),
+                const Text(
+                  'Event Calendar • Browse campus events by schedule',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: CalendarBwPalette.mutedText,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          // Notification Bell with unread badge
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                key: const ValueKey('calendar-notifications-btn'),
+                icon: Icon(LucideIcons.bell, size: 20, color: fg),
+                tooltip: 'Notifications',
+                onPressed: _openNotifications,
+              ),
+              if (_unreadNotifications > 0)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    key: const ValueKey('calendar-notifications-badge'),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: fg,
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      border: Border.all(
+                        color: isDark
+                            ? CalendarBwPalette.darkSurfaces
+                            : CalendarBwPalette.primaryWhite,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      _unreadNotifications > 99 ? '99+' : '$_unreadNotifications',
+                      style: TextStyle(
+                        color: isDark
+                            ? CalendarBwPalette.primaryBlack
+                            : CalendarBwPalette.primaryWhite,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarToolbar(BuildContext context) {
+    final d = context.design;
+    final isDark = d.isDark;
+    final fg = isDark ? CalendarBwPalette.primaryWhite : CalendarBwPalette.primaryBlack;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: d.md, vertical: d.sm),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 460;
+
+          final monthNav = Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                key: const ValueKey('calendar-prev-btn'),
+                icon: Icon(LucideIcons.chevronLeft, size: 18, color: fg),
+                tooltip: 'Previous',
+                onPressed: _onPrevPage,
+              ),
               Text(
                 DateFormat('MMMM yyyy').format(_focusedDay),
-                style: d.sectionTitle,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
               ),
-              SizedBox(height: d.xs),
+              IconButton(
+                key: const ValueKey('calendar-next-btn'),
+                icon: Icon(LucideIcons.chevronRight, size: 18, color: fg),
+                tooltip: 'Next',
+                onPressed: _onNextPage,
+              ),
+            ],
+          );
+
+          final viewSelector = Container(
+            decoration: BoxDecoration(
+              color: isDark
+                  ? CalendarBwPalette.darkModeBorders
+                  : CalendarBwPalette.secondaryGray,
+              borderRadius: BorderRadius.circular(AppRadius.full),
+              border: Border.all(
+                color: isDark
+                    ? CalendarBwPalette.darkModeBorders
+                    : CalendarBwPalette.borders,
+              ),
+            ),
+            padding: const EdgeInsets.all(3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildViewTab(
+                  label: 'Month',
+                  isSelected: _calendarFormat == CalendarFormat.month,
+                  onTap: () => setState(() => _calendarFormat = CalendarFormat.month),
+                ),
+                _buildViewTab(
+                  label: 'Week',
+                  isSelected: _calendarFormat == CalendarFormat.week,
+                  onTap: () => setState(() => _calendarFormat = CalendarFormat.week),
+                ),
+              ],
+            ),
+          );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    monthNav,
+                    AppButton(
+                      variant: AppButtonVariant.outline,
+                      pill: true,
+                      label: 'Today',
+                      onPressed: _goToToday,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Center(child: viewSelector),
+              ],
+            );
+          }
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              monthNav,
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  AppButton(
-                    variant: AppButtonVariant.ghost,
-                    label: 'Week',
-                    onPressed: () =>
-                        setState(() => _calendarFormat = CalendarFormat.week),
-                  ),
-                  AppButton(
-                    variant: AppButtonVariant.ghost,
-                    label: 'Month',
-                    onPressed: () =>
-                        setState(() => _calendarFormat = CalendarFormat.month),
-                  ),
-                  const Spacer(),
+                  viewSelector,
+                  const SizedBox(width: 8),
                   AppButton(
                     variant: AppButtonVariant.outline,
                     pill: true,
@@ -216,69 +498,146 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ],
               ),
             ],
-          ),
-        ),
-
-        // ── Calendar grid ───────────────────────────────────────────────────
-        Container(
-          color: d.card,
-          child: TableCalendar<EventModel>(
-            firstDay: DateTime(2020, 1, 1),
-            lastDay: DateTime(2030, 12, 31),
-            focusedDay: _focusedDay,
-            calendarFormat: _calendarFormat,
-            selectedDayPredicate: (day) => isSameDay(day, _selectedDay),
-            eventLoader: _getEventsForDay,
-            onDaySelected: _onDaySelected,
-            onFormatChanged: _onFormatChanged,
-            onPageChanged: _onPageChanged,
-            headerVisible: false,
-            calendarStyle: CalendarStyle(
-              outsideDaysVisible: false,
-              selectedDecoration: BoxDecoration(
-                color: d.primary,
-                shape: BoxShape.circle,
-              ),
-              todayDecoration: BoxDecoration(
-                border: Border.all(color: d.primary, width: 1.5),
-                shape: BoxShape.circle,
-              ),
-              todayTextStyle: d.supporting.copyWith(
-                color: d.primary,
-                fontWeight: FontWeight.w700,
-              ),
-              selectedTextStyle: d.supporting.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-              markerDecoration: BoxDecoration(
-                color: d.success,
-                shape: BoxShape.circle,
-              ),
-              markersMaxCount: 3,
-            ),
-            daysOfWeekStyle: DaysOfWeekStyle(
-              weekdayStyle: d.badge,
-              weekendStyle: d.badge,
-            ),
-          ),
-        ),
-
-        Divider(color: d.border),
-
-        // ── Event list for selected day ──────────────────────────────────────
-        Expanded(child: _buildEventList(context)),
-      ],
+          );
+        },
+      ),
     );
+  }
 
-    if (widget.embedded) return content;
+  Widget _buildViewTab({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final d = context.design;
+    final isDark = d.isDark;
+    final bg = isSelected
+        ? (isDark ? CalendarBwPalette.primaryWhite : CalendarBwPalette.primaryBlack)
+        : Colors.transparent;
+    final fg = isSelected
+        ? (isDark ? CalendarBwPalette.primaryBlack : CalendarBwPalette.primaryWhite)
+        : CalendarBwPalette.mutedText;
 
-    return Scaffold(
-      body: AppResponsivePage(child: content),
+    return AppPressable(
+      onPressed: onTap,
+      semanticLabel: '$label view',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: fg,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalendarGrid(BuildContext context) {
+    final d = context.design;
+    final isDark = d.isDark;
+    final fg = isDark ? CalendarBwPalette.primaryWhite : CalendarBwPalette.primaryBlack;
+    final cardBg = isDark ? CalendarBwPalette.darkSurfaces : CalendarBwPalette.primaryWhite;
+    final cardBorder = isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.borders;
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: d.md),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: CalendarBwPalette.primaryBlack.withValues(alpha: 0.03),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: TableCalendar<EventModel>(
+        firstDay: DateTime(2020, 1, 1),
+        lastDay: DateTime(2030, 12, 31),
+        focusedDay: _focusedDay,
+        calendarFormat: _calendarFormat,
+        selectedDayPredicate: (day) => isSameDay(day, _selectedDay),
+        eventLoader: _getEventsForDay,
+        onDaySelected: _onDaySelected,
+        onFormatChanged: _onFormatChanged,
+        onPageChanged: _onPageChanged,
+        headerVisible: false,
+        startingDayOfWeek: StartingDayOfWeek.monday,
+        daysOfWeekHeight: 28,
+        calendarStyle: CalendarStyle(
+          outsideDaysVisible: false,
+          defaultTextStyle: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: fg,
+          ),
+          weekendTextStyle: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: fg,
+          ),
+          selectedDecoration: BoxDecoration(
+            color: fg,
+            shape: BoxShape.circle,
+          ),
+          selectedTextStyle: TextStyle(
+            color: isDark ? CalendarBwPalette.primaryBlack : CalendarBwPalette.primaryWhite,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+          todayDecoration: BoxDecoration(
+            border: Border.all(color: fg, width: 1.5),
+            shape: BoxShape.circle,
+          ),
+          todayTextStyle: TextStyle(
+            color: fg,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+          markerDecoration: BoxDecoration(
+            color: fg,
+            shape: BoxShape.circle,
+          ),
+          markerSize: 5,
+          markerMargin: const EdgeInsets.symmetric(horizontal: 1.2),
+          markersMaxCount: 3,
+          markersAlignment: Alignment.bottomCenter,
+        ),
+        daysOfWeekStyle: DaysOfWeekStyle(
+          dowTextFormatter: (date, locale) =>
+              DateFormat.E(locale).format(date).toUpperCase(),
+          weekdayStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: CalendarBwPalette.mutedText,
+            letterSpacing: 0.5,
+          ),
+          weekendStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: CalendarBwPalette.mutedText,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildEventList(BuildContext context) {
+    final d = context.design;
+    final isDark = d.isDark;
+    final fg = isDark ? CalendarBwPalette.primaryWhite : CalendarBwPalette.primaryBlack;
+
     if (_isLoading && _eventsByDay.isEmpty) {
       return const Center(child: AppSpinner());
     }
@@ -308,18 +667,346 @@ class _CalendarScreenState extends State<CalendarScreen> {
       );
     }
 
+    final dayHeader = DateFormat('EEEE, MMMM d, yyyy').format(_selectedDay!);
+
     return ListView.builder(
-      padding: EdgeInsets.all(context.design.md),
-      itemCount: events.length,
+      padding: EdgeInsets.symmetric(horizontal: d.md, vertical: d.sm),
+      itemCount: events.length + 1,
       itemBuilder: (context, index) {
-        final e = events[index];
-        return EventCard(
+        if (index == 0) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: d.sm),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    dayHeader,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? CalendarBwPalette.darkModeBorders
+                        : CalendarBwPalette.secondaryGray,
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    border: Border.all(
+                      color: isDark
+                          ? CalendarBwPalette.darkModeBorders
+                          : CalendarBwPalette.borders,
+                    ),
+                  ),
+                  child: Text(
+                    '${events.length} EVENT${events.length == 1 ? '' : 'S'}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final e = events[index - 1];
+        return _BwEventCard(
           event: e,
-          showEventStatusBadge: true,
-          showCapacity: true,
           onTap: () => _openEventDetail(e),
         );
       },
+    );
+  }
+}
+
+/// Strictly black-and-white event card with monochrome category icon, status pill,
+/// location, time, and chevron navigation indicator.
+class _BwEventCard extends StatelessWidget {
+  final EventModel event;
+  final VoidCallback onTap;
+
+  const _BwEventCard({
+    required this.event,
+    required this.onTap,
+  });
+
+  static IconData _categoryIconForEvent(EventModel event) {
+    final text = '${event.title} ${event.description} ${event.venue}'.toLowerCase();
+    if (text.contains('workshop') ||
+        text.contains('training') ||
+        text.contains('build') ||
+        text.contains('lab')) {
+      return LucideIcons.wrench;
+    }
+    if (text.contains('academic') ||
+        text.contains('lecture') ||
+        text.contains('exam') ||
+        text.contains('class') ||
+        text.contains('summit') ||
+        text.contains('symposium')) {
+      return LucideIcons.graduationCap;
+    }
+    if (text.contains('tech') ||
+        text.contains('code') ||
+        text.contains('hackathon') ||
+        text.contains('dev') ||
+        text.contains('computer')) {
+      return LucideIcons.laptop;
+    }
+    if (text.contains('sport') ||
+        text.contains('tournament') ||
+        text.contains('match') ||
+        text.contains('game') ||
+        text.contains('championship')) {
+      return LucideIcons.trophy;
+    }
+    if (text.contains('art') ||
+        text.contains('culture') ||
+        text.contains('music') ||
+        text.contains('dance') ||
+        text.contains('concert') ||
+        text.contains('festival')) {
+      return LucideIcons.palette;
+    }
+    if (text.contains('club') ||
+        text.contains('meetup') ||
+        text.contains('social') ||
+        text.contains('assembly') ||
+        text.contains('fair')) {
+      return LucideIcons.users;
+    }
+    return LucideIcons.calendarDays;
+  }
+
+  static String _categoryLabelForEvent(EventModel event) {
+    final text = '${event.title} ${event.description} ${event.venue}'.toLowerCase();
+    if (text.contains('workshop') || text.contains('training')) {
+      return 'WORKSHOP';
+    }
+    if (text.contains('academic') ||
+        text.contains('lecture') ||
+        text.contains('summit') ||
+        text.contains('symposium')) {
+      return 'ACADEMIC';
+    }
+    if (text.contains('tech') || text.contains('hackathon')) {
+      return 'TECH';
+    }
+    if (text.contains('sport') || text.contains('tournament')) {
+      return 'SPORTS';
+    }
+    if (text.contains('art') || text.contains('music') || text.contains('festival')) {
+      return 'ARTS & CULTURE';
+    }
+    if (text.contains('club') || text.contains('social')) {
+      return 'COMMUNITY';
+    }
+    return 'EVENT';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    final isDark = d.isDark;
+    final cardBg = isDark ? CalendarBwPalette.darkSurfaces : CalendarBwPalette.primaryWhite;
+    final cardBorder = isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.borders;
+    final iconBg = isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.secondaryGray;
+    final primaryColor = isDark ? CalendarBwPalette.primaryWhite : CalendarBwPalette.primaryBlack;
+    final badgeBg = isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.secondaryGray;
+
+    final icon = _categoryIconForEvent(event);
+    final categoryLabel = _categoryLabelForEvent(event);
+    final statusText = event.status.replaceAll('_', ' ').toUpperCase();
+
+    final maxCap = event.maxParticipants;
+    final registered = event.currentRegisteredCount;
+    final progress = (maxCap != null && maxCap > 0)
+        ? (registered / maxCap).clamp(0.0, 1.0)
+        : null;
+
+    final formattedTime = event.startTime.isNotEmpty
+        ? (event.endTime.isNotEmpty
+            ? '${event.startTime.length >= 5 ? event.startTime.substring(0, 5) : event.startTime} - ${event.endTime.length >= 5 ? event.endTime.substring(0, 5) : event.endTime}'
+            : event.startTime)
+        : '';
+
+    return Container(
+      margin: EdgeInsets.only(bottom: d.sm + 4),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cardBorder, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: CalendarBwPalette.primaryBlack.withValues(alpha: 0.03),
+            offset: const Offset(0, 2),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: AppPressable(
+        onPressed: onTap,
+        semanticLabel: '${event.title}, $categoryLabel, ${event.venue}',
+        child: Padding(
+          padding: EdgeInsets.all(d.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Monochrome category icon badge
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: cardBorder),
+                ),
+                child: Center(
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: primaryColor,
+                  ),
+                ),
+              ),
+              SizedBox(width: d.md),
+              // Event info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Category & Status row
+                    Row(
+                      children: [
+                        Text(
+                          categoryLabel,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: CalendarBwPalette.mutedText,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: badgeBg,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                            border: Border.all(color: cardBorder),
+                          ),
+                          child: Text(
+                            statusText,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Title
+                    Text(
+                      event.title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: primaryColor,
+                        height: 1.25,
+                      ),
+                      softWrap: true,
+                    ),
+                    const SizedBox(height: 6),
+                    // Venue & Time
+                    Row(
+                      children: [
+                        if (formattedTime.isNotEmpty) ...[
+                          const Icon(
+                            LucideIcons.clock,
+                            size: 13,
+                            color: CalendarBwPalette.mutedText,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            formattedTime,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: CalendarBwPalette.mutedText,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        const Icon(
+                          LucideIcons.mapPin,
+                          size: 13,
+                          color: CalendarBwPalette.mutedText,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            event.venue,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: CalendarBwPalette.mutedText,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (progress != null) ...[
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 4,
+                          backgroundColor: iconBg,
+                          color: primaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Capacity: $registered / $maxCap',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: CalendarBwPalette.mutedText,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              // Chevron indicator
+              const Padding(
+                padding: EdgeInsets.only(top: 10, left: 6),
+                child: Icon(
+                  LucideIcons.chevronRight,
+                  size: 18,
+                  color: CalendarBwPalette.mutedText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

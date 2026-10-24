@@ -1,5 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/intl.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:school_event_attendance/models/event_model.dart';
 import 'package:school_event_attendance/screens/common/calendar_screen.dart';
 import '../support/app_test_host.dart';
@@ -9,17 +10,20 @@ EventModel _makeEvent({
   String title = 'Test Event',
   String? eventDate,
   String status = 'published',
+  String venue = 'Main Hall',
+  String description = 'A test description.',
 }) {
   final date = eventDate ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
   return EventModel(
     id: id,
     title: title,
-    description: 'A test description.',
-    venue: 'Test Hall',
+    description: description,
+    venue: venue,
     eventDate: date,
     startTime: '09:00:00',
     endTime: '17:00:00',
-    currentRegisteredCount: 0,
+    currentRegisteredCount: 15,
+    maxParticipants: 50,
     lateGracePeriodMinutes: 15,
     walkInAllowed: false,
     status: status,
@@ -40,6 +44,7 @@ void main() {
     final monthName = DateFormat('MMMM').format(DateTime.now());
     expect(find.textContaining(monthName), findsAtLeastNWidgets(1));
     expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Attendify'), findsOneWidget);
   });
 
   // 2. Empty state when no day is selected on load
@@ -101,5 +106,78 @@ void main() {
 
     final monthName = DateFormat('MMMM').format(DateTime.now());
     expect(find.textContaining(monthName), findsAtLeastNWidgets(1));
+  });
+
+  // 6. Monochrome category badge, status pill, and chevron render on event card
+  testWidgets('CalendarScreen renders monochrome category badge and chevron on event card',
+      (tester) async {
+    final today = DateTime.now();
+    final event = _makeEvent(
+      title: 'Hackathon Workshop',
+      description: 'Tech coding workshop for students.',
+      venue: 'Lab 3',
+      status: 'published',
+      eventDate: DateFormat('yyyy-MM-dd').format(today),
+    );
+
+    await tester.pumpWidget(
+      AppTestHost(child: CalendarScreen(initialEvents: [event])),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hackathon Workshop'), findsOneWidget);
+    expect(find.text('PUBLISHED'), findsOneWidget);
+    expect(find.text('WORKSHOP'), findsOneWidget);
+    expect(find.byIcon(LucideIcons.chevronRight), findsAtLeastNWidgets(1));
+    expect(find.byIcon(LucideIcons.wrench), findsOneWidget);
+    expect(find.text('Capacity: 15 / 50'), findsOneWidget);
+  });
+
+  // 7. Navigation controls: Next and Previous month buttons work
+  testWidgets('CalendarScreen navigation previous and next buttons advance month',
+      (tester) async {
+    await tester.pumpWidget(
+      const AppTestHost(child: CalendarScreen(initialEvents: [])),
+    );
+    await tester.pumpAndSettle();
+
+    // Tap next month
+    await tester.tap(find.byKey(const ValueKey('calendar-next-btn')));
+    await tester.pumpAndSettle();
+
+    final nextMonth = DateTime.now().add(const Duration(days: 35));
+    final nextMonthName = DateFormat('MMMM').format(nextMonth);
+    expect(find.textContaining(nextMonthName), findsAtLeastNWidgets(1));
+
+    // Tap previous month back
+    await tester.tap(find.byKey(const ValueKey('calendar-prev-btn')));
+    await tester.pumpAndSettle();
+
+    final currentMonthName = DateFormat('MMMM').format(DateTime.now());
+    expect(find.textContaining(currentMonthName), findsAtLeastNWidgets(1));
+  });
+
+  // 8. Notification badge displays unread count
+  testWidgets('CalendarScreen renders unread notification badge when unread count > 0',
+      (tester) async {
+    await tester.pumpWidget(
+      const AppTestHost(
+        child: CalendarScreen(
+          initialEvents: [],
+          initialUnreadNotifications: 5,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('calendar-notifications-badge')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('calendar-notifications-badge')),
+        matching: find.text('5'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('calendar-notifications-btn')), findsOneWidget);
   });
 }
