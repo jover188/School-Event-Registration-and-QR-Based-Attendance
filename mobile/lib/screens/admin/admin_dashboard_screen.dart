@@ -615,8 +615,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       selectedId: _selectedDestinationId,
       onDestinationSelected: _selectDestination,
       actions: [
-        IconButton(
-          icon: const Icon(LucideIcons.bell, size: 20),
+        AppIconButton(
+          icon: LucideIcons.bell,
           tooltip: 'Notifications',
           onPressed: () {
             Navigator.push(
@@ -625,8 +625,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             );
           },
         ),
-        IconButton(
-          icon: const Icon(LucideIcons.refreshCw, size: 18),
+        AppIconButton(
+          icon: LucideIcons.refreshCw,
           tooltip: 'Refresh Console',
           onPressed: _isLoading ? null : _fetchAdminData,
         ),

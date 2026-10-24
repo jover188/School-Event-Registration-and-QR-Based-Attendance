@@ -27,6 +27,7 @@ class SectionHeader extends StatelessWidget {
     final trailingWidget = trailing ??
         (actionLabel != null && onAction != null
             ? AppButton(
+                size: AppButtonSize.compact,
                 variant: AppButtonVariant.ghost,
                 onPressed: onAction,
                 label: actionLabel!,

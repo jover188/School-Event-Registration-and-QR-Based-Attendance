@@ -482,6 +482,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         onPressed:
                                             _isLoading ? null : _handleLogin,
                                         isLoading: _isLoading,
+                                        isFullWidth: true,
+                                        height: d.authButtonHeight,
                                         pill: true,
                                         backgroundColor: d.authDark,
                                         foregroundColor: d.authLight,

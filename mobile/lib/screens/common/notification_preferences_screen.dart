@@ -126,9 +126,9 @@ class _NotificationPreferencesScreenState
       title: 'Notification Preferences',
       maxWidth: 720,
       actions: [
-        IconButton(
+        AppIconButton(
           tooltip: 'Refresh Preferences',
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
+          icon: LucideIcons.refreshCw,
           onPressed: _isLoading ? null : _fetchPreferences,
         ),
       ],

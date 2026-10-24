@@ -147,15 +147,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       actions: [
         if (unread > 0)
           AppButton(
-            variant: AppButtonVariant.ghost,
-            pill: true,
+            size: AppButtonSize.compact,
+            variant: AppButtonVariant.secondary,
             icon: LucideIcons.checkCheck,
             onPressed: _markAllRead,
             label: 'Mark All Read',
           ),
-        IconButton(
+        AppIconButton(
           tooltip: 'Notification Preferences',
-          icon: const Icon(LucideIcons.settings, size: 20),
+          icon: LucideIcons.settings,
           onPressed: () {
             Navigator.push(
               context,

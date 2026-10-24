@@ -511,8 +511,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   children: [
                     monthNav,
                     AppButton(
+                      size: AppButtonSize.compact,
                       variant: AppButtonVariant.outline,
-                      pill: true,
                       label: 'Today',
                       onPressed: _goToToday,
                     ),
@@ -534,8 +534,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   viewSelector,
                   const SizedBox(width: 8),
                   AppButton(
+                    size: AppButtonSize.compact,
                     variant: AppButtonVariant.outline,
-                    pill: true,
                     label: 'Today',
                     onPressed: _goToToday,
                   ),

@@ -106,17 +106,24 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
           'Reissuing will immediately and permanently revoke your current QR code. You will need to present the new QR code at all future events.\n\nAre you sure you want to proceed?',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: d.destructive,
-              foregroundColor: d.destructiveForeground,
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Reissue Now'),
+          Wrap(
+            spacing: d.sm,
+            runSpacing: d.sm,
+            alignment: WrapAlignment.end,
+            children: [
+              AppButton(
+                size: AppButtonSize.compact,
+                variant: AppButtonVariant.ghost,
+                onPressed: () => Navigator.pop(dialogContext, false),
+                label: 'Cancel',
+              ),
+              AppButton(
+                size: AppButtonSize.compact,
+                variant: AppButtonVariant.destructive,
+                onPressed: () => Navigator.pop(dialogContext, true),
+                label: 'Reissue Now',
+              ),
+            ],
           ),
         ],
       ),
@@ -171,9 +178,9 @@ class _PermanentQrScreenState extends State<PermanentQrScreen> {
       embedded: widget.embedded,
       maxWidth: 640,
       actions: [
-        IconButton(
+        AppIconButton(
           tooltip: 'Refresh QR Code',
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
+          icon: LucideIcons.refreshCw,
           onPressed: (_isLoading || _isReissuing) ? null : _fetchQrData,
         ),
       ],

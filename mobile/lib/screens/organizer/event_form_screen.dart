@@ -1143,18 +1143,24 @@ class _RequestCancellationDialogState
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Back'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: d.destructive,
-            foregroundColor: Colors.white,
-            shape: const StadiumBorder(),
-          ),
-          onPressed: _submit,
-          child: const Text('Submit Request'),
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.sm,
+          alignment: WrapAlignment.end,
+          children: [
+            AppButton(
+              size: AppButtonSize.compact,
+              variant: AppButtonVariant.ghost,
+              onPressed: () => Navigator.pop(context),
+              label: 'Back',
+            ),
+            AppButton(
+              size: AppButtonSize.compact,
+              variant: AppButtonVariant.destructive,
+              onPressed: _submit,
+              label: 'Submit Request',
+            ),
+          ],
         ),
       ],
     );

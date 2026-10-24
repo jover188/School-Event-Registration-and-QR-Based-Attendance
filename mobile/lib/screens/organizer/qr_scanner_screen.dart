@@ -477,20 +477,20 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       title: 'QR Scanner — ${widget.event.title}',
       actions: [
         if (_shouldMountCamera && _scannerController != null) ...[
-          IconButton(
+          AppIconButton(
             tooltip: 'Toggle Flash',
-            icon: const Icon(LucideIcons.zap, size: 20),
+            icon: LucideIcons.zap,
             onPressed: () => _scannerController?.toggleTorch(),
           ),
-          IconButton(
+          AppIconButton(
             tooltip: 'Switch Camera',
-            icon: const Icon(LucideIcons.switchCamera, size: 20),
+            icon: LucideIcons.switchCamera,
             onPressed: () => _scannerController?.switchCamera(),
           ),
         ],
-        IconButton(
+        AppIconButton(
           tooltip: 'Attendance Records',
-          icon: const Icon(LucideIcons.clipboardCheck, size: 20),
+          icon: LucideIcons.clipboardCheck,
           onPressed: _openAttendance,
         ),
       ],

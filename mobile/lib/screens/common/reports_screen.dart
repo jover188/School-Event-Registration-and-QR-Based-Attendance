@@ -447,7 +447,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           actions: [
             AppButton(
-              pill: true,
+              size: AppButtonSize.compact,
               variant: AppButtonVariant.primary,
               label: 'Close',
               onPressed: () => Navigator.of(ctx).pop(),
@@ -605,9 +605,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       title: 'Attendance & Event Reports',
       embedded: widget.embedded,
       actions: [
-        IconButton(
+        AppIconButton(
           tooltip: 'Refresh Report',
-          icon: const Icon(LucideIcons.refreshCw, size: 18),
+          icon: LucideIcons.refreshCw,
           onPressed: _isLoadingReport ? null : _generateReport,
         ),
       ],
@@ -793,7 +793,7 @@ class _ReportExportButtonsCard extends StatelessWidget {
                 AppButton(
                   key: const ValueKey<String>('export-csv-button'),
                   pill: true,
-                  variant: AppButtonVariant.outline,
+                  variant: AppButtonVariant.secondary,
                   onPressed: isExporting ? null : onExportCsv,
                   icon: LucideIcons.fileSpreadsheet,
                   label: 'Export CSV',
@@ -801,7 +801,7 @@ class _ReportExportButtonsCard extends StatelessWidget {
                 AppButton(
                   key: const ValueKey<String>('export-excel-button'),
                   pill: true,
-                  variant: AppButtonVariant.outline,
+                  variant: AppButtonVariant.secondary,
                   onPressed: isExporting ? null : onExportExcel,
                   icon: LucideIcons.table,
                   label: 'Export XLSX',
@@ -810,7 +810,7 @@ class _ReportExportButtonsCard extends StatelessWidget {
                   AppButton(
                     key: const ValueKey<String>('export-pdf-button'),
                     pill: true,
-                    variant: AppButtonVariant.outline,
+                    variant: AppButtonVariant.secondary,
                     onPressed: isExporting ? null : onExportPdf,
                     icon: LucideIcons.fileText,
                     label: 'Export PDF',

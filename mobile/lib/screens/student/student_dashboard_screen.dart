@@ -251,8 +251,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     }
     if (event.isRegistered) {
       return AppButton(
+        size: AppButtonSize.compact,
         variant: AppButtonVariant.outline,
-        pill: true,
         onPressed: () => _openEventDetail(event),
         label: 'Manage Registration',
       );
@@ -265,16 +265,16 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     }
     if (isFull) {
       return AppButton(
+        size: AppButtonSize.compact,
         variant: AppButtonVariant.outline,
-        pill: true,
         icon: LucideIcons.listOrdered,
         onPressed: () => _openEventDetail(event),
         label: 'Join Waiting List',
       );
     }
     return AppButton(
+      size: AppButtonSize.compact,
       variant: AppButtonVariant.ghost,
-      pill: true,
       onPressed: () => _openEventDetail(event),
       label: 'View Event',
     );
@@ -332,8 +332,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                             ],
                           ),
                           AppButton(
+                            size: AppButtonSize.compact,
                             variant: AppButtonVariant.outline,
-                            pill: true,
                             icon: LucideIcons.refreshCw,
                             onPressed: _fetchEvents,
                             label: 'Retry',

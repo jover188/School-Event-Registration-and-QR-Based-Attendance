@@ -159,6 +159,7 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
 
     final student = (reg['student'] as Map<String, dynamic>?) ?? {};
     final fullName = _resolveStudentName(student);
+    final d = context.design;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -168,14 +169,24 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
           'Cancel registration for $fullName? If this student holds an active slot, the next waiting-list student will be automatically promoted.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep Registration'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.absent),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cancel Registration'),
+          Wrap(
+            spacing: d.sm,
+            runSpacing: d.sm,
+            alignment: WrapAlignment.end,
+            children: [
+              AppButton(
+                size: AppButtonSize.compact,
+                variant: AppButtonVariant.ghost,
+                onPressed: () => Navigator.pop(ctx, false),
+                label: 'Keep Registration',
+              ),
+              AppButton(
+                size: AppButtonSize.compact,
+                variant: AppButtonVariant.destructive,
+                onPressed: () => Navigator.pop(ctx, true),
+                label: 'Cancel Registration',
+              ),
+            ],
           ),
         ],
       ),
@@ -228,9 +239,9 @@ class _EventRegistrationsScreenState extends State<EventRegistrationsScreen> {
     return AppPageScaffold(
       title: 'Registrations — ${widget.eventTitle}',
       actions: [
-        IconButton(
+        AppIconButton(
           tooltip: 'Refresh Registrations',
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
+          icon: LucideIcons.refreshCw,
           onPressed: _isLoading ? null : _fetchRegistrations,
         ),
       ],
@@ -550,8 +561,8 @@ class _RegistrationItemCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: AppButton(
                 key: ValueKey<String>('cancel-registration-$regId'),
+                size: AppButtonSize.compact,
                 variant: AppButtonVariant.destructive,
-                pill: true,
                 icon: LucideIcons.userX,
                 label: 'Cancel Registration',
                 onPressed: onCancel,

@@ -113,17 +113,24 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
           'Are you sure you want to cancel your registration for "$eventTitle"? If you hold a confirmed slot, the next student on the waiting list will be automatically promoted.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep Slot'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: d.destructive,
-              foregroundColor: d.destructiveForeground,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cancel Registration'),
+          Wrap(
+            spacing: d.sm,
+            runSpacing: d.sm,
+            alignment: WrapAlignment.end,
+            children: [
+              AppButton(
+                size: AppButtonSize.compact,
+                variant: AppButtonVariant.ghost,
+                onPressed: () => Navigator.pop(ctx, false),
+                label: 'Keep Slot',
+              ),
+              AppButton(
+                size: AppButtonSize.compact,
+                variant: AppButtonVariant.destructive,
+                onPressed: () => Navigator.pop(ctx, true),
+                label: 'Cancel Registration',
+              ),
+            ],
           ),
         ],
       ),
@@ -167,9 +174,9 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
       title: 'My Registrations',
       embedded: widget.embedded,
       actions: [
-        IconButton(
+        AppIconButton(
           tooltip: 'Refresh Registrations',
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
+          icon: LucideIcons.refreshCw,
           onPressed: _isLoading ? null : _fetchRegistrations,
         ),
       ],

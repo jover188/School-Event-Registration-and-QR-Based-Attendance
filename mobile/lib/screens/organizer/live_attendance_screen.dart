@@ -300,14 +300,14 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
       title: 'Attendance — ${widget.eventTitle}',
       actions: [
         if (widget.canCorrect)
-          IconButton(
+          AppIconButton(
             tooltip: 'Mark Student Attendance',
-            icon: const Icon(LucideIcons.userPlus, size: 20),
+            icon: LucideIcons.userPlus,
             onPressed: _openMarkAttendanceDialog,
           ),
-        IconButton(
+        AppIconButton(
           tooltip: 'Refresh Attendance',
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
+          icon: LucideIcons.refreshCw,
           onPressed: _isLoading ? null : _fetchAttendance,
         ),
       ],
@@ -318,6 +318,7 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
               backgroundColor: d.primary,
               foregroundColor: d.primaryForeground,
               icon: const Icon(LucideIcons.clipboardCheck, size: 20),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.buttonRadiusStandard)),
               label: const Text('Mark Attendance'),
             )
           : null,
@@ -646,8 +647,8 @@ class _AttendanceRecordCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: AppButton(
                 key: ValueKey<String>('correct-attendance-$recordId'),
+                size: AppButtonSize.compact,
                 variant: AppButtonVariant.outline,
-                pill: true,
                 icon: LucideIcons.pencilLine,
                 label: 'Correct Attendance Status',
                 onPressed: onCorrect,
@@ -811,18 +812,24 @@ class _CorrectAttendanceDialogState extends State<_CorrectAttendanceDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: d.authDark,
-            foregroundColor: d.isDark ? Colors.black : Colors.white,
-            shape: const StadiumBorder(),
-          ),
-          onPressed: _submit,
-          child: const Text('Save Correction'),
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.sm,
+          alignment: WrapAlignment.end,
+          children: [
+            AppButton(
+              size: AppButtonSize.compact,
+              variant: AppButtonVariant.ghost,
+              onPressed: () => Navigator.pop(context),
+              label: 'Cancel',
+            ),
+            AppButton(
+              size: AppButtonSize.compact,
+              variant: AppButtonVariant.primary,
+              onPressed: _submit,
+              label: 'Save Correction',
+            ),
+          ],
         ),
       ],
     );
@@ -1008,18 +1015,24 @@ class _MarkAttendanceDialogState extends State<_MarkAttendanceDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: d.authDark,
-            foregroundColor: d.isDark ? Colors.black : Colors.white,
-            shape: const StadiumBorder(),
-          ),
-          onPressed: _submit,
-          child: const Text('Mark Attendance'),
+        Wrap(
+          spacing: d.sm,
+          runSpacing: d.sm,
+          alignment: WrapAlignment.end,
+          children: [
+            AppButton(
+              size: AppButtonSize.compact,
+              variant: AppButtonVariant.ghost,
+              onPressed: () => Navigator.pop(context),
+              label: 'Cancel',
+            ),
+            AppButton(
+              size: AppButtonSize.compact,
+              variant: AppButtonVariant.primary,
+              onPressed: _submit,
+              label: 'Mark Attendance',
+            ),
+          ],
         ),
       ],
     );

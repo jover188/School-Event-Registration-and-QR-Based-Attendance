@@ -300,6 +300,20 @@ class AppDesignTokens extends ThemeExtension<AppDesignTokens> {
   bool get isDark => background == AppPalette.darkBackground;
   double get radiusPill => 999;
   double get minimumTarget => 48;
+
+  // Mobile-Friendly Button Design Tokens
+  double get buttonHeightCompact => 34;
+  double get buttonHeightStandard => 40;
+  double get buttonHeightLarge => 46;
+  double get buttonRadiusStandard => 10;
+  double get buttonRadiusCompact => 8;
+  double get buttonPaddingHorizontalCompact => 10;
+  double get buttonPaddingHorizontalStandard => 14;
+  double get buttonPaddingHorizontalLarge => 18;
+  double get buttonIconSpacing => 6;
+  double get buttonIconSizeCompact => 14;
+  double get buttonIconSizeStandard => 16;
+  double get buttonIconSizeLarge => 18;
   double get compactBreakpoint => 600;
   double get expandedBreakpoint => 1024;
   double get railWidth => 88;

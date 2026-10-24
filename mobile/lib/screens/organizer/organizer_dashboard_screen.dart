@@ -435,8 +435,8 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       onDestinationSelected: (id) =>
           setState(() => _selectedDestinationId = id),
       actions: [
-        IconButton(
-          icon: const Icon(LucideIcons.bell, size: 20),
+        AppIconButton(
+          icon: LucideIcons.bell,
           tooltip: 'Notifications',
           onPressed: () {
             Navigator.push(
@@ -445,8 +445,8 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
             );
           },
         ),
-        IconButton(
-          icon: const Icon(LucideIcons.user, size: 20),
+        AppIconButton(
+          icon: LucideIcons.user,
           tooltip: 'My Profile',
           onPressed: () {
             Navigator.push(
@@ -455,13 +455,13 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
             );
           },
         ),
-        IconButton(
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
+        AppIconButton(
+          icon: LucideIcons.refreshCw,
           tooltip: 'Refresh Dashboard',
           onPressed: _isLoading ? null : _fetchDashboardData,
         ),
-        IconButton(
-          icon: const Icon(LucideIcons.logOut, size: 20),
+        AppIconButton(
+          icon: LucideIcons.logOut,
           tooltip: 'Logout',
           onPressed: _logout,
         ),

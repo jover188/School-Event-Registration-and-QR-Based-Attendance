@@ -160,17 +160,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           'Are you sure you want to cancel your registration for this event? Your slot will be given to the next student on the waiting list.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep Registration'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: d.destructive,
-              foregroundColor: d.destructiveForeground,
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Cancel Slot'),
+          Wrap(
+            spacing: d.sm,
+            runSpacing: d.sm,
+            alignment: WrapAlignment.end,
+            children: [
+              AppButton(
+                size: AppButtonSize.compact,
+                variant: AppButtonVariant.ghost,
+                onPressed: () => Navigator.pop(dialogContext, false),
+                label: 'Keep Registration',
+              ),
+              AppButton(
+                size: AppButtonSize.compact,
+                variant: AppButtonVariant.destructive,
+                onPressed: () => Navigator.pop(dialogContext, true),
+                label: 'Cancel Slot',
+              ),
+            ],
           ),
         ],
       ),
@@ -443,9 +450,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     return AppPageScaffold(
       title: event?.title ?? 'Event Details',
       actions: [
-        IconButton(
+        AppIconButton(
           tooltip: 'Refresh Event Details',
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
+          icon: LucideIcons.refreshCw,
           onPressed: (_isLoading || _isSubmitting) ? null : _refreshEventDetails,
         ),
       ],

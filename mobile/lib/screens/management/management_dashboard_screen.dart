@@ -254,8 +254,8 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
 
           final actionBtn = AppButton(
             key: const ValueKey<String>('overview-open-reports-button'),
+            size: AppButtonSize.compact,
             variant: AppButtonVariant.ghost,
-            pill: true,
             icon: LucideIcons.barChart2,
             label: 'Open Reports',
             onPressed: () => _openReports(),
@@ -595,8 +595,8 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
         setState(() => _selectedDestination = id);
       },
       actions: [
-        IconButton(
-          icon: const Icon(LucideIcons.bell, size: 20),
+        AppIconButton(
+          icon: LucideIcons.bell,
           tooltip: 'Notifications',
           onPressed: () {
             Navigator.push(
@@ -605,8 +605,8 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
             );
           },
         ),
-        IconButton(
-          icon: const Icon(LucideIcons.user, size: 20),
+        AppIconButton(
+          icon: LucideIcons.user,
           tooltip: 'My Profile',
           onPressed: () {
             Navigator.push(
@@ -615,13 +615,13 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
             );
           },
         ),
-        IconButton(
-          icon: const Icon(LucideIcons.refreshCw, size: 20),
+        AppIconButton(
+          icon: LucideIcons.refreshCw,
           tooltip: 'Refresh Metrics',
           onPressed: _isLoading ? null : _fetchData,
         ),
-        IconButton(
-          icon: const Icon(LucideIcons.logOut, size: 20),
+        AppIconButton(
+          icon: LucideIcons.logOut,
           tooltip: 'Logout',
           onPressed: _logout,
         ),
@@ -807,22 +807,22 @@ class _ManagementEventReadOnlyCard extends StatelessWidget {
                   runSpacing: d.sm,
                   children: [
                     AppButton(
+                      size: AppButtonSize.compact,
                       variant: AppButtonVariant.outline,
-                      pill: true,
                       icon: LucideIcons.users,
                       label: 'Registrations (RO)',
                       onPressed: () => onViewRegistrations(eventId, title),
                     ),
                     AppButton(
+                      size: AppButtonSize.compact,
                       variant: AppButtonVariant.outline,
-                      pill: true,
                       icon: LucideIcons.eye,
                       label: 'Attendance (RO)',
                       onPressed: () => onViewAttendance(eventId, title),
                     ),
                     AppButton(
+                      size: AppButtonSize.compact,
                       variant: AppButtonVariant.ghost,
-                      pill: true,
                       icon: LucideIcons.barChart2,
                       label: 'Reports',
                       onPressed: () => onOpenReports(eventId),

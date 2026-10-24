@@ -239,9 +239,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: 'My Profile & Settings',
       maxWidth: 720,
       actions: [
-        IconButton(
+        AppIconButton(
           tooltip: 'Refresh Profile',
-          icon: Icon(LucideIcons.refreshCw, size: 18, color: d.foreground),
+          icon: LucideIcons.refreshCw,
           onPressed: _isLoading ? null : _fetchProfile,
         ),
       ],
