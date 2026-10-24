@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\Event;
 use App\Models\EventApproval;
 use App\Models\User;
+use App\Services\EventNotificationService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -174,18 +175,13 @@ class EventController extends Controller
         $event->update($validated);
 
         if ($event->status === 'published') {
-            $registrations = $event->activeRegistrations()->with('student.user')->get();
-            foreach ($registrations as $reg) {
-                if ($reg->student?->user) {
-                    NotificationService::send(
-                        $reg->student->user->id,
-                        "Event Updated: {$event->title}",
-                        "Details for '{$event->title}' have been updated. Please check the event page for changes.",
-                        'event_updates',
-                        ['event_id' => $event->id]
-                    );
-                }
-            }
+            // Only students validly registered for this exact event are notified.
+            EventNotificationService::notifyRegistered(
+                $event,
+                "Event Updated: {$event->title}",
+                "Details for '{$event->title}' have been updated. Please check the event page for changes.",
+                'event_updates'
+            );
         }
 
         ActivityLog::log('event_updated', 'events', $event->id, [
@@ -349,22 +345,17 @@ class EventController extends Controller
                     'remarks' => $validated['remarks'] ?? null,
                 ]);
 
-                // Notify all registered attendees of cancellation (mandatory notification)
-                $registrations = $event->activeRegistrations()->with('student.user')->get();
-                foreach ($registrations as $reg) {
-                    if ($reg->student?->user) {
-                        NotificationService::send(
-                            $reg->student->user->id,
-                            "Event Cancelled: {$event->title}",
-                            "The event '{$event->title}' scheduled for {$event->event_date} has been cancelled.",
-                            'event_cancellation',
-                            ['event_id' => $event->id]
-                        );
-                    }
-                }
+                // Notify registered attendees of cancellation (mandatory notification).
+                // Recipients come solely from the backend eligibility gate.
+                $notified = EventNotificationService::notifyRegistered(
+                    $event,
+                    "Event Cancelled: {$event->title}",
+                    "The event '{$event->title}' scheduled for {$event->event_date} has been cancelled.",
+                    'event_cancellation'
+                );
 
                 ActivityLog::log('event_cancellation_approved', 'events', $event->id, [
-                    'notified_attendees' => $registrations->count(),
+                    'notified_attendees' => $notified,
                 ]);
             });
 

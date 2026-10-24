@@ -25,6 +25,8 @@ class NotificationService
         'event_reminder_24h'     => 'event_reminders',
         'event_reminder_1h'      => 'event_reminders',
         'event_reminders'        => 'event_reminders',
+        'event_started'          => 'event_reminders',
+        'event_ended'            => 'event_reminders',
         'event_updated'          => 'event_updates',
         'event_updates'          => 'event_updates',
         'waiting_list_promoted'  => 'waiting_list_promoted',

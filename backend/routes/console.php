@@ -1,9 +1,8 @@
 <?php
 
 use App\Models\Event;
-use App\Models\EventRegistration;
 use App\Models\Notification;
-use App\Services\NotificationService;
+use App\Services\EventNotificationService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -15,95 +14,28 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote')->hourly();
 
-// ── 1. Send 24-hour event reminders ──────────────────────────────────────────
-//    Runs every 30 minutes; finds events starting in ~24 hours and notifies
-//    all registered students who haven't yet received a 24h reminder.
+// ── 1–2. Event reminders & lifecycle notifications ───────────────────────────
+//    Every event-specific notification below is delivered by
+//    EventNotificationService, which targets ONLY students holding a
+//    'registered' row in event_registrations for that exact event (no
+//    waitlisted, cancelled, non-student, or other-event users), skips cancelled
+//    events, de-duplicates per (user, type, event, scheduled instant), and
+//    never back-fills reminders for students who register after the window.
 Schedule::call(function () {
-    $windowStart = Carbon::now()->addHours(23)->addMinutes(45);
-    $windowEnd   = Carbon::now()->addHours(24)->addMinutes(15);
-
-    $events = Event::where('status', 'published')
-        ->whereDate('event_date', Carbon::today()->addDay())
-        ->get()
-        ->filter(function ($event) use ($windowStart, $windowEnd) {
-            $startDt = Carbon::parse($event->event_date->format('Y-m-d') . ' ' . $event->start_time);
-            return $startDt->between($windowStart, $windowEnd);
-        });
-
-    foreach ($events as $event) {
-        $registrations = EventRegistration::with('student.user')
-            ->where('event_id', $event->id)
-            ->where('status', 'registered')
-            ->get();
-
-        foreach ($registrations as $reg) {
-            $userId = $reg->student?->user?->id;
-            if (! $userId) continue;
-
-            // Avoid duplicate 24h reminders
-            $alreadySent = Notification::where('user_id', $userId)
-                ->where('notification_type', 'event_reminder_24h')
-                ->where('payload->event_id', $event->id)
-                ->exists();
-
-            if (! $alreadySent) {
-                NotificationService::send(
-                    $userId,
-                    '📅 Event Tomorrow: ' . $event->title,
-                    "Reminder: \"{$event->title}\" is happening tomorrow at {$event->start_time} in {$event->venue}. Don't forget to bring your QR code!",
-                    'event_reminder_24h',
-                    ['event_id' => $event->id, 'event_date' => $event->event_date->format('Y-m-d')]
-                );
-            }
-        }
-
-        Log::info("[Scheduler] 24h reminder sent for event #{$event->id}: {$event->title}");
-    }
+    EventNotificationService::send24HourReminders();
 })->everyThirtyMinutes()->name('event-reminder-24h')->withoutOverlapping();
 
-// ── 2. Send 1-hour event reminders ───────────────────────────────────────────
-//    Runs every 15 minutes; finds events starting in ~1 hour.
 Schedule::call(function () {
-    $windowStart = Carbon::now()->addMinutes(45);
-    $windowEnd   = Carbon::now()->addMinutes(75);
-
-    $events = Event::where('status', 'published')
-        ->whereDate('event_date', Carbon::today())
-        ->get()
-        ->filter(function ($event) use ($windowStart, $windowEnd) {
-            $startDt = Carbon::parse($event->event_date->format('Y-m-d') . ' ' . $event->start_time);
-            return $startDt->between($windowStart, $windowEnd);
-        });
-
-    foreach ($events as $event) {
-        $registrations = EventRegistration::with('student.user')
-            ->where('event_id', $event->id)
-            ->where('status', 'registered')
-            ->get();
-
-        foreach ($registrations as $reg) {
-            $userId = $reg->student?->user?->id;
-            if (! $userId) continue;
-
-            $alreadySent = Notification::where('user_id', $userId)
-                ->where('notification_type', 'event_reminder_1h')
-                ->where('payload->event_id', $event->id)
-                ->exists();
-
-            if (! $alreadySent) {
-                NotificationService::send(
-                    $userId,
-                    '⏰ Starting Soon: ' . $event->title,
-                    "\"{$event->title}\" starts in about 1 hour at {$event->start_time} in {$event->venue}. Please make your way there!",
-                    'event_reminder_1h',
-                    ['event_id' => $event->id]
-                );
-            }
-        }
-
-        Log::info("[Scheduler] 1h reminder sent for event #{$event->id}: {$event->title}");
-    }
+    EventNotificationService::send1HourReminders();
 })->everyFifteenMinutes()->name('event-reminder-1h')->withoutOverlapping();
+
+Schedule::call(function () {
+    EventNotificationService::sendStartNotifications();
+})->everyFiveMinutes()->name('event-start-notification')->withoutOverlapping();
+
+Schedule::call(function () {
+    EventNotificationService::sendEndNotifications();
+})->everyFiveMinutes()->name('event-end-notification')->withoutOverlapping();
 
 // ── 3. Auto-transition ongoing events & auto-close events past their end_time ─
 //    Runs every 5 minutes. Marks published events as 'ongoing' when start_time
