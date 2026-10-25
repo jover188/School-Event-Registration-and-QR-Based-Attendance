@@ -33,7 +33,7 @@
 
 1. **Waiting List Re-indexing on Walk-In or Staff Cancellation:** When a student on `waiting_list` is scanned as a `walk_in` or cancelled by staff, remaining `waiting_list_position` values above that position must be decremented so no position gaps occur.
 2. **Absentee Representation in Event Attendance Report & Manual Corrections:** Registered students without an `attendances` row must appear as `absent` in `GET /api/v1/reports/event-attendance/{id}` and must be eligible for manual correction (`excused` / `present`) by an organizer or administrator.
-3. **Multipart Profile Photo Upload Compatibility:** PHP does not parse `multipart/form-data` bodies on native `PUT` requests; `POST /api/v1/profile` must be supported alongside `PUT /api/v1/profile`.
+3. **Multipart Profile Photo Upload & Student Profile Immutability:** PHP does not parse `multipart/form-data` bodies on native `PUT` requests; `POST /api/v1/profile` is supported alongside `PUT /api/v1/profile` for staff accounts. Student profiles are immutable institutional records; all student mutation attempts return `403 Forbidden` (`ERR_STUDENT_PROFILE_IMMUTABLE`) with security audit logging. The `contact_number` property has been removed from profile updates.
 4. **Check-Out Scan Verification Display:** Scanning in `check_out` mode must return the `student` profile object (`full_name`, `student_id_number`, `profile_photo_url`) and display `check_out_time` in the mobile scanner modal.
 5. **Multi-Row Static Counter Reset in Excel Exports:** Excel export classes must use instance properties (`$this->row`) rather than `static $row` so sequential exports within the same worker process start at row 1.
 
@@ -53,7 +53,7 @@
 - [x] **Database Seeders (`backend/database/seeders/`):** `RoleSeeder` (4 roles) and `UserSeeder` (4 demo accounts + student profile `20260001` + 64-char permanent QR + notification preferences).
 - [x] **Custom Middleware (`backend/app/Http/Middleware/`):** `CheckRole` (`role` alias) and `EnforceSingleSession` (`single.session` alias).
 - [x] **API v1 Controllers (`backend/app/Http/Controllers/Api/V1/`):**
-  - [x] `AuthController` — `login` (email or numeric student ID + single-session token creation), `logout`, `profile`, `updateProfile`, `changePassword` (public self-registration removed in favor of institutional database seeding/middleware sync).
+  - [x] `AuthController` — `login` (email or numeric student ID + single-session token creation), `logout`, `profile` (`GET`), `updateProfile` (staff only; student profile immutable returning `403 Forbidden` with audit logging; `contact_number` removed), `changePassword` (staff only; student password change disabled returning `403 Forbidden` in favor of administrator reset; public self-registration removed in favor of institutional database seeding/middleware sync).
   - [x] `StudentQRController` — `show` (`GET /student/qr`), `reissue` (`POST /student/qr/reissue`), `inspect` (`GET /admin/students/{id}/qr`).
   - [x] `EventController` — `index`, `show`, `store`, `update`, `submitApproval`, `reviewApproval`, `requestCancellation`, `reviewCancellation`.
   - [x] `RegistrationController` — `register` (with capacity & waiting list placement), `cancelRegistration` (with transactional waiting list auto-promotion), `index` (`GET /events/{id}/registrations`), `studentRegistrations` (`GET /student/registrations`).
@@ -181,7 +181,7 @@
 - Modify: `mobile/lib/screens/student/student_dashboard_screen.dart`
 
 - [x] **Step 1: Upgrade `ApiClient` to use `FlutterSecureStorage` with fallback to `SharedPreferences` in tests**
-- [x] **Step 2: Implement `ProfileScreen` (view/edit profile fields, change password form)**
+- [x] **Step 2: Implement `ProfileScreen` (read-only institutional identity summary for students; staff profile/password management; contact number and password fields removed)**
 - [x] **Step 3: Implement `NotificationsScreen` (list notifications, mark read, mark all read) and `NotificationPreferencesScreen` (toggle 6 optional switches; show mandatory lock on critical alerts)**
 - [x] **Step 4: Wire AppBar icons in `StudentDashboardScreen` (and other dashboards) to open `NotificationsScreen` and `ProfileScreen`**
 - [x] **Step 5: Run Flutter analyzer and tests (`0` issues, all passing)**

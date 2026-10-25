@@ -12,7 +12,7 @@
 The **School Event Registration and QR-Based Attendance Management System** is a decoupled client-server platform built with a **Laravel 11 REST API backend**, **MySQL / MariaDB relational database**, and a **Flutter cross-platform application** (Android, iOS, Linux Desktop, Web).
 
 It replaces manual paper/spreadsheet event workflows with:
-- Institutional account integration via the school **Student Information System (SIS)** (and pre-provisioned demo accounts via database seeders in development/demo environments) with login via either **numeric Student ID** (e.g., `20260001`) or **school email** (open self-registration and self-service forgot-password are omitted).
+- Institutional account integration via the school **Student Information System (SIS)** (and pre-provisioned demo accounts via database seeders in development/demo environments) with login via either **numeric Student ID** (e.g., `20260001`) or **school email** (open self-registration and self-service forgot-password are omitted; student profiles are immutable institutional records with contact number omitted and passwords managed via institutional administrator reset).
 - **Single active session enforcement** (logging in on a new device invalidates previous tokens).
 - **Permanent student QR codes** (`64-char hex`, containing zero PII) with self-service instant reissue/revocation.
 - **Event lifecycle governance** requiring Administrator approval before publishing or cancelling events.
@@ -98,7 +98,7 @@ The system enforces strict Role-Based Access Control (`CheckRole` middleware usi
 |---|---|---|---|---|---|
 | `1` | Administrator | `administrator` | Full control, user/role management, event/cancellation approval, QR inspection, audit logs | `admin@school.edu` | `Admin@12345` |
 | `2` | Event Organizer / Staff | `organizer` | Create/manage own events, scan student QR (check-in/out), monitor/correct attendance, export reports | `organizer@school.edu` | `Organizer@12345` |
-| `3` | Student | `student` | Pre-provisioned/synced institutional account, browse/register for events, waiting list, view/reissue permanent QR, attendance history | `student@school.edu` or `20260001` | `Student@12345` |
+| `3` | Student | `student` | Pre-provisioned/synced institutional account (immutable profile; credentials managed via admin reset), browse/register for events, waiting list, view/reissue permanent QR, attendance history | `student@school.edu` or `20260001` | `Student@12345` |
 | `4` | School Management | `management` | **Strictly Read-Only** access to dashboards, events, registrations, attendance, and reports/exports | `management@school.edu` | `Management@12345` |
 
 ---
@@ -107,7 +107,7 @@ The system enforces strict Role-Based Access Control (`CheckRole` middleware usi
 
 1. **`roles`**: `id`, `name`, `slug` (`administrator`, `organizer`, `student`, `management`), `description`
 2. **`users`**: `id`, `role_id`, `email`, `password`, `status` (`pending`, `active`, `inactive`), `email_verified_at`, `active_session_id`
-3. **`students`**: `id`, `user_id`, `student_id_number` (unique numeric), `first_name`, `middle_name`, `last_name`, `course`, `year_level`, `section`, `department`, `contact_number`, `profile_photo_path`
+3. **`students`**: `id`, `user_id`, `student_id_number` (unique numeric), `first_name`, `middle_name`, `last_name`, `course`, `year_level`, `section`, `department`, `contact_number` (omitted from client profile mutations and student views), `profile_photo_path`
 4. **`student_qrs`**: `id`, `student_id`, `qr_token` (unique 64-char hex), `status` (`active`, `revoked`), `revoked_at`
 5. **`events`**: `id`, `organizer_id`, `title`, `description`, `venue`, `event_date`, `start_time`, `end_time`, `registration_start`, `registration_end`, `max_participants` (nullable), `late_grace_period_minutes` (default 15), `walk_in_allowed` (bool), `status` (`draft`, `pending_approval`, `published`, `ongoing`, `completed`, `cancelled`)
 6. **`event_approvals`**: `id`, `event_id`, `admin_id`, `approval_type` (`publish`, `cancellation`), `status` (`approved`, `rejected`), `remarks`
@@ -128,22 +128,22 @@ The system enforces strict Role-Based Access Control (`CheckRole` middleware usi
 - **Backend Core (`backend/`)**:
   - All 13 domain migrations, Eloquent models, relationships, and seeders (`RoleSeeder`, `UserSeeder`, `DemoSchoolDataSeeder`).
   - `CheckRole` and `EnforceSingleSession` middleware.
-  - All 9 API v1 controllers (`AuthController`, `StudentQRController`, `EventController`, `RegistrationController`, `AttendanceController`, `NotificationController`, `DashboardController`, `ReportController`, `AdminController`) covering 47 routes (including `verify-email`, staff registration cancellation, admin QR reissue, manual attendance marking, and admin announcements; self-service forgot/reset password omitted in favor of school SIS integration).
+  - All 9 API v1 controllers (`AuthController`, `StudentQRController`, `EventController`, `RegistrationController`, `AttendanceController`, `NotificationController`, `DashboardController`, `ReportController`, `AdminController`) covering 47 routes (including `verify-email`, staff registration cancellation, admin QR reissue, manual attendance marking, and admin announcements; student profile mutation via `PUT|POST /api/v1/profile` and student password modification via `POST /api/v1/profile/change-password` strictly return `403 Forbidden` with audit logging; self-service forgot/reset password omitted in favor of administrator reset and SIS integration).
   - Centralized `NotificationService` enforcing mandatory vs. optional user notification preferences.
   - Scheduled console tasks (`event-reminder-24h`, `event-reminder-1h`, `purge-old-notifications`, `auto-close-events`) in `routes/console.php`.
   - Complete PDF (7 DomPDF Blade templates), Excel (7 `Maatwebsite\Excel` export classes), and CSV streaming exports for all 7 institutional report types with optional query filters.
-  - 44 automated feature/unit tests (226 assertions) passing on in-memory SQLite (`SchoolAttendanceWorkflowTest`, `AuthorizationPolicyTest`, `ReportExportTest`, `AuthAndStaffOperationsTest`, `NotificationServiceTest`, `DemoSchoolDataSeederTest`).
+  - 62 automated feature/unit tests (303 assertions) passing on in-memory SQLite (`SchoolAttendanceWorkflowTest`, `AuthorizationPolicyTest`, `ReportExportTest`, `AuthAndStaffOperationsTest`, `NotificationServiceTest`, `DemoSchoolDataSeederTest`, `StudentProfileSecurityTest`).
 - **Mobile Application (`mobile/`)**:
   - Cross-platform Flutter structure (`linux`, `android`, `web`) with `ShadApp.custom` (`shadcn_ui`) + Material 3 integration and the **AetherUI** design system (`AppDesignTokens.light` & `AppDesignTokens.dark`: `'Inter'` typography, lightweight `LucideIcons`, Light Mode `#FAFAFA` background, `#FFFFFF` cards/popovers, `#09090B` foreground, `#18181B` primary, `#F4F4F5` secondary/muted/accent/sidebar, `#52525B` muted foreground, `#E4E4E7` borders/inputs, `#71717A` ring; Dark Mode `#09090B` background, `#121214` cards, `#18181B` popovers, `#FFFFFF` foreground/primary, `#27272A` secondary/muted/accent/borders/inputs, `#A1A1AA` muted foreground/ring, `#0F0F12` sidebar; `#14B8A6` Teal success, `#F59E0B` Amber warning, `#EF4444` Red destructive, `8px` (`0.5rem`) radius), `NoSplash.splashFactory`, custom `AppPressable` / `AppButton` controls, adaptive `AppShell` (`<600` slide-over off-canvas drawer with blurred backdrop + `56px` bottom nav, `600–1023` navigation rail, `1024+` `256px` sticky sidebar + blurred `64px` top header), `AppPageScaffold`, and responsive layout primitives (`AppResponsivePage`, `ResponsiveGrid`, `ResponsiveCardSliver`, `ResponsiveQrFrame`).
   - `ApiClient` with `FlutterSecureStorage` token persistence, Bearer token injection, `postMultipart`, `downloadBytes`, and 401 session termination listener.
   - All 20 screens implemented, responsive across phone/tablet/desktop viewports (`320px` at `2x` text scale through `1440px`), and wired across all 4 roles:
     - Auth: `LoginScreen` (`AccountInput`)
-    - Common: `ProfileScreen`, `NotificationsScreen`, `NotificationPreferencesScreen`, `ReportsScreen`
+    - Common: `ProfileScreen` (read-only institutional identity summary card for students; no contact number or password fields), `NotificationsScreen`, `NotificationPreferencesScreen`, `ReportsScreen`
     - Student: `StudentDashboardScreen`, `PermanentQrScreen`, `EventDetailScreen`, `MyRegistrationsScreen`, `MyAttendanceHistoryScreen`
     - Organizer: `OrganizerDashboardScreen`, `QrScannerScreen` (`ScanResultContent`), `EventFormScreen`, `EventRegistrationsScreen`, `LiveAttendanceScreen`
     - Management: `ManagementDashboardScreen` (strictly Read-Only)
     - Admin: `AdminDashboardScreen`, `UserManagementScreen`, `ActivityLogsScreen`, `StudentQrInspectScreen`
-  - 54 Flutter unit and widget tests passing across 13 test files with `0` analyzer issues and clean `flutter build web` compilation.
+  - 91 Flutter unit and widget tests passing across 13 test files with `0` analyzer issues and clean `flutter build web` compilation.
 
 ---
 

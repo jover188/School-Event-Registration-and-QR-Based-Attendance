@@ -171,14 +171,33 @@ Every JSON response conforms to a consistent structure.
 ### 2.4 Authenticated Profile Management
 - **`GET /profile`**
   - **Access:** Authenticated (All roles)
-  - **Description:** Retrieves authenticated user details, student profile (if student), and notification preferences.
+  - **Description:** Retrieves authenticated user details, student profile (if student, presented as a read-only institutional record), and notification preferences.
 - **`PUT /profile`** (and **`POST /profile`** for `multipart/form-data` photo upload)
-  - **Access:** Authenticated (All roles)
-  - **Description:** Updates editable student profile details: `first_name`, `middle_name`, `last_name`, `course`, `year_level`, `section`, `department`, `contact_number`, `profile_photo` (JPG/PNG, max 2MB).
-  - **Note:** `student_id_number` and `email` are immutable by students. Self-service forgot-password endpoints are omitted because student and staff accounts are integrated with the school SIS (and provisioned via database seeders for demo environments).
+  - **Access:** Authenticated staff roles (`administrator`, `organizer`, `management`)
+  - **Description:** Updates staff profile details.
+  - **Student Access Restriction (OWASP API3 / Immutability):** If called by a user with role `student`, returns `403 Forbidden`:
+    ```json
+    {
+      "success": false,
+      "error_code": "ERR_STUDENT_PROFILE_IMMUTABLE",
+      "message": "Students are not permitted to modify institutional profile information. Profile changes must be requested through the school registrar or administrator."
+    }
+    ```
+    An audit record `unauthorized_profile_update_attempt` is written to `activity_logs`.
+  - **Note:** Student institutional profiles are strictly read-only. `contact_number` has been completely removed from validation rules, field mutations, and mobile views.
 - **`POST /profile/change-password`**
-  - **Access:** Authenticated (All roles)
-  - **Body:** Accepts `current_password` and `new_password` + `new_password_confirmation` (or `password` + `password_confirmation`):
+  - **Access:** Authenticated staff roles (`administrator`, `organizer`, `management`)
+  - **Description:** Changes password for staff accounts after verifying `current_password`.
+  - **Student Access Restriction (Credential Hardening):** If called by a user with role `student`, returns `403 Forbidden`:
+    ```json
+    {
+      "success": false,
+      "error_code": "ERR_STUDENT_PASSWORD_CHANGE_DISABLED",
+      "message": "Student password changes are managed by institutional administration or SIS synchronization. Contact your administrator to reset credentials."
+    }
+    ```
+    An audit record `unauthorized_password_change_attempt` is written to `activity_logs`. Student credentials can only be reset by administrators via `POST /api/v1/admin/users/{id}/reset-password`.
+  - **Body (Staff Only):** Accepts `current_password` and `new_password` + `new_password_confirmation` (or `password` + `password_confirmation`):
 ```json
 {
   "current_password": "OldPassword@123",

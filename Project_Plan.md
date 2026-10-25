@@ -40,7 +40,7 @@
 - [x] Laravel 11 scaffolded in `backend/` with Laravel Sanctum 4.x
 - [x] 13 domain table migrations + Sanctum `personal_access_tokens` & Laravel system tables
 - [x] 13 Eloquent Models with full relationships, capacity helpers, and `ActivityLog::log()`
-- [x] `AuthController` — `POST /api/v1/auth/login` (numeric student ID or email), `POST /api/v1/auth/logout`, `GET /api/v1/profile`, `PUT|POST /api/v1/profile`, `POST /api/v1/profile/change-password` (public self-registration disabled; pre-provisioned via institutional seeders/middleware)
+- [x] `AuthController` — `POST /api/v1/auth/login` (numeric student ID or email), `POST /api/v1/auth/logout`, `GET /api/v1/profile`, `PUT|POST /api/v1/profile` (staff only; student profile immutable returning `403 Forbidden` and logged in audit logs), `POST /api/v1/profile/change-password` (staff only; student password changes disabled returning `403 Forbidden` in favor of admin reset)
 - [x] `StudentQRController` — `GET /api/v1/student/qr`, `POST /api/v1/student/qr/reissue`, `GET /api/v1/admin/students/{id}/qr`
 - [x] `EventController` — `GET /api/v1/events`, `GET /api/v1/events/{id}`, `POST /api/v1/events`, `PUT /api/v1/events/{id}`, `POST /api/v1/events/{id}/submit-approval`, `POST /api/v1/admin/events/{id}/review`, `POST /api/v1/events/{id}/request-cancellation`, `POST /api/v1/admin/events/{id}/review-cancellation`
 - [x] Custom Middleware: `CheckRole` (`role` alias) + `EnforceSingleSession` (`single.session` alias)
@@ -93,7 +93,7 @@
 ### Sprint 5 — Flutter Secondary Screens & Security Polish ✅
 - [x] **Secure Token Storage:** Migrate token persistence in `mobile/lib/core/network/api_client.dart` from `SharedPreferences` to `FlutterSecureStorage` (with fallback).
 - [x] **Profile & Notification Screens (All Roles):**
-  - `ProfileScreen` (`GET /api/v1/profile`, `POST /api/v1/profile`, `POST /api/v1/profile/change-password`).
+  - `ProfileScreen` (read-only institutional identity summary for students; contact number and password change fields removed; `GET /api/v1/profile`; staff profile/password management).
   - `NotificationsScreen` (`GET /api/v1/notifications`, `PATCH /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/mark-all-read`).
   - `NotificationPreferencesScreen` (`GET|PUT /api/v1/notifications/preferences`).
 - [x] **Student Secondary Screens:**

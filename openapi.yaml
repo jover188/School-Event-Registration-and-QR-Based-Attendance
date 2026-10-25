@@ -427,9 +427,6 @@ components:
         department:
           type: string
           maxLength: 100
-        contact_number:
-          type: string
-          maxLength: 25
         profile_photo:
           type: string
           format: binary
@@ -545,7 +542,7 @@ paths:
       security:
         - SanctumBearerAuth: []
       summary: Update Authenticated Profile
-      description: Updates editable profile details (student_id_number and email are immutable).
+      description: Updates staff profile details. Student profiles are immutable institutional records; attempts by students return 403 Forbidden (ERR_STUDENT_PROFILE_IMMUTABLE) and log a security audit event.
       requestBody:
         required: true
         content:
@@ -562,12 +559,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
+        '403':
+          description: Student profile is immutable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
     post:
       security:
         - SanctumBearerAuth: []
       summary: Update Authenticated Profile (Multipart Photo Upload)
-      description: Updates editable profile details including multipart profile_photo upload.
+      description: Updates staff profile details including multipart profile_photo upload. Student profiles are immutable institutional records; attempts by students return 403 Forbidden (ERR_STUDENT_PROFILE_IMMUTABLE).
       requestBody:
         required: true
         content:
@@ -581,13 +584,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
+        '403':
+          description: Student profile is immutable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /profile/change-password:
     post:
       security:
         - SanctumBearerAuth: []
       summary: Change Authenticated User Password
-      description: Changes password for the authenticated user after verifying current_password.
+      description: Changes password for staff accounts after verifying current_password. Student password changes are disabled in favor of institutional administrator resets; attempts by students return 403 Forbidden (ERR_STUDENT_PASSWORD_CHANGE_DISABLED).
       requestBody:
         required: true
         content:
@@ -619,6 +628,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
+        '403':
+          description: Student password changes are disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Current password mismatch or validation error
           content:
