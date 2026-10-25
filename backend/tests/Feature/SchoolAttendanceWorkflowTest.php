@@ -328,21 +328,46 @@ class SchoolAttendanceWorkflowTest extends TestCase
         ]);
         $token = $login->json('data.token');
 
-        // Update profile via POST /api/v1/profile
+        // Students are rejected from mutating profile (institutional records are immutable)
         $updateResp = $this->requestAs($token, 'POST', '/api/v1/profile', [
             'section' => 'CS-4Z',
             'contact_number' => '+639991112233',
         ]);
-        $updateResp->assertStatus(200);
-        $this->assertEquals('CS-4Z', $updateResp->json('data.student_profile.section'));
+        $updateResp->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'ERR_STUDENT_PROFILE_IMMUTABLE',
+            ]);
 
-        // Change password using new_password & new_password_confirmation
-        $pwResp = $this->requestAs($token, 'POST', '/api/v1/profile/change-password', [
+        // Students are rejected from changing password via API
+        $studentPwResp = $this->requestAs($token, 'POST', '/api/v1/profile/change-password', [
             'current_password' => 'Student@12345',
             'new_password' => 'NewPass@12345',
             'new_password_confirmation' => 'NewPass@12345',
         ]);
-        $pwResp->assertStatus(200);
+        $studentPwResp->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'ERR_STUDENT_PASSWORD_CHANGE_DISABLED',
+            ]);
+
+        // Staff accounts (organizer) retain password change capability
+        $orgLogin = $this->postJson('/api/v1/auth/login', [
+            'login' => 'organizer@school.edu',
+            'password' => 'Organizer@12345',
+        ]);
+        $orgToken = $orgLogin->json('data.token');
+
+        $orgPwResp = $this->requestAs($orgToken, 'POST', '/api/v1/profile/change-password', [
+            'current_password' => 'Organizer@12345',
+            'new_password' => 'NewStaffPass@12345',
+            'new_password_confirmation' => 'NewStaffPass@12345',
+        ]);
+        $orgPwResp->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Password updated successfully.',
+            ]);
     }
 }
 

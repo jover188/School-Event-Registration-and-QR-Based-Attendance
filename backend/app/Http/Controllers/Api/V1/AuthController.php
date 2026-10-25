@@ -173,11 +173,25 @@ class AuthController extends Controller
     }
 
     /**
-     * Update Profile (Editable fields per SRS USER-006; student_id_number & email are immutable)
+     * Update Profile (Editable fields per SRS USER-006; student_id_number & email are immutable; students are read-only)
      */
     public function updateProfile(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        if ($user->isStudent() || $user->role?->slug === 'student') {
+            ActivityLog::log('unauthorized_profile_update_attempt', 'auth', $user->id, [
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'payload' => $request->except(['profile_photo']),
+            ], $user->id);
+
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_STUDENT_PROFILE_IMMUTABLE',
+                'message' => 'Students are not permitted to modify institutional profile information. Profile changes must be requested through the school registrar or administrator.',
+            ], 403);
+        }
 
         $validated = $request->validate([
             'first_name' => ['sometimes', 'string', 'max:100'],
@@ -187,14 +201,13 @@ class AuthController extends Controller
             'year_level' => ['sometimes', 'string', 'max:20'],
             'section' => ['sometimes', 'string', 'max:50'],
             'department' => ['sometimes', 'string', 'max:100'],
-            'contact_number' => ['nullable', 'string', 'max:25'],
             'profile_photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
         ]);
 
         if ($user->student) {
             $student = $user->student;
 
-            foreach (['first_name', 'middle_name', 'last_name', 'course', 'year_level', 'section', 'department', 'contact_number'] as $field) {
+            foreach (['first_name', 'middle_name', 'last_name', 'course', 'year_level', 'section', 'department'] as $field) {
                 if (array_key_exists($field, $validated)) {
                     $student->{$field} = $validated[$field];
                 }
@@ -239,6 +252,21 @@ class AuthController extends Controller
      */
     public function changePassword(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if ($user->isStudent() || $user->role?->slug === 'student') {
+            ActivityLog::log('unauthorized_password_change_attempt', 'auth', $user->id, [
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ], $user->id);
+
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_STUDENT_PASSWORD_CHANGE_DISABLED',
+                'message' => 'Student password changes are managed by institutional administration or SIS synchronization. Contact your administrator to reset credentials.',
+            ], 403);
+        }
+
         $passwordRules = ['required', 'string', Password::min(8)->mixedCase()->numbers(), 'confirmed'];
 
         if ($request->has('new_password') && !$request->has('password')) {
@@ -254,8 +282,6 @@ class AuthController extends Controller
             ]);
             $newPassword = $validated['password'];
         }
-
-        $user = $request->user();
 
         if (!Hash::check($validated['current_password'], $user->password)) {
             return response()->json([
