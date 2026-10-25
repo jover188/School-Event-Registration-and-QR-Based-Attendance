@@ -275,8 +275,9 @@ void main() {
 
       expect(find.text('thea@school.edu'), findsOneWidget);
       expect(find.textContaining('20260001'), findsOneWidget);
-      final saveBtn = find.text('Save Profile Changes');
-      expect(tester.getSize(saveBtn).width, lessThanOrEqualTo(720));
+      final institutionalCard =
+          find.byKey(const ValueKey('student-institutional-card'));
+      expect(tester.getSize(institutionalCard).width, lessThanOrEqualTo(720));
 
       tester.view.physicalSize = const Size(320, 568);
       await tester.pumpWidget(
@@ -373,6 +374,80 @@ void main() {
       expect(switches[1].value, isTrue);
       expect(switches[1].onChanged, isNull);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'student profile displays read-only institutional info without contact number, edit inputs, or password change fields',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        const AppTestHost(
+          child: ProfileScreen(
+            initialData: {
+              'user': {
+                'email': 'student@school.edu',
+                'role': 'student',
+                'status': 'active',
+              },
+              'student_profile': {
+                'student_id_number': '20260001',
+                'first_name': 'Thea',
+                'middle_name': 'M',
+                'last_name': 'Santos',
+                'course': 'BS Computer Science',
+                'year_level': '3rd Year',
+                'section': 'CS-3A',
+                'department': 'College of Computing Studies',
+                'contact_number': '09171234567',
+              },
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Ensure no contact number input or display
+      expect(find.byKey(const ValueKey('profile-contact')), findsNothing);
+      expect(find.text('09171234567'), findsNothing);
+
+      // Ensure no password change fields
+      expect(
+        find.byKey(const ValueKey('change-current-password')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('change-new-password')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('change-confirm-password')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('update-password-button')),
+        findsNothing,
+      );
+
+      // Ensure no edit form or save button
+      expect(find.byKey(const ValueKey('save-profile-button')), findsNothing);
+
+      // Institutional notice banner
+      expect(
+        find.textContaining('synchronized with the School Student Information System'),
+        findsOneWidget,
+      );
+
+      // Read-only student academic details
+      expect(find.textContaining('20260001'), findsOneWidget);
+      expect(find.text('Thea M Santos'), findsOneWidget);
+      expect(find.text('BS Computer Science'), findsOneWidget);
+      expect(find.text('3rd Year'), findsOneWidget);
+      expect(find.text('CS-3A'), findsOneWidget);
+      expect(find.text('College of Computing Studies'), findsOneWidget);
     },
   );
 }
