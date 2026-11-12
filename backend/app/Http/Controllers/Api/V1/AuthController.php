@@ -204,7 +204,14 @@ class AuthController extends Controller
             'profile_photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
         ]);
 
-        if ($user->student) {
+        if ($user->isStudent() && $user->student) {
+            $student = $user->student;
+            // Only contact_number is editable by students
+            if (array_key_exists('contact_number', $validated)) {
+                $student->contact_number = $validated['contact_number'];
+            }
+            $student->save();
+        } elseif ($user->student) {
             $student = $user->student;
 
             foreach (['first_name', 'middle_name', 'last_name', 'course', 'year_level', 'section', 'department'] as $field) {
@@ -343,4 +350,39 @@ class AuthController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Submit Profile Correction Request
+     * Logs request to activity_logs for administrative/management review without directly altering data.
+     */
+    public function requestProfileCorrection(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->student) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_STUDENT_PROFILE_NOT_FOUND',
+                'message' => 'Student profile not found.',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'fields' => ['required', 'array', 'min:1'],
+            'fields.*' => ['required', 'string', 'max:100'],
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+        ]);
+
+        ActivityLog::log('profile_correction_requested', 'students', $user->student->id, [
+            'fields' => $validated['fields'],
+            'reason' => $validated['reason'],
+            'student_id_number' => $user->student->student_id_number,
+        ], $user->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your correction request has been submitted. Management will review it.',
+        ]);
+    }
 }
+

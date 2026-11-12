@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\NotificationPreference;
+use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -229,4 +230,69 @@ class AdminController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Update Student Profile Information (Administrator only)
+     * Updates only editable demographic fields; student_id_number and email are immutable.
+     */
+    public function updateStudentProfile(int $id, Request $request): JsonResponse
+    {
+        $student = Student::findOrFail($id);
+
+        $validated = $request->validate([
+            'first_name' => ['sometimes', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['sometimes', 'string', 'max:100'],
+            'course' => ['sometimes', 'string', 'max:100'],
+            'year_level' => ['sometimes', 'string', 'max:20'],
+            'section' => ['sometimes', 'string', 'max:50'],
+            'department' => ['sometimes', 'string', 'max:100'],
+            'contact_number' => ['nullable', 'string', 'max:25'],
+        ]);
+
+        $updatableFields = [
+            'first_name',
+            'middle_name',
+            'last_name',
+            'course',
+            'year_level',
+            'section',
+            'department',
+            'contact_number',
+        ];
+
+        foreach ($updatableFields as $field) {
+            if (array_key_exists($field, $validated)) {
+                $student->{$field} = $validated[$field];
+            }
+        }
+
+        $student->save();
+
+        ActivityLog::log('admin_updated_student_profile', 'students', $student->id, [
+            'updated_by' => $request->user()->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Student profile updated successfully.',
+            'data' => [
+                'student_profile' => [
+                    'id' => $student->id,
+                    'student_id_number' => $student->student_id_number,
+                    'full_name' => $student->full_name,
+                    'first_name' => $student->first_name,
+                    'middle_name' => $student->middle_name,
+                    'last_name' => $student->last_name,
+                    'course' => $student->course,
+                    'year_level' => $student->year_level,
+                    'section' => $student->section,
+                    'department' => $student->department,
+                    'contact_number' => $student->contact_number,
+                    'profile_photo_url' => $student->profile_photo_url,
+                ],
+            ],
+        ]);
+    }
 }
+
