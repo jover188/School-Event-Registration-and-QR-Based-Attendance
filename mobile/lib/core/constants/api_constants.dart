@@ -21,9 +21,9 @@ class ApiConstants {
       return customBaseUrl!;
     }
     if (!kIsWeb && Platform.isAndroid) {
-      return 'http://127.0.0.1:8000/api/v1';
+      return 'https://attendify-fugh.onrender.com/api/v1';
     }
-    return 'http://127.0.0.1:8000/api/v1';
+    return 'https://attendify-fugh.onrender.com/api/v1';
   }
 
   // ===========================================================================
