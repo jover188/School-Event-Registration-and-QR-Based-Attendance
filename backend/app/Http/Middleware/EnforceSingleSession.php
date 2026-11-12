@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnforceSingleSession
@@ -18,11 +19,20 @@ class EnforceSingleSession
         $user = $request->user();
 
         if ($user) {
+            if ($user->status !== 'active') {
+                $user->currentAccessToken()?->delete();
+
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'ERR_ACCOUNT_INACTIVE',
+                    'message' => 'Your account has been deactivated. Please contact an administrator.',
+                ], 403);
+            }
+
             $currentToken = $user->currentAccessToken();
 
-            if ($currentToken && $user->active_session_id) {
-                // If token name does not match the user's active session, it was superseded by another login
-                if (!str_contains($currentToken->name, (string) $user->active_session_id)) {
+            if ($currentToken instanceof PersonalAccessToken) {
+                if (!$user->active_session_id || $currentToken->name !== "session-{$user->active_session_id}") {
                     $currentToken->delete();
 
                     return response()->json([

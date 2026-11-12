@@ -57,8 +57,8 @@ class EventController extends Controller
                 })
                 ->values();
 
-            $perPage = (int) $request->query('per_page', 15);
-            $page = (int) $request->query('page', 1);
+            $perPage = max(1, min(100, (int) $request->query('per_page', 15)));
+            $page = max(1, (int) $request->query('page', 1));
             $total = $allEvents->count();
             $items = $allEvents->slice(($page - 1) * $perPage, $perPage)->values();
 
@@ -225,12 +225,31 @@ class EventController extends Controller
         $user = $request->user();
         $event = Event::with(['organizer:id,email', 'approvals'])->findOrFail($id);
 
-        if ($user->isStudent() && !$event->isStudentEligible($user->student)) {
-            return response()->json([
-                'success' => false,
-                'error_code' => 'ERR_AUDIENCE_INELIGIBLE',
-                'message' => 'You are not eligible to view or register for this event based on audience criteria.',
-            ], 403);
+        if ($user->isStudent()) {
+            $hasHistory = $user->student && $event->registrations()->where('student_id', $user->student->id)->exists();
+            if (!in_array($event->status, ['published', 'ongoing', 'completed'], true) && !$hasHistory) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'ERR_EVENT_NOT_ACTIVE',
+                    'message' => 'This event is not published or available for viewing.',
+                ], 403);
+            }
+
+            if (!$event->isStudentEligible($user->student)) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'ERR_AUDIENCE_INELIGIBLE',
+                    'message' => 'You are not eligible to view or register for this event based on audience criteria.',
+                ], 403);
+            }
+        } elseif (!$user->isAdmin() && !$user->isManagement()) {
+            if (in_array($event->status, ['draft', 'pending_approval'], true) && $event->organizer_id !== $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'ERR_FORBIDDEN',
+                    'message' => 'You do not have permission to view this unpublished event.',
+                ], 403);
+            }
         }
 
         $registeredCount = $event->activeRegistrations()->count();
@@ -277,6 +296,7 @@ class EventController extends Controller
             'target_sections' => ['nullable', 'array'],
             'target_sections.*' => ['string'],
             'target_rules' => ['nullable', 'array'],
+            'target_rules.*' => ['array'],
             'send_announcement' => ['nullable', 'boolean'],
         ]);
 
@@ -342,6 +362,7 @@ class EventController extends Controller
             'target_sections' => ['sometimes', 'nullable', 'array'],
             'target_sections.*' => ['string'],
             'target_rules' => ['sometimes', 'nullable', 'array'],
+            'target_rules.*' => ['array'],
             'send_announcement' => ['sometimes', 'boolean'],
         ]);
 

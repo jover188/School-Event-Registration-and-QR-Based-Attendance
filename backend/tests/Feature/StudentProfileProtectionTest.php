@@ -41,6 +41,7 @@ class StudentProfileProtectionTest extends TestCase
         $originalYearLevel = $student->year_level;
         $originalSection = $student->section;
         $originalDept = $student->department;
+        $originalContact = $student->contact_number;
 
         // Student attempts to update protected fields alongside contact_number
         $updateResp = $this->requestAs($token, 'PUT', '/api/v1/profile', [
@@ -53,30 +54,19 @@ class StudentProfileProtectionTest extends TestCase
             'contact_number' => '+639123334455',
         ]);
 
-        $updateResp->assertStatus(200)
-            ->assertJsonPath('success', true);
-
-        // contact_number must be updated
-        $this->assertEquals('+639123334455', $updateResp->json('data.contact_number'));
-        $this->assertEquals('+639123334455', $updateResp->json('data.student_profile.contact_number'));
-
-        // Protected fields must remain unchanged
-        $this->assertEquals($originalFirstName, $updateResp->json('data.student_profile.first_name'));
-        $this->assertEquals($originalLastName, $updateResp->json('data.student_profile.last_name'));
-        $this->assertEquals($originalCourse, $updateResp->json('data.student_profile.course'));
-        $this->assertEquals($originalYearLevel, $updateResp->json('data.student_profile.year_level'));
-        $this->assertEquals($originalSection, $updateResp->json('data.student_profile.section'));
-        $this->assertEquals($originalDept, $updateResp->json('data.student_profile.department'));
+        $updateResp->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('error_code', 'ERR_STUDENT_PROFILE_IMMUTABLE');
 
         $student->refresh();
-        $this->assertEquals('+639123334455', $student->contact_number);
+        $this->assertEquals($originalContact, $student->contact_number);
         $this->assertEquals($originalFirstName, $student->first_name);
         $this->assertEquals($originalLastName, $student->last_name);
         $this->assertEquals($originalCourse, $student->course);
 
-        // Verify activity log was recorded
+        // Verify unauthorized update attempt was recorded
         $this->assertDatabaseHas('activity_logs', [
-            'action' => 'profile_updated',
+            'action' => 'unauthorized_profile_update_attempt',
             'module' => 'auth',
             'user_id' => $student->user_id,
         ]);

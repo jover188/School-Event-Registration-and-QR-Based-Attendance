@@ -32,6 +32,15 @@ class ReportController extends Controller
     public function eventAttendance(int $eventId, Request $request): JsonResponse
     {
         $event = Event::with('organizer:id,email')->findOrFail($eventId);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && !$user->isManagement() && $event->organizer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You do not have permission to view reports for this event.',
+            ], 403);
+        }
 
         $attQuery = Attendance::with(['student', 'scanner:id,email'])
             ->where('event_id', $event->id)
@@ -113,6 +122,15 @@ class ReportController extends Controller
     public function studentHistory(int $studentId, Request $request): JsonResponse
     {
         $student = Student::with('user:id,email')->findOrFail($studentId);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && !$user->isManagement()) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You do not have permission to view student attendance history.',
+            ], 403);
+        }
 
         $query = Attendance::with('event')
             ->where('student_id', $student->id);
@@ -157,6 +175,15 @@ class ReportController extends Controller
     public function registrationSummary(int $eventId, Request $request): JsonResponse
     {
         $event = Event::findOrFail($eventId);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && !$user->isManagement() && $event->organizer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You do not have permission to view reports for this event.',
+            ], 403);
+        }
 
         $baseQuery = fn () => EventRegistration::where('event_id', $event->id)
             ->when($request->filled('department'), function ($q) use ($request) {
@@ -256,6 +283,15 @@ class ReportController extends Controller
     public function absentee(int $eventId, Request $request): JsonResponse
     {
         $event = Event::findOrFail($eventId);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && !$user->isManagement() && $event->organizer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You do not have permission to view reports for this event.',
+            ], 403);
+        }
 
         $query = EventRegistration::with('student')
             ->where('event_id', $event->id)
@@ -293,6 +329,15 @@ class ReportController extends Controller
     public function walkIn(int $eventId, Request $request): JsonResponse
     {
         $event = Event::findOrFail($eventId);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && !$user->isManagement() && $event->organizer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You do not have permission to view reports for this event.',
+            ], 403);
+        }
 
         $query = Attendance::with('student')
             ->where('event_id', $event->id)
@@ -330,8 +375,14 @@ class ReportController extends Controller
     {
         $dateFrom = $request->query('date_from');
         $dateTo   = $request->query('date_to');
+        $user     = $request->user();
 
-        $organizers = User::where('role_id', 2)
+        $organizersQuery = User::where('role_id', 2);
+        if ($user && !$user->isAdmin() && !$user->isManagement()) {
+            $organizersQuery->where('id', $user->id);
+        }
+
+        $organizers = $organizersQuery
             ->get()
             ->map(function (User $organizer) use ($dateFrom, $dateTo) {
                 $eventsQuery = $organizer->organizedEvents();
@@ -382,7 +433,29 @@ class ReportController extends Controller
 
         $reportType  = $validated['report_type'];
         $format      = $validated['format'];
-        $generatedBy = $request->user()?->email ?? 'system';
+        $user        = $request->user();
+        $generatedBy = $user?->email ?? 'system';
+
+        if ($user && !$user->isAdmin() && !$user->isManagement()) {
+            if ($reportType === 'student_history') {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'ERR_FORBIDDEN',
+                    'message' => 'You do not have permission to export student attendance history.',
+                ], 403);
+            }
+
+            if (!empty($validated['event_id'])) {
+                $event = Event::findOrFail($validated['event_id']);
+                if ($event->organizer_id !== $user->id) {
+                    return response()->json([
+                        'success' => false,
+                        'error_code' => 'ERR_FORBIDDEN',
+                        'message' => 'You do not have permission to export reports for this event.',
+                    ], 403);
+                }
+            }
+        }
 
         ActivityLog::log('report_exported', 'reports', $validated['event_id'] ?? $validated['student_id'] ?? null, [
             'report_type' => $reportType,

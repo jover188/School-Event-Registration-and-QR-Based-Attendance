@@ -12,6 +12,7 @@ class ApiResponse {
   final dynamic data;
   final Map<String, dynamic>? errors;
   final int statusCode;
+  final Map<String, dynamic>? rawBody;
 
   ApiResponse({
     required this.success,
@@ -19,6 +20,7 @@ class ApiResponse {
     this.data,
     this.errors,
     required this.statusCode,
+    this.rawBody,
   });
 
   Map<String, dynamic> toMap() => {
@@ -27,6 +29,7 @@ class ApiResponse {
         'data': data,
         'errors': errors,
         'statusCode': statusCode,
+        'rawBody': rawBody,
       };
 }
 
@@ -77,18 +80,22 @@ class ApiClient {
   }
 
   Future<void> saveToken(String token, [String? role]) async {
+    bool secureSaved = false;
     try {
       await _secureStorage.write(key: _tokenKey, value: token);
       if (role != null) {
         await _secureStorage.write(key: _userRoleKey, value: role);
       }
+      secureSaved = true;
     } catch (_) {
       // Fallback to SharedPreferences when secure storage channel is unavailable
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
-    if (role != null) {
-      await prefs.setString(_userRoleKey, role);
+    if (!secureSaved) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenKey, token);
+      if (role != null) {
+        await prefs.setString(_userRoleKey, role);
+      }
     }
   }
 
@@ -143,20 +150,28 @@ class ApiClient {
 
     if (response.statusCode == 401) {
       clearSession();
-      if (onSessionTerminated != null) {
+      if (onSessionTerminated != null &&
+          jsonBody is Map<String, dynamic> &&
+          jsonBody['error_code'] == 'ERR_SESSION_TERMINATED') {
         onSessionTerminated!();
       }
     }
 
     if (jsonBody is Map<String, dynamic>) {
+      dynamic dataPayload = jsonBody['data'];
+      if (dataPayload == null && jsonBody.containsKey('summary')) {
+        dataPayload = jsonBody;
+      }
+
       return ApiResponse(
         success: jsonBody['success'] == true,
         message: jsonBody['message']?.toString(),
-        data: jsonBody['data'],
+        data: dataPayload,
         errors: jsonBody['errors'] is Map<String, dynamic>
             ? jsonBody['errors'] as Map<String, dynamic>
             : null,
         statusCode: response.statusCode,
+        rawBody: jsonBody,
       );
     }
 

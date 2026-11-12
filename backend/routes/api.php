@@ -24,7 +24,7 @@ Route::prefix('v1')->group(function () {
     // ========================================================================
     Route::prefix('auth')->group(function () {
         Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
-        Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
+        Route::post('/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:5,1');
     });
 
     // ========================================================================

@@ -65,33 +65,32 @@ class RegistrationController extends Controller
             ], 422);
         }
 
-        // Check existing registration
-        $existing = EventRegistration::where('event_id', $event->id)
-            ->where('student_id', $student->id)
-            ->first();
-
-        if ($existing && in_array($existing->status, ['registered', 'waiting_list'])) {
-            return response()->json([
-                'success' => false,
-                'error_code' => 'ERR_DUPLICATE_REGISTRATION',
-                'message' => $existing->status === 'registered' 
-                    ? 'You are already registered for this event.' 
-                    : "You are already on the waiting list (Position: #{$existing->waiting_list_position}).",
-            ], 409);
-        }
-
         // Atomic registration transaction
-        $registration = DB::transaction(function () use ($event, $student, $existing) {
-            $isFull = $event->isCapacityFull();
+        $result = DB::transaction(function () use ($event, $student) {
+            $lockedEvent = Event::where('id', $event->id)->lockForUpdate()->firstOrFail();
+
+            // Lock and check for duplicate registration inside the transaction
+            $existing = EventRegistration::where('event_id', $lockedEvent->id)
+                ->where('student_id', $student->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing && in_array($existing->status, ['registered', 'waiting_list'])) {
+                return ['duplicate' => true, 'existing' => $existing];
+            }
+
+            $isFull = $lockedEvent->isCapacityFull();
 
             if ($isFull) {
                 // Placed on Waiting List
-                $nextPosition = EventRegistration::where('event_id', $event->id)
+                $maxPosition = EventRegistration::where('event_id', $lockedEvent->id)
                     ->where('status', 'waiting_list')
-                    ->count() + 1;
+                    ->lockForUpdate()
+                    ->max('waiting_list_position') ?? 0;
+                $nextPosition = $maxPosition + 1;
 
                 $regData = [
-                    'event_id' => $event->id,
+                    'event_id' => $lockedEvent->id,
                     'student_id' => $student->id,
                     'status' => 'waiting_list',
                     'waiting_list_position' => $nextPosition,
@@ -104,21 +103,21 @@ class RegistrationController extends Controller
                 NotificationService::send(
                     $student->user_id,
                     'Placed on Waiting List',
-                    "You have joined the waiting list for '{$event->title}' at position #{$nextPosition}.",
+                    "You have joined the waiting list for '{$lockedEvent->title}' at position #{$nextPosition}.",
                     'waiting_list_joined',
-                    ['event_id' => $event->id, 'waiting_position' => $nextPosition]
+                    ['event_id' => $lockedEvent->id, 'waiting_position' => $nextPosition]
                 );
 
                 ActivityLog::log('waiting_list_joined', 'registration', $reg->id, [
-                    'event_id' => $event->id,
+                    'event_id' => $lockedEvent->id,
                     'position' => $nextPosition,
                 ]);
 
-                return $reg;
+                return ['registration' => $reg];
             } else {
                 // Normal Registration Confirmed
                 $regData = [
-                    'event_id' => $event->id,
+                    'event_id' => $lockedEvent->id,
                     'student_id' => $student->id,
                     'status' => 'registered',
                     'waiting_list_position' => null,
@@ -131,19 +130,31 @@ class RegistrationController extends Controller
                 NotificationService::send(
                     $student->user_id,
                     'Registration Confirmed',
-                    "You are registered for '{$event->title}' on {$event->event_date->format('M d, Y')}.",
+                    "You are registered for '{$lockedEvent->title}' on {$lockedEvent->event_date->format('M d, Y')}.",
                     'registration_confirmed',
-                    ['event_id' => $event->id]
+                    ['event_id' => $lockedEvent->id]
                 );
 
                 ActivityLog::log('event_registered', 'registration', $reg->id, [
-                    'event_id' => $event->id,
+                    'event_id' => $lockedEvent->id,
                 ]);
 
-                return $reg;
+                return ['registration' => $reg];
             }
         });
 
+        if (isset($result['duplicate']) && $result['duplicate']) {
+            $existing = $result['existing'];
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_DUPLICATE_REGISTRATION',
+                'message' => $existing->status === 'registered' 
+                    ? 'You are already registered for this event.' 
+                    : "You are already on the waiting list (Position: #{$existing->waiting_list_position}).",
+            ], 409);
+        }
+
+        $registration = $result['registration'];
         $isWaiting = $registration->status === 'waiting_list';
 
         return response()->json([
@@ -203,19 +214,26 @@ class RegistrationController extends Controller
             ], 404);
         }
 
-        $wasRegistered = $registration->status === 'registered';
-        $wasWaiting = $registration->status === 'waiting_list';
-        $oldPosition = $registration->waiting_list_position;
+        DB::transaction(function () use ($registration, $event) {
+            Event::where('id', $event->id)->lockForUpdate()->first();
+            $lockedReg = EventRegistration::where('id', $registration->id)->lockForUpdate()->first();
 
-        DB::transaction(function () use ($registration, $event, $wasRegistered, $wasWaiting, $oldPosition) {
+            if (!$lockedReg || !in_array($lockedReg->status, ['registered', 'waiting_list'], true)) {
+                return;
+            }
+
+            $wasRegistered = $lockedReg->status === 'registered';
+            $wasWaiting = $lockedReg->status === 'waiting_list';
+            $oldPosition = $lockedReg->waiting_list_position;
+
             // Cancel current registration
-            $registration->update([
+            $lockedReg->update([
                 'status' => 'cancelled',
                 'waiting_list_position' => null,
                 'cancelled_at' => now(),
             ]);
 
-            ActivityLog::log('registration_cancelled', 'registration', $registration->id, [
+            ActivityLog::log('registration_cancelled', 'registration', $lockedReg->id, [
                 'event_id' => $event->id,
             ]);
 
@@ -224,9 +242,11 @@ class RegistrationController extends Controller
                 $nextCandidate = EventRegistration::where('event_id', $event->id)
                     ->where('status', 'waiting_list')
                     ->orderBy('waiting_list_position', 'asc')
+                    ->lockForUpdate()
                     ->first();
 
                 if ($nextCandidate) {
+                    $promotedPos = $nextCandidate->waiting_list_position;
                     $nextCandidate->update([
                         'status' => 'registered',
                         'waiting_list_position' => null,
@@ -236,7 +256,7 @@ class RegistrationController extends Controller
                     // Re-index remaining waiting list
                     EventRegistration::where('event_id', $event->id)
                         ->where('status', 'waiting_list')
-                        ->where('waiting_list_position', '>', 1)
+                        ->where('waiting_list_position', '>', $promotedPos)
                         ->decrement('waiting_list_position');
 
                     // Notify promoted student
@@ -298,20 +318,27 @@ class RegistrationController extends Controller
             ], 422);
         }
 
-        $wasRegistered = $registration->status === 'registered';
-        $wasWaiting = $registration->status === 'waiting_list';
-        $oldPosition = $registration->waiting_list_position;
+        DB::transaction(function () use ($registration, $event) {
+            Event::where('id', $event->id)->lockForUpdate()->first();
+            $lockedReg = EventRegistration::with('student.user')->where('id', $registration->id)->lockForUpdate()->first();
 
-        DB::transaction(function () use ($registration, $event, $wasRegistered, $wasWaiting, $oldPosition) {
-            $registration->update([
+            if (!$lockedReg || $lockedReg->status === 'cancelled') {
+                return;
+            }
+
+            $wasRegistered = $lockedReg->status === 'registered';
+            $wasWaiting = $lockedReg->status === 'waiting_list';
+            $oldPosition = $lockedReg->waiting_list_position;
+
+            $lockedReg->update([
                 'status' => 'cancelled',
                 'waiting_list_position' => null,
                 'cancelled_at' => now(),
             ]);
 
-            if ($registration->student?->user) {
+            if ($lockedReg->student?->user) {
                 NotificationService::send(
-                    $registration->student->user->id,
+                    $lockedReg->student->user->id,
                     "Registration Cancelled: {$event->title}",
                     "Your registration for '{$event->title}' has been cancelled by event staff.",
                     'event_updates',
@@ -319,9 +346,9 @@ class RegistrationController extends Controller
                 );
             }
 
-            ActivityLog::log('registration_cancelled_by_staff', 'registration', $registration->id, [
+            ActivityLog::log('registration_cancelled_by_staff', 'registration', $lockedReg->id, [
                 'event_id' => $event->id,
-                'student_id' => $registration->student_id,
+                'student_id' => $lockedReg->student_id,
             ]);
 
             if ($wasRegistered) {
@@ -329,9 +356,11 @@ class RegistrationController extends Controller
                     ->where('event_id', $event->id)
                     ->where('status', 'waiting_list')
                     ->orderBy('waiting_list_position', 'asc')
+                    ->lockForUpdate()
                     ->first();
 
                 if ($nextCandidate) {
+                    $promotedPos = $nextCandidate->waiting_list_position;
                     $nextCandidate->update([
                         'status' => 'registered',
                         'waiting_list_position' => null,
@@ -340,7 +369,7 @@ class RegistrationController extends Controller
 
                     EventRegistration::where('event_id', $event->id)
                         ->where('status', 'waiting_list')
-                        ->where('waiting_list_position', '>', 1)
+                        ->where('waiting_list_position', '>', $promotedPos)
                         ->decrement('waiting_list_position');
 
                     if ($nextCandidate->student?->user) {
@@ -378,6 +407,16 @@ class RegistrationController extends Controller
     public function index(int $eventId, Request $request): JsonResponse
     {
         $event = Event::findOrFail($eventId);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && !$user->isManagement() && $event->organizer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You do not have permission to view registrations for this event.',
+            ], 403);
+        }
+
         $query = $event->registrations()->with(['student.user', 'attendance']);
 
         if ($request->filled('status')) {

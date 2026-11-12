@@ -67,6 +67,40 @@ class AuthAndStaffOperationsTest extends TestCase
         $loginAfter->assertStatus(200);
     }
 
+    public function test_verify_email_rejects_missing_token_and_inactive_accounts(): void
+    {
+        $inactiveUser = User::create([
+            'role_id' => 3,
+            'email' => 'inactive.user@school.edu',
+            'password' => bcrypt('Inactive@12345'),
+            'status' => 'inactive',
+            'email_verified_at' => null,
+        ]);
+
+        // Attempting to verify inactive account must be rejected with 403
+        $resp = $this->postJson('/api/v1/auth/verify-email', [
+            'email' => 'inactive.user@school.edu',
+            'code' => '123456',
+        ]);
+        $resp->assertStatus(403)
+            ->assertJsonPath('error_code', 'ERR_ACCOUNT_INACTIVE');
+
+        // Attempting to verify pending account without token/code must fail with 422
+        $pendingUser = User::create([
+            'role_id' => 3,
+            'email' => 'another.pending@school.edu',
+            'password' => bcrypt('Pending@12345'),
+            'status' => 'pending',
+            'email_verified_at' => null,
+        ]);
+
+        $noTokenResp = $this->postJson('/api/v1/auth/verify-email', [
+            'email' => 'another.pending@school.edu',
+        ]);
+        $noTokenResp->assertStatus(422)
+            ->assertJsonPath('error_code', 'ERR_INVALID_TOKEN');
+    }
+
     public function test_staff_can_cancel_registration_and_promote_waiting_list(): void
     {
         $orgLogin = $this->postJson('/api/v1/auth/login', [

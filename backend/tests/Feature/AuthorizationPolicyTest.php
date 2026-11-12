@@ -319,4 +319,72 @@ class AuthorizationPolicyTest extends TestCase
         // Admin → own dashboard 200
         $this->actAs($this->admin(), 'get', '/api/v1/dashboard/admin')->assertStatus(200);
     }
+
+    /** @test */
+    public function student_cannot_view_draft_or_pending_event(): void
+    {
+        $org = $this->organizer();
+        $draftEvent = Event::create([
+            'organizer_id' => $org->id,
+            'title' => 'Secret Draft Event',
+            'description' => 'Secret Draft Description',
+            'venue' => 'Room 101',
+            'event_date' => now()->addDays(5)->toDateString(),
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'registration_start' => now()->toDateTimeString(),
+            'registration_end' => now()->addDays(4)->toDateTimeString(),
+            'status' => 'draft',
+            'target_audience_type' => 'all',
+        ]);
+
+        $this->actAs($this->student(), 'get', "/api/v1/events/{$draftEvent->id}")
+            ->assertStatus(403)
+            ->assertJsonPath('error_code', 'ERR_EVENT_NOT_ACTIVE');
+    }
+
+    /** @test */
+    public function organizer_cannot_scan_or_view_other_organizers_event(): void
+    {
+        $orgA = $this->organizer();
+        $orgB = User::create([
+            'role_id' => Role::where('slug', 'organizer')->value('id'),
+            'email' => 'other.organizer@school.edu',
+            'password' => bcrypt('Organizer@12345'),
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+
+        $eventB = Event::create([
+            'organizer_id' => $orgB->id,
+            'title' => 'Organizer B Event',
+            'description' => 'Organizer B Description',
+            'venue' => 'Room 202',
+            'event_date' => now()->toDateString(),
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'registration_start' => now()->subDay()->toDateTimeString(),
+            'registration_end' => now()->addDay()->toDateTimeString(),
+            'status' => 'published',
+            'walk_in_allowed' => true,
+        ]);
+
+        // Organizer A attempts to scan on Event B -> 403
+        $this->actAs($orgA, 'post', "/api/v1/events/{$eventB->id}/attendance/scan", [
+            'qr_token' => str_repeat('a', 64),
+            'mode' => 'check_in',
+        ])->assertStatus(403)->assertJsonPath('error_code', 'ERR_FORBIDDEN');
+
+        // Organizer A attempts to view registrations of Event B -> 403
+        $this->actAs($orgA, 'get', "/api/v1/events/{$eventB->id}/registrations")
+            ->assertStatus(403)->assertJsonPath('error_code', 'ERR_FORBIDDEN');
+
+        // Organizer A attempts to view attendance of Event B -> 403
+        $this->actAs($orgA, 'get', "/api/v1/events/{$eventB->id}/attendance")
+            ->assertStatus(403)->assertJsonPath('error_code', 'ERR_FORBIDDEN');
+
+        // Organizer A attempts to view reports of Event B -> 403
+        $this->actAs($orgA, 'get', "/api/v1/reports/event-attendance/{$eventB->id}")
+            ->assertStatus(403)->assertJsonPath('error_code', 'ERR_FORBIDDEN');
+    }
 }

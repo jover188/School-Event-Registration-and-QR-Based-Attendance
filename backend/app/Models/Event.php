@@ -133,6 +133,9 @@ class Event extends Model
         if ($type === 'custom') {
             if (!empty($this->target_rules)) {
                 foreach ($this->target_rules as $rule) {
+                    if (!is_array($rule)) {
+                        continue;
+                    }
                     $matchesCourse = empty($rule['course']) || $rule['course'] === $student->course;
                     $matchesYear = empty($rule['year_level']) || $rule['year_level'] === $student->year_level;
                     $matchesSection = empty($rule['section']) || $rule['section'] === $student->section;

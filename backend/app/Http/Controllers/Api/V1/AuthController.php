@@ -204,14 +204,7 @@ class AuthController extends Controller
             'profile_photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
         ]);
 
-        if ($user->isStudent() && $user->student) {
-            $student = $user->student;
-            // Only contact_number is editable by students
-            if (array_key_exists('contact_number', $validated)) {
-                $student->contact_number = $validated['contact_number'];
-            }
-            $student->save();
-        } elseif ($user->student) {
+        if ($user->student) {
             $student = $user->student;
 
             foreach (['first_name', 'middle_name', 'last_name', 'course', 'year_level', 'section', 'department'] as $field) {
@@ -329,6 +322,35 @@ class AuthController extends Controller
                 'error_code' => 'ERR_USER_NOT_FOUND',
                 'message' => 'No user account found with that email address.',
             ], 404);
+        }
+
+        if ($user->status === 'inactive') {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_ACCOUNT_INACTIVE',
+                'message' => 'Your account has been deactivated. Please contact an administrator.',
+            ], 403);
+        }
+
+        if ($user->status === 'active') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Email is already verified. Your account is active.',
+                'data' => [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'status' => $user->status,
+                ],
+            ]);
+        }
+
+        $code = $validated['code'] ?? $validated['token'] ?? null;
+        if (empty($code)) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_INVALID_TOKEN',
+                'message' => 'A verification code or token is required to activate your account.',
+            ], 422);
         }
 
         $user->update([

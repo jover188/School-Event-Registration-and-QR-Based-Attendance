@@ -136,6 +136,14 @@ class SchoolAttendanceWorkflowTest extends TestCase
         $regResponse->assertStatus(201);
         $this->assertEquals('registered', $regResponse->json('data.status'));
 
+        // Attempt duplicate registration (Must return 409 ERR_DUPLICATE_REGISTRATION)
+        $dupReg = $this->requestAs($studentToken, 'POST', "/api/v1/events/{$event->id}/register");
+        $dupReg->assertStatus(409)
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'ERR_DUPLICATE_REGISTRATION',
+            ]);
+
         // 4. Get Student Active QR Token
         $qrResp = $this->requestAs($studentToken, 'GET', '/api/v1/student/qr');
         $qrToken = $qrResp->json('data.qr_token');
@@ -161,7 +169,11 @@ class SchoolAttendanceWorkflowTest extends TestCase
             'qr_token' => $qrToken,
             'mode' => 'check_in',
         ]);
-        $dupScan->assertStatus(409);
+        $dupScan->assertStatus(409)
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'ERR_DUPLICATE_CHECK_IN',
+            ]);
 
         // 7. Organizer Scans QR (Check-Out Mode)
         $checkOutResponse = $this->requestAs($orgToken, 'POST', "/api/v1/events/{$event->id}/attendance/scan", [
@@ -170,6 +182,43 @@ class SchoolAttendanceWorkflowTest extends TestCase
         ]);
         $checkOutResponse->assertStatus(200);
         $this->assertNotNull($checkOutResponse->json('data.check_out_time'));
+
+        // 8. Attempt duplicate Check-Out Scan (Must fail with 409 ERR_ALREADY_CHECKED_OUT)
+        $dupCheckOut = $this->requestAs($orgToken, 'POST', "/api/v1/events/{$event->id}/attendance/scan", [
+            'qr_token' => $qrToken,
+            'mode' => 'check_out',
+        ]);
+        $dupCheckOut->assertStatus(409)
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'ERR_ALREADY_CHECKED_OUT',
+            ]);
+
+        // 9. QR Scan rejection on completed event (Must fail with 422 ERR_EVENT_NOT_ACTIVE)
+        $event->update(['status' => 'completed']);
+        $completedScan = $this->requestAs($orgToken, 'POST', "/api/v1/events/{$event->id}/attendance/scan", [
+            'qr_token' => $qrToken,
+            'mode' => 'check_in',
+        ]);
+        $completedScan->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'ERR_EVENT_NOT_ACTIVE',
+            ]);
+
+        // 10. Manual mark rejection on cancelled event (Must fail with 422 ERR_EVENT_NOT_ACTIVE)
+        $event->update(['status' => 'cancelled']);
+        $studentModel = Student::where('student_id_number', '20260001')->firstOrFail();
+        $cancelledMark = $this->requestAs($orgToken, 'POST', "/api/v1/events/{$event->id}/attendance/mark", [
+            'student_id' => $studentModel->id,
+            'status' => 'present',
+            'reason' => 'Testing manual mark on cancelled event',
+        ]);
+        $cancelledMark->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'ERR_EVENT_NOT_ACTIVE',
+            ]);
     }
 
     public function test_waiting_list_auto_promotion_on_cancellation(): void

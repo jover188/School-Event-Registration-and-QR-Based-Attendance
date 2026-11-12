@@ -31,8 +31,17 @@ class AttendanceController extends Controller
         ]);
 
         $event = Event::findOrFail($eventId);
+        $scannerUser = $request->user();
 
-        if (in_array($event->status, ['draft', 'pending_approval', 'cancelled'])) {
+        if (!$scannerUser->isAdmin() && $event->organizer_id !== $scannerUser->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You do not have permission to scan attendance for this event.',
+            ], 403);
+        }
+
+        if (!in_array($event->status, ['published', 'ongoing'], true)) {
             return response()->json([
                 'success' => false,
                 'error_code' => 'ERR_EVENT_NOT_ACTIVE',
@@ -66,34 +75,55 @@ class AttendanceController extends Controller
 
         // 2. CHECK-OUT MODE
         if ($validated['mode'] === 'check_out') {
-            $attendance = Attendance::where('event_id', $event->id)
-                ->where('student_id', $student->id)
-                ->first();
+            $checkoutResult = DB::transaction(function () use ($event, $student) {
+                $attendance = Attendance::where('event_id', $event->id)
+                    ->where('student_id', $student->id)
+                    ->lockForUpdate()
+                    ->first();
 
-            if (!$attendance) {
-                return response()->json([
-                    'success' => false,
-                    'error_code' => 'ERR_NO_CHECK_IN_RECORD',
-                    'message' => "Cannot check out: {$student->full_name} does not have an existing check-in record for this event.",
-                ], 422);
+                if (!$attendance) {
+                    return ['error' => 'ERR_NO_CHECK_IN_RECORD'];
+                }
+
+                if ($attendance->check_out_time) {
+                    return [
+                        'error' => 'ERR_ALREADY_CHECKED_OUT',
+                        'check_out_time' => $attendance->check_out_time,
+                    ];
+                }
+
+                $attendance->update([
+                    'check_out_time' => now(),
+                ]);
+
+                ActivityLog::log('attendance_check_out', 'attendance', $attendance->id, [
+                    'event_id' => $event->id,
+                    'student_id' => $student->id,
+                ]);
+
+                return ['attendance' => $attendance];
+            });
+
+            if (isset($checkoutResult['error'])) {
+                if ($checkoutResult['error'] === 'ERR_NO_CHECK_IN_RECORD') {
+                    return response()->json([
+                        'success' => false,
+                        'error_code' => 'ERR_NO_CHECK_IN_RECORD',
+                        'message' => "Cannot check out: {$student->full_name} does not have an existing check-in record for this event.",
+                    ], 422);
+                }
+
+                if ($checkoutResult['error'] === 'ERR_ALREADY_CHECKED_OUT') {
+                    $checkOutTime = $checkoutResult['check_out_time'];
+                    return response()->json([
+                        'success' => false,
+                        'error_code' => 'ERR_ALREADY_CHECKED_OUT',
+                        'message' => "{$student->full_name} has already checked out at {$checkOutTime->format('h:i A')}.",
+                    ], 409);
+                }
             }
 
-            if ($attendance->check_out_time) {
-                return response()->json([
-                    'success' => false,
-                    'error_code' => 'ERR_ALREADY_CHECKED_OUT',
-                    'message' => "{$student->full_name} has already checked out at {$attendance->check_out_time->format('h:i A')}.",
-                ], 409);
-            }
-
-            $attendance->update([
-                'check_out_time' => now(),
-            ]);
-
-            ActivityLog::log('attendance_check_out', 'attendance', $attendance->id, [
-                'event_id' => $event->id,
-                'student_id' => $student->id,
-            ]);
+            $attendance = $checkoutResult['attendance'];
 
             return response()->json([
                 'success' => true,
@@ -166,6 +196,20 @@ class AttendanceController extends Controller
                 ], 403);
             }
 
+            if (!$event->isStudentEligible($student)) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'ERR_AUDIENCE_INELIGIBLE',
+                    'message' => "{$student->full_name} is not eligible for this event based on audience criteria.",
+                    'data' => [
+                        'student' => [
+                            'student_id_number' => $student->student_id_number,
+                            'full_name' => $student->full_name,
+                        ],
+                    ],
+                ], 403);
+            }
+
             // Walk-in is allowed: create or update registration as walk_in
             $isWalkIn = true;
             $attendanceStatus = 'walk_in';
@@ -182,12 +226,26 @@ class AttendanceController extends Controller
         }
 
         // Atomic attendance recording
-        $attendance = DB::transaction(function () use ($event, $student, $registration, $isWalkIn, $attendanceStatus, $scannerUser) {
-            $regRecord = $registration;
+        $result = DB::transaction(function () use ($event, $student, $isWalkIn, $attendanceStatus, $scannerUser) {
+            Event::where('id', $event->id)->lockForUpdate()->first();
+
+            $existing = Attendance::where('event_id', $event->id)
+                ->where('student_id', $student->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                return ['duplicate' => true, 'existing' => $existing];
+            }
+
+            $regRecord = EventRegistration::where('event_id', $event->id)
+                ->where('student_id', $student->id)
+                ->lockForUpdate()
+                ->first();
 
             if ($isWalkIn) {
-                $wasWaiting = $registration && $registration->status === 'waiting_list';
-                $oldPosition = $wasWaiting ? $registration->waiting_list_position : null;
+                $wasWaiting = $regRecord && $regRecord->status === 'waiting_list';
+                $oldPosition = $wasWaiting ? $regRecord->waiting_list_position : null;
 
                 $regRecord = EventRegistration::updateOrCreate(
                     ['event_id' => $event->id, 'student_id' => $student->id],
@@ -236,8 +294,29 @@ class AttendanceController extends Controller
                 'status' => $attendanceStatus,
             ]);
 
-            return $createdAttendance;
+            return ['attendance' => $createdAttendance];
         });
+
+        if (isset($result['duplicate']) && $result['duplicate']) {
+            $existingAttendance = $result['existing'];
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_DUPLICATE_CHECK_IN',
+                'message' => "Check-in was already recorded for {$student->full_name} at {$existingAttendance->check_in_time?->format('h:i A')} (Status: " . strtoupper($existingAttendance->status) . ").",
+                'data' => [
+                    'check_in_time' => $existingAttendance->check_in_time?->toIso8601String(),
+                    'status' => $existingAttendance->status,
+                    'student' => [
+                        'id' => $student->id,
+                        'student_id_number' => $student->student_id_number,
+                        'full_name' => $student->full_name,
+                        'profile_photo_url' => $student->profile_photo_url,
+                    ],
+                ],
+            ], 409);
+        }
+
+        $attendance = $result['attendance'];
 
         $statusLabel = strtoupper($attendanceStatus);
         $message = "Check-in recorded as {$statusLabel} for {$student->full_name}.";
@@ -292,19 +371,44 @@ class AttendanceController extends Controller
             ], 403);
         }
 
+        if (!in_array($event->status, ['published', 'ongoing', 'completed'], true)) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_EVENT_NOT_ACTIVE',
+                'message' => "Attendance cannot be marked for an event in '{$event->status}' status.",
+            ], 422);
+        }
+
         $student = Student::with('user')->findOrFail($validated['student_id']);
 
+        if (!$event->isStudentEligible($student)) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_AUDIENCE_INELIGIBLE',
+                'message' => 'The student is not eligible for this event based on audience criteria.',
+            ], 403);
+        }
+
         $attendance = DB::transaction(function () use ($event, $student, $validated, $user) {
-            $reg = EventRegistration::firstOrCreate(
-                ['event_id' => $event->id, 'student_id' => $student->id],
-                [
+            Event::where('id', $event->id)->lockForUpdate()->first();
+
+            $reg = EventRegistration::where('event_id', $event->id)
+                ->where('student_id', $student->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$reg) {
+                $reg = EventRegistration::create([
+                    'event_id' => $event->id,
+                    'student_id' => $student->id,
                     'status' => $validated['status'] === 'walk_in' ? 'walk_in' : 'registered',
                     'registered_at' => now(),
-                ]
-            );
+                ]);
+            }
 
             $existing = Attendance::where('event_id', $event->id)
                 ->where('student_id', $student->id)
+                ->lockForUpdate()
                 ->first();
 
             $originalStatus = $existing ? $existing->status : 'absent';
@@ -373,6 +477,16 @@ class AttendanceController extends Controller
     public function index(int $eventId, Request $request): JsonResponse
     {
         $event = Event::findOrFail($eventId);
+        $user = $request->user();
+
+        if (!$user->isAdmin() && !$user->isManagement() && $event->organizer_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_FORBIDDEN',
+                'message' => 'You do not have permission to view attendance for this event.',
+            ], 403);
+        }
+
         $query = $event->attendances()->with(['student.user', 'scanner:id,email']);
 
         if ($request->filled('status')) {
@@ -437,24 +551,25 @@ class AttendanceController extends Controller
         $originalStatus = $attendance->status;
 
         DB::transaction(function () use ($attendance, $validated, $user, $originalStatus) {
-            $attendance->update([
+            $lockedAttendance = Attendance::where('id', $attendance->id)->lockForUpdate()->first();
+            $lockedAttendance->update([
                 'status' => $validated['new_status'],
             ]);
 
             AttendanceCorrection::create([
-                'attendance_id' => $attendance->id,
+                'attendance_id' => $lockedAttendance->id,
                 'corrected_by' => $user->id,
                 'original_status' => $originalStatus,
                 'new_status' => $validated['new_status'],
                 'reason' => $validated['reason'],
             ]);
 
-            ActivityLog::log('attendance_corrected', 'attendance', $attendance->id, [
+            ActivityLog::log('attendance_corrected', 'attendance', $lockedAttendance->id, [
                 'original_status' => $originalStatus,
                 'new_status' => $validated['new_status'],
                 'reason' => $validated['reason'],
-                'student_id' => $attendance->student_id,
-                'event_id' => $attendance->event_id,
+                'student_id' => $lockedAttendance->student_id,
+                'event_id' => $lockedAttendance->event_id,
             ]);
         });
 

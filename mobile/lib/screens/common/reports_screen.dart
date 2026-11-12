@@ -281,22 +281,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (!mounted) return;
 
     if (response.success) {
-      dynamic payload = response.data;
-      if (payload == null) {
-        final rawDownload = await ApiClient().downloadBytes(
-          endpoint,
-          queryParams: queryParams.isEmpty ? null : queryParams,
-        );
-        if (!mounted) return;
-        if (rawDownload.bytes.isNotEmpty) {
-          try {
-            final decoded = json.decode(utf8.decode(rawDownload.bytes));
-            if (decoded is Map<String, dynamic>) {
-              payload = decoded['summary'] ?? decoded['data'] ?? decoded;
-            }
-          } catch (_) {}
-        }
-      }
+      final payload = response.data ?? response.rawBody?['summary'] ?? response.rawBody;
       setState(() {
         _isLoadingReport = false;
         _reportPayload = payload ?? <String, dynamic>{};
@@ -382,13 +367,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
     String upperFormat,
     List<int> bytes,
   ) async {
+    final isTextFormat = upperFormat == 'CSV';
     String previewText;
-    try {
-      final decoded = utf8.decode(bytes, allowMalformed: true);
-      previewText =
-          decoded.length > 600 ? '${decoded.substring(0, 600)}…' : decoded;
-    } catch (_) {
-      previewText = 'Binary $upperFormat payload (${bytes.length} bytes).';
+    if (isTextFormat) {
+      try {
+        final decoded = utf8.decode(bytes, allowMalformed: true);
+        previewText =
+            decoded.length > 600 ? '${decoded.substring(0, 600)}…' : decoded;
+      } catch (_) {
+        previewText = 'CSV report payload (${bytes.length} bytes).';
+      }
+    } else {
+      final sizeKb = (bytes.length / 1024).toStringAsFixed(1);
+      previewText = '$upperFormat document generated successfully ($sizeKb KB).\nPayload ready for saving or export.';
     }
 
     await showDialog<void>(
