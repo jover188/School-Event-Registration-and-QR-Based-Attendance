@@ -65,6 +65,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
   String? _errorMessage;
   String _currentMonthKey = '';
   int _unreadNotifications = 0;
+  String? _role;
+
+  bool get _isStaffViewer {
+    final r = _role?.trim().toLowerCase();
+    return r == 'administrator' || r == 'organizer' || r == 'management';
+  }
+
+  Future<void> _resolveRole() async {
+    try {
+      final role = await ApiClient().getUserRole();
+      if (mounted) setState(() => _role = role);
+    } catch (_) {}
+  }
 
   // ──────────────────────────────────────────────────────────────────────────
   // Lifecycle
@@ -85,6 +98,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     } else {
       _loadEventsForMonth(_focusedDay);
       _fetchUnreadNotifications();
+      _resolveRole();
     }
   }
 
@@ -140,6 +154,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         'date_from': dateFrom,
         'date_to': dateTo,
         'per_page': '100',
+        'status': 'published,ongoing',
       },
     );
 
@@ -683,6 +698,61 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  /// Organized list of every event in the focused month for staff roles.
+  List<Widget> _buildStaffMonthSlivers(BuildContext context) {
+    final d = context.design;
+    final fg = d.isDark
+        ? CalendarBwPalette.primaryWhite
+        : CalendarBwPalette.primaryBlack;
+    final keys = _eventsByDay.keys
+        .where((k) =>
+            k.year == _focusedDay.year && k.month == _focusedDay.month)
+        .toList()
+      ..sort();
+    final events = [for (final k in keys) ..._eventsByDay[k]!];
+
+    if (events.isEmpty) {
+      return const [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: EmptyStateView(
+              icon: LucideIcons.calendarX2,
+              title: 'No events this month',
+              message: 'There are no events scheduled for this month.',
+            ),
+          ),
+        ),
+      ];
+    }
+
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          key: const ValueKey('calendar-staff-month-list'),
+          padding: EdgeInsets.symmetric(horizontal: d.md, vertical: d.sm),
+          child: Text(
+            'All events in ${DateFormat('MMMM yyyy').format(_focusedDay)} (${events.length})',
+            style: d.cardTitle.copyWith(color: fg),
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: d.md),
+        sliver: SliverList.builder(
+          itemCount: events.length,
+          itemBuilder: (context, index) {
+            final e = events[index];
+            return _BwEventCard(
+              event: e,
+              onTap: () => _openEventDetail(e),
+            );
+          },
+        ),
+      ),
+    ];
+  }
+
   List<Widget> _buildEventSlivers(BuildContext context) {
     final d = context.design;
     final isDark = d.isDark;
@@ -711,6 +781,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ),
       ];
+    }
+
+    if (_selectedDay == null && _isStaffViewer) {
+      return _buildStaffMonthSlivers(context);
     }
 
     if (_selectedDay == null) {

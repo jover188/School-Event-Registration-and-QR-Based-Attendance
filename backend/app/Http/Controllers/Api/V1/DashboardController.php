@@ -80,6 +80,7 @@ class DashboardController extends Controller
         $publishedCount = (clone $organizedQuery)->where('status', 'published')->count();
         $ongoingCount = (clone $organizedQuery)->where('status', 'ongoing')->count();
         $draftCount = (clone $organizedQuery)->where('status', 'draft')->count();
+        $pendingCount = (clone $organizedQuery)->where('status', 'pending_approval')->count();
 
         // Recent organized events with attendance tallies
         $recentEvents = (clone $organizedQuery)
@@ -96,6 +97,7 @@ class DashboardController extends Controller
                     'published_events' => $publishedCount,
                     'ongoing_events' => $ongoingCount,
                     'draft_events' => $draftCount,
+                    'pending_events' => $pendingCount,
                 ],
                 'recent_events' => $recentEvents,
             ],

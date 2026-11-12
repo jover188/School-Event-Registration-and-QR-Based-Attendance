@@ -111,7 +111,10 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
 
     final results = await Future.wait([
       ApiClient().get(ApiConstants.organizerDashboard),
-      ApiClient().get(ApiConstants.events),
+      ApiClient().get(
+        ApiConstants.events,
+        queryParams: {'my_events': 'true', 'per_page': '100'},
+      ),
     ]);
 
     final dashboardResp = results[0];
@@ -238,12 +241,11 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
         _myEvents.where((e) => e.status == 'published').length;
     final ongoingCount = (_stats['ongoing_events'] as num?)?.toInt() ??
         _myEvents.where((e) => e.status == 'ongoing').length;
-    final draftOrPendingCount = (_stats['pending_events'] as num?)?.toInt() ??
-        _myEvents
-            .where(
-              (e) => e.status == 'draft' || e.status == 'pending_approval',
-            )
-            .length;
+    final draftCount = (_stats['draft_events'] as num?)?.toInt() ??
+        _myEvents.where((e) => e.status == 'draft').length;
+    final pendingCount = (_stats['pending_events'] as num?)?.toInt() ??
+        _myEvents.where((e) => e.status == 'pending_approval').length;
+    final draftOrPendingCount = draftCount + pendingCount;
 
     final priorityEvents = _myEvents.take(4).toList();
 
