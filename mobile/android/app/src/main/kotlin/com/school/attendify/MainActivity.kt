@@ -1,4 +1,4 @@
-package com.example.school_event_attendance
+package com.school.attendify
 
 import io.flutter.embedding.android.FlutterActivity
 
