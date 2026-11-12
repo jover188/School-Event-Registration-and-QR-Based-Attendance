@@ -35,6 +35,9 @@ class ApiConstants {
   static const String profile = '/profile';
   static const String updateProfile = '/profile';
   static const String changePassword = '/profile/change-password';
+  static const String profileCorrectionRequest = '/profile/correction-request';
+  static String adminUpdateStudentProfile(int studentId) =>
+      '/admin/students/$studentId/profile';
 
   // ===========================================================================
   // Student QR
@@ -50,6 +53,7 @@ class ApiConstants {
   // Events & Approvals
   // ===========================================================================
   static const String events = '/events';
+  static const String eventAudienceOptions = '/events/audience-options';
   static String eventDetail(int id) => '/events/$id';
   static String eventDetails(int id) => '/events/$id';
   static String submitEventApproval(int id) => '/events/$id/submit-approval';

@@ -50,6 +50,7 @@ Route::prefix('v1')->group(function () {
 
         // General Event Discovery (Available to all authenticated roles)
         Route::get('/events', [EventController::class, 'index']);
+        Route::get('/events/audience-options', [EventController::class, 'audienceOptions']);
         Route::get('/events/{id}', [EventController::class, 'show']);
 
         // ====================================================================
@@ -68,6 +69,9 @@ Route::prefix('v1')->group(function () {
 
             // Student Dashboard
             Route::get('/dashboard/student', [DashboardController::class, 'student']);
+
+            // Profile Correction Request
+            Route::post('/profile/correction-request', [AuthController::class, 'requestProfileCorrection']);
         });
 
         // ====================================================================
@@ -105,6 +109,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/admin/users', [AdminController::class, 'createUser']);
             Route::patch('/admin/users/{id}/status', [AdminController::class, 'toggleStatus']);
             Route::post('/admin/users/{id}/reset-password', [AdminController::class, 'resetPassword']);
+
+            // Student Profile Management
+            Route::put('/admin/students/{id}/profile', [AdminController::class, 'updateStudentProfile']);
 
             // QR Inspection & Reissue
             Route::get('/admin/students/{id}/qr', [StudentQRController::class, 'inspect']);

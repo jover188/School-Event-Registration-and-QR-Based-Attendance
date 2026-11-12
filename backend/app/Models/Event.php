@@ -15,6 +15,8 @@ class Event extends Model
         'organizer_id',
         'title',
         'description',
+        'category',
+        'cover_image_path',
         'venue',
         'event_date',
         'start_time',
@@ -24,6 +26,12 @@ class Event extends Model
         'max_participants',
         'late_grace_period_minutes',
         'walk_in_allowed',
+        'target_audience_type',
+        'target_courses',
+        'target_year_levels',
+        'target_sections',
+        'target_rules',
+        'send_announcement',
         'status',
     ];
 
@@ -36,6 +44,11 @@ class Event extends Model
             'walk_in_allowed' => 'boolean',
             'max_participants' => 'integer',
             'late_grace_period_minutes' => 'integer',
+            'target_courses' => 'array',
+            'target_year_levels' => 'array',
+            'target_sections' => 'array',
+            'target_rules' => 'array',
+            'send_announcement' => 'boolean',
         ];
     }
 
@@ -95,5 +108,67 @@ class Event extends Model
 
         $remaining = $this->max_participants - $this->activeRegistrations()->count();
         return max(0, $remaining);
+    }
+
+    public function isStudentEligible(?Student $student): bool
+    {
+        if (!$student) {
+            return false;
+        }
+
+        $type = $this->target_audience_type ?? 'all';
+
+        if ($type === 'all' || empty($type)) {
+            return true;
+        }
+
+        if ($type === 'course') {
+            return in_array($student->course, $this->target_courses ?? [], true);
+        }
+
+        if ($type === 'year_level') {
+            return in_array($student->year_level, $this->target_year_levels ?? [], true);
+        }
+
+        if ($type === 'custom') {
+            if (!empty($this->target_rules)) {
+                foreach ($this->target_rules as $rule) {
+                    $matchesCourse = empty($rule['course']) || $rule['course'] === $student->course;
+                    $matchesYear = empty($rule['year_level']) || $rule['year_level'] === $student->year_level;
+                    $matchesSection = empty($rule['section']) || $rule['section'] === $student->section;
+
+                    if ($matchesCourse && $matchesYear && $matchesSection) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            if (!empty($this->target_courses) || !empty($this->target_year_levels) || !empty($this->target_sections)) {
+                $matchesCourse = empty($this->target_courses) || in_array($student->course, $this->target_courses, true);
+                $matchesYear = empty($this->target_year_levels) || in_array($student->year_level, $this->target_year_levels, true);
+                $matchesSection = empty($this->target_sections) || in_array($student->section, $this->target_sections, true);
+
+                return $matchesCourse && $matchesYear && $matchesSection;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    public function eligibleStudentUserIds(): \Illuminate\Support\Collection
+    {
+        return User::where('role_id', 3)
+            ->where('status', 'active')
+            ->whereHas('student')
+            ->with('student')
+            ->get()
+            ->filter(function (User $user) {
+                return $this->isStudentEligible($user->student);
+            })
+            ->pluck('id')
+            ->values();
     }
 }

@@ -98,6 +98,62 @@ class EventCard extends StatelessWidget {
                 ? StatusBadge(status: event.status)
                 : null;
 
+    final categoryBadge = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: d.foreground,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        event.category.toUpperCase(),
+        style: TextStyle(
+          color: d.background,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+
+    final audienceBadge = Container(
+      constraints: BoxConstraints(maxWidth: isScaledText ? 120 : 180),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: d.border, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            LucideIcons.users,
+            size: 10,
+            color: d.mutedForeground,
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              event.audienceSummary,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: d.foreground,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
     final mainInfoContent = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -156,6 +212,16 @@ class EventCard extends StatelessWidget {
                     SizedBox(height: d.sm),
                     badgeWidget,
                   ],
+                  SizedBox(height: d.xs),
+                  Wrap(
+                    spacing: d.xs,
+                    runSpacing: d.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      categoryBadge,
+                      audienceBadge,
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -284,4 +350,3 @@ class EventCard extends StatelessWidget {
     );
   }
 }
-

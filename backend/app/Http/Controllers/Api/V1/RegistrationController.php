@@ -32,6 +32,14 @@ class RegistrationController extends Controller
 
         $event = Event::findOrFail($eventId);
 
+        if (!$event->isStudentEligible($student)) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_AUDIENCE_INELIGIBLE',
+                'message' => 'You are not eligible to register for this event based on audience criteria.',
+            ], 403);
+        }
+
         if ($event->status !== 'published') {
             return response()->json([
                 'success' => false,

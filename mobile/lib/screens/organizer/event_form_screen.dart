@@ -27,6 +27,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _venueController;
+  late final TextEditingController _coverImageController;
   late final TextEditingController _eventDateController;
   late final TextEditingController _startTimeController;
   late final TextEditingController _endTimeController;
@@ -38,6 +39,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
   late final FocusNode _titleFocus = FocusNode();
   late final FocusNode _descriptionFocus = FocusNode();
   late final FocusNode _venueFocus = FocusNode();
+  late final FocusNode _coverImageFocus = FocusNode();
   late final FocusNode _eventDateFocus = FocusNode();
   late final FocusNode _startTimeFocus = FocusNode();
   late final FocusNode _endTimeFocus = FocusNode();
@@ -51,6 +53,44 @@ class _EventFormScreenState extends State<EventFormScreen> {
   bool _isSaving = false;
   bool _isSubmittingAction = false;
   late String _currentStatus;
+
+  // Audience & Category State
+  String _selectedCategory = 'General';
+  String _targetAudienceType = 'all';
+  List<String> _selectedCourses = <String>[];
+  List<String> _selectedYearLevels = <String>[];
+  List<Map<String, dynamic>> _targetRules = <Map<String, dynamic>>[];
+  bool _sendAnnouncement = true;
+
+  // Custom Combination builder selection
+  String _comboCourse = 'BSIT';
+  String _comboYearLevel = '1st Year';
+
+  // Dynamic Options (fetched or defaulted)
+  List<String> _availableCategories = const [
+    'General',
+    'Academic',
+    'Cultural',
+    'Sports',
+    'Workshop',
+    'Seminar',
+    'Career',
+    'Community',
+  ];
+  List<String> _availableCourses = const [
+    'BSIT',
+    'BSCS',
+    'BSIS',
+    'BSBA',
+    'BSEd',
+    'BSHM',
+  ];
+  List<String> _availableYearLevels = const [
+    '1st Year',
+    '2nd Year',
+    '3rd Year',
+    '4th Year',
+  ];
 
   Map<String, String?> _fieldServerErrors = {};
 
@@ -73,6 +113,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
     _titleController = TextEditingController(text: e?.title ?? '');
     _descriptionController = TextEditingController(text: e?.description ?? '');
     _venueController = TextEditingController(text: e?.venue ?? '');
+    _coverImageController = TextEditingController(text: e?.coverImagePath ?? '');
     _eventDateController = TextEditingController(text: rawEventDate);
     _startTimeController = TextEditingController(
       text: e?.startTime.isNotEmpty == true ? e!.startTime : '09:00:00',
@@ -93,16 +134,48 @@ class _EventFormScreenState extends State<EventFormScreen> {
       text: '${e?.lateGracePeriodMinutes ?? 15}',
     );
 
+    if (e != null) {
+      if (e.category.isNotEmpty) {
+        _selectedCategory = e.category;
+      }
+      _targetAudienceType = e.targetAudienceType;
+      _selectedCourses = List<String>.from(e.targetCourses);
+      _selectedYearLevels = List<String>.from(e.targetYearLevels);
+      _targetRules = List<Map<String, dynamic>>.from(e.targetRules);
+      _sendAnnouncement = e.sendAnnouncement;
+    }
+
+    _fetchAudienceOptions();
+
     if (_isEditing) {
       _loadExistingEventDetails();
     }
+
+    _titleController.addListener(_onFieldChanged);
+    _venueController.addListener(_onFieldChanged);
+    _eventDateController.addListener(_onFieldChanged);
+    _startTimeController.addListener(_onFieldChanged);
+    _endTimeController.addListener(_onFieldChanged);
+    _maxParticipantsController.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _titleController.removeListener(_onFieldChanged);
+    _venueController.removeListener(_onFieldChanged);
+    _eventDateController.removeListener(_onFieldChanged);
+    _startTimeController.removeListener(_onFieldChanged);
+    _endTimeController.removeListener(_onFieldChanged);
+    _maxParticipantsController.removeListener(_onFieldChanged);
+
     _titleController.dispose();
     _descriptionController.dispose();
     _venueController.dispose();
+    _coverImageController.dispose();
     _eventDateController.dispose();
     _startTimeController.dispose();
     _endTimeController.dispose();
@@ -114,6 +187,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
     _titleFocus.dispose();
     _descriptionFocus.dispose();
     _venueFocus.dispose();
+    _coverImageFocus.dispose();
     _eventDateFocus.dispose();
     _startTimeFocus.dispose();
     _endTimeFocus.dispose();
@@ -131,6 +205,50 @@ class _EventFormScreenState extends State<EventFormScreen> {
     return '$y-$m-$d';
   }
 
+  Future<void> _fetchAudienceOptions() async {
+    try {
+      final response =
+          await ApiClient().get(ApiConstants.eventAudienceOptions);
+      if (!mounted) return;
+      if (response.success && response.data is Map) {
+        final data = Map<String, dynamic>.from(response.data as Map);
+        setState(() {
+          if (data['categories'] is List &&
+              (data['categories'] as List).isNotEmpty) {
+            _availableCategories = (data['categories'] as List)
+                .map((e) => e.toString())
+                .toList();
+          }
+          if (data['courses'] is List &&
+              (data['courses'] as List).isNotEmpty) {
+            _availableCourses =
+                (data['courses'] as List).map((e) => e.toString()).toList();
+          }
+          if (data['year_levels'] is List &&
+              (data['year_levels'] as List).isNotEmpty) {
+            _availableYearLevels = (data['year_levels'] as List)
+                .map((e) => e.toString())
+                .toList();
+          }
+
+          if (!_availableCategories.contains(_selectedCategory)) {
+            _selectedCategory = _availableCategories.first;
+          }
+          if (!_availableCourses.contains(_comboCourse) &&
+              _availableCourses.isNotEmpty) {
+            _comboCourse = _availableCourses.first;
+          }
+          if (!_availableYearLevels.contains(_comboYearLevel) &&
+              _availableYearLevels.isNotEmpty) {
+            _comboYearLevel = _availableYearLevels.first;
+          }
+        });
+      }
+    } catch (_) {
+      // Keep static defaults on network/offline fallback
+    }
+  }
+
   Future<void> _loadExistingEventDetails() async {
     final eventId = widget.event?.id;
     if (eventId == null) return;
@@ -143,6 +261,35 @@ class _EventFormScreenState extends State<EventFormScreen> {
       setState(() {
         if (data['status'] != null) {
           _currentStatus = data['status'].toString();
+        }
+        if (data['category'] != null &&
+            data['category'].toString().isNotEmpty) {
+          _selectedCategory = data['category'].toString();
+        }
+        if (data['cover_image_path'] != null) {
+          _coverImageController.text = data['cover_image_path'].toString();
+        }
+        if (data['target_audience_type'] != null) {
+          _targetAudienceType = data['target_audience_type'].toString();
+        }
+        if (data['target_courses'] is List) {
+          _selectedCourses = (data['target_courses'] as List)
+              .map((e) => e.toString())
+              .toList();
+        }
+        if (data['target_year_levels'] is List) {
+          _selectedYearLevels = (data['target_year_levels'] as List)
+              .map((e) => e.toString())
+              .toList();
+        }
+        if (data['target_rules'] is List) {
+          _targetRules = (data['target_rules'] as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        }
+        if (data['send_announcement'] != null) {
+          _sendAnnouncement = data['send_announcement'] == true ||
+              data['send_announcement'] == 1;
         }
         if (data['registration_start'] != null) {
           _registrationStartController.text = _normalizeDateTime(
@@ -163,8 +310,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
   }
 
   String _normalizeDateTime(String raw) {
-    final cleaned = raw.replaceAll('T', ' ').split('.').first.trim();
-    return cleaned;
+    return raw.replaceAll('T', ' ').split('.').first.trim();
   }
 
   Future<void> _pickEventDate() async {
@@ -215,6 +361,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _titleFocus,
       _descriptionFocus,
       _venueFocus,
+      _coverImageFocus,
       _eventDateFocus,
       _startTimeFocus,
       _endTimeFocus,
@@ -231,7 +378,53 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
   }
 
-  Future<void> _saveEvent() async {
+  String get _audienceSummaryText {
+    if (_targetAudienceType == 'course') {
+      return _selectedCourses.isEmpty
+          ? 'Specific Courses (None Selected)'
+          : 'Course: ${_selectedCourses.join(", ")}';
+    } else if (_targetAudienceType == 'year_level') {
+      return _selectedYearLevels.isEmpty
+          ? 'Specific Year Levels (None Selected)'
+          : 'Year: ${_selectedYearLevels.join(", ")}';
+    } else if (_targetAudienceType == 'custom') {
+      if (_targetRules.isNotEmpty) {
+        return _targetRules
+            .map((r) {
+              final c = r['course']?.toString() ?? '';
+              final y = r['year_level']?.toString() ?? '';
+              if (c.isNotEmpty && y.isNotEmpty) return '$c ($y)';
+              return c.isNotEmpty ? c : y;
+            })
+            .where((s) => s.isNotEmpty)
+            .join(', ');
+      }
+      return 'Custom Rules (No combinations added)';
+    }
+    return 'All Students';
+  }
+
+  void _addCustomCombination() {
+    final rule = {'course': _comboCourse, 'year_level': _comboYearLevel};
+    final exists = _targetRules.any(
+      (r) =>
+          r['course'] == rule['course'] &&
+          r['year_level'] == rule['year_level'],
+    );
+    if (!exists) {
+      setState(() {
+        _targetRules.add(rule);
+      });
+    }
+  }
+
+  void _removeCustomCombination(int index) {
+    setState(() {
+      _targetRules.removeAt(index);
+    });
+  }
+
+  Future<void> _saveEvent({bool saveAsDraft = false}) async {
     setState(() => _fieldServerErrors = {});
 
     final invalidFields = _formKey.currentState!.validateGranularly();
@@ -252,7 +445,20 @@ class _EventFormScreenState extends State<EventFormScreen> {
     final payload = <String, dynamic>{
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
+      'category': _selectedCategory,
       'venue': _venueController.text.trim(),
+      'cover_image_path': _coverImageController.text.trim().isNotEmpty
+          ? _coverImageController.text.trim()
+          : null,
+      'target_audience_type': _targetAudienceType,
+      'target_courses':
+          _targetAudienceType == 'course' ? _selectedCourses : <String>[],
+      'target_year_levels':
+          _targetAudienceType == 'year_level' ? _selectedYearLevels : <String>[],
+      'target_sections': <String>[],
+      'target_rules':
+          _targetAudienceType == 'custom' ? _targetRules : <Map<String, dynamic>>[],
+      'send_announcement': _sendAnnouncement,
       'event_date': _eventDateController.text.trim(),
       'start_time': _startTimeController.text.trim(),
       'end_time': _endTimeController.text.trim(),
@@ -261,6 +467,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       'max_participants': maxCap,
       'late_grace_period_minutes': graceMinutes,
       'walk_in_allowed': _walkInAllowed,
+      if (!_isEditing) 'save_as_draft': saveAsDraft,
     };
 
     setState(() => _isSaving = true);
@@ -282,7 +489,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
         response.message ??
             (_isEditing
                 ? 'Event updated successfully.'
-                : 'Event draft created successfully.'),
+                : (saveAsDraft
+                    ? 'Event draft saved successfully.'
+                    : 'Event submitted for approval.')),
       );
       Navigator.pop(context, true);
     } else {
@@ -409,12 +618,12 @@ class _EventFormScreenState extends State<EventFormScreen> {
                     SizedBox(height: d.md),
                   ],
 
-                  // Section 1: Event Details
+                  // SECTION A: Event Information
                   _FormSectionCard(
                     header: const SectionHeader(
-                      title: 'Event Details',
+                      title: 'Event Information',
                       subtitle:
-                          'Provide official event title, description, and venue',
+                          'Provide official event title, description, category, and venue',
                     ),
                     children: [
                       _LabeledEventField(
@@ -462,7 +671,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           maxLines: 3,
                           textInputAction: TextInputAction.next,
                           keyboardType: TextInputType.multiline,
-                          autofillHints: const [AutofillHints.name],
                           forceErrorText: _fieldServerErrors['description'],
                           onChanged: (_) {
                             if (_fieldServerErrors.containsKey('description')) {
@@ -473,7 +681,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           },
                           decoration: _inputDecoration(
                             hintText:
-                                'Describe the agenda, speakers, and target participants',
+                                'Describe the agenda, speakers, objectives, and outcomes',
                             prefixIcon: LucideIcons.alignLeft,
                           ),
                           validator: (value) {
@@ -485,8 +693,59 @@ class _EventFormScreenState extends State<EventFormScreen> {
                         ),
                       ),
                       SizedBox(height: d.xs),
+                      ResponsiveGrid(
+                        minItemWidth: 260,
+                        maxColumns: 2,
+                        children: [
+                          _LabeledEventField(
+                            label: 'Event Category',
+                            child: DropdownButtonFormField<String>(
+                              key: const ValueKey<String>(
+                                'event-category-field',
+                              ),
+                              isExpanded: true,
+                              initialValue: _selectedCategory,
+                              decoration: _inputDecoration(
+                                hintText: 'Select category',
+                                prefixIcon: LucideIcons.tag,
+                              ),
+                              items: _availableCategories
+                                  .map(
+                                    (cat) => DropdownMenuItem(
+                                      value: cat,
+                                      child: Text(cat),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _selectedCategory = val);
+                                }
+                              },
+                            ),
+                          ),
+                          _LabeledEventField(
+                            label: 'Cover Image URL / Path (Optional)',
+                            child: TextFormField(
+                              key: const ValueKey<String>(
+                                'event-cover-image-field',
+                              ),
+                              controller: _coverImageController,
+                              focusNode: _coverImageFocus,
+                              textInputAction: TextInputAction.next,
+                              keyboardType: TextInputType.url,
+                              decoration: _inputDecoration(
+                                hintText: 'e.g. https://example.com/banner.jpg',
+                                prefixIcon: LucideIcons.image,
+                                helperText: 'Banner graphic or thumbnail image',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: d.xs),
                       _LabeledEventField(
-                        label: 'Venue',
+                        label: 'Venue / Location',
                         child: TextFormField(
                           key: const ValueKey<String>('event-venue-field'),
                           controller: _venueController,
@@ -521,12 +780,331 @@ class _EventFormScreenState extends State<EventFormScreen> {
                   ),
                   SizedBox(height: d.md),
 
-                  // Section 2: Schedule & Registration Window
+                  // SECTION B: Target Participants (Audience Selection)
                   _FormSectionCard(
                     header: const SectionHeader(
-                      title: 'Schedule & Registration Window',
+                      title: 'Target Participants',
                       subtitle:
-                          'Configure event date, start/end times, and cutoff window',
+                          'Restrict event visibility, registration, and announcement delivery',
+                    ),
+                    children: [
+                      Text(
+                        'Target Audience Scope',
+                        style: d.supporting.copyWith(
+                          color: d.foreground,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: d.xs),
+                      Wrap(
+                        spacing: d.sm,
+                        runSpacing: d.sm,
+                        children: [
+                          _AudienceScopeChip(
+                            key: const ValueKey('audience-type-all'),
+                            label: 'All Students',
+                            icon: LucideIcons.users,
+                            isSelected: _targetAudienceType == 'all',
+                            onTap: () => setState(() => _targetAudienceType = 'all'),
+                          ),
+                          _AudienceScopeChip(
+                            key: const ValueKey('audience-type-course'),
+                            label: 'Specific Course / Program',
+                            icon: LucideIcons.graduationCap,
+                            isSelected: _targetAudienceType == 'course',
+                            onTap: () => setState(() => _targetAudienceType = 'course'),
+                          ),
+                          _AudienceScopeChip(
+                            key: const ValueKey('audience-type-year-level'),
+                            label: 'Specific Year Level',
+                            icon: LucideIcons.layers,
+                            isSelected: _targetAudienceType == 'year_level',
+                            onTap: () =>
+                                setState(() => _targetAudienceType = 'year_level'),
+                          ),
+                          _AudienceScopeChip(
+                            key: const ValueKey('audience-type-custom'),
+                            label: 'Custom Combination',
+                            icon: LucideIcons.sliders,
+                            isSelected: _targetAudienceType == 'custom',
+                            onTap: () => setState(() => _targetAudienceType = 'custom'),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: d.md),
+
+                      // Audience Type Sub-Controls
+                      if (_targetAudienceType == 'all') ...[
+                        Container(
+                          padding: EdgeInsets.all(d.sm + 2),
+                          decoration: BoxDecoration(
+                            color: d.isDark ? d.muted : const Color(0xFFF9F9F8),
+                            borderRadius: BorderRadius.circular(d.radiusControl),
+                            border: Border.all(color: d.border),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(LucideIcons.checkCheck, size: 16, color: d.foreground),
+                              SizedBox(width: d.sm),
+                              Expanded(
+                                child: Text(
+                                  'This event is open to all enrolled students across all programs and year levels.',
+                                  style: d.supporting.copyWith(color: d.foreground),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else if (_targetAudienceType == 'course') ...[
+                        Text(
+                          'Select Eligible Courses',
+                          style: d.supporting.copyWith(
+                            color: d.foreground,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: d.xs),
+                        Wrap(
+                          spacing: d.sm,
+                          runSpacing: d.sm,
+                          children: _availableCourses.map((course) {
+                            final isSelected = _selectedCourses.contains(course);
+                            return FilterChip(
+                              key: ValueKey('course-chip-$course'),
+                              label: Text(course),
+                              selected: isSelected,
+                              selectedColor: d.foreground,
+                              checkmarkColor: d.background,
+                              labelStyle: TextStyle(
+                                color: isSelected ? d.background : d.foreground,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                              backgroundColor: d.card,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
+                                  color: isSelected ? d.foreground : d.border,
+                                ),
+                              ),
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedCourses.add(course);
+                                  } else {
+                                    _selectedCourses.remove(course);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ] else if (_targetAudienceType == 'year_level') ...[
+                        Text(
+                          'Select Eligible Year Levels',
+                          style: d.supporting.copyWith(
+                            color: d.foreground,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: d.xs),
+                        Wrap(
+                          spacing: d.sm,
+                          runSpacing: d.sm,
+                          children: _availableYearLevels.map((year) {
+                            final isSelected = _selectedYearLevels.contains(year);
+                            return FilterChip(
+                              key: ValueKey('year-chip-$year'),
+                              label: Text(year),
+                              selected: isSelected,
+                              selectedColor: d.foreground,
+                              checkmarkColor: d.background,
+                              labelStyle: TextStyle(
+                                color: isSelected ? d.background : d.foreground,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                              backgroundColor: d.card,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
+                                  color: isSelected ? d.foreground : d.border,
+                                ),
+                              ),
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedYearLevels.add(year);
+                                  } else {
+                                    _selectedYearLevels.remove(year);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ] else if (_targetAudienceType == 'custom') ...[
+                        Text(
+                          'Add Course + Year Level Combination',
+                          style: d.supporting.copyWith(
+                            color: d.foreground,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: d.xs),
+                        ResponsiveGrid(
+                          minItemWidth: 200,
+                          maxColumns: 3,
+                          children: [
+                            DropdownButtonFormField<String>(
+                              key: const ValueKey('combo-course-dropdown'),
+                              isExpanded: true,
+                              initialValue: _comboCourse,
+                              decoration: _inputDecoration(
+                                hintText: 'Course',
+                                prefixIcon: LucideIcons.graduationCap,
+                              ),
+                              items: _availableCourses
+                                  .map(
+                                    (c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(
+                                        c,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _comboCourse = val);
+                              },
+                            ),
+                            DropdownButtonFormField<String>(
+                              key: const ValueKey('combo-year-dropdown'),
+                              isExpanded: true,
+                              initialValue: _comboYearLevel,
+                              decoration: _inputDecoration(
+                                hintText: 'Year Level',
+                                prefixIcon: LucideIcons.layers,
+                              ),
+                              items: _availableYearLevels
+                                  .map(
+                                    (y) => DropdownMenuItem(
+                                      value: y,
+                                      child: Text(
+                                        y,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _comboYearLevel = val);
+                              },
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: AppButton(
+                                key: const ValueKey('add-combination-button'),
+                                pill: true,
+                                icon: LucideIcons.plus,
+                                label: 'Add Combination',
+                                onPressed: _addCustomCombination,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_targetRules.isNotEmpty) ...[
+                          SizedBox(height: d.sm),
+                          Text(
+                            'Active Combinations:',
+                            style: d.supporting.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          SizedBox(height: d.xs),
+                          Wrap(
+                            spacing: d.sm,
+                            runSpacing: d.sm,
+                            children: List.generate(_targetRules.length, (idx) {
+                              final rule = _targetRules[idx];
+                              final label =
+                                  '${rule['course']} – ${rule['year_level']}';
+                              return Container(
+                                key: ValueKey('combo-rule-$idx'),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: d.card,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: d.foreground, width: 1.2),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      label,
+                                      style: d.supporting.copyWith(
+                                        color: d.foreground,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    GestureDetector(
+                                      onTap: () => _removeCustomCombination(idx),
+                                      child: Icon(
+                                        LucideIcons.x,
+                                        size: 14,
+                                        color: d.foreground,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
+                      ],
+
+                      SizedBox(height: d.sm),
+                      // Audience Summary Pill
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: d.sm + 2,
+                          vertical: d.xs + 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: d.isDark
+                              ? d.muted.withValues(alpha: 0.5)
+                              : const Color(0xFFF4F4F5),
+                          borderRadius: BorderRadius.circular(d.radiusControl),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(LucideIcons.filter, size: 14, color: d.mutedForeground),
+                            SizedBox(width: d.xs),
+                            Expanded(
+                              child: Text(
+                                'Audience: $_audienceSummaryText',
+                                style: d.supporting.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: d.foreground,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: d.md),
+
+                  // SECTION C: Event Schedule
+                  _FormSectionCard(
+                    header: const SectionHeader(
+                      title: 'Event Schedule',
+                      subtitle:
+                          'Configure event date, start time, and end time',
                     ),
                     children: [
                       _LabeledEventField(
@@ -537,7 +1115,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           focusNode: _eventDateFocus,
                           textInputAction: TextInputAction.next,
                           keyboardType: TextInputType.datetime,
-                          autofillHints: const [AutofillHints.birthday],
                           forceErrorText: _fieldServerErrors['event_date'],
                           onChanged: (_) {
                             if (_fieldServerErrors.containsKey('event_date')) {
@@ -583,7 +1160,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               focusNode: _startTimeFocus,
                               textInputAction: TextInputAction.next,
                               keyboardType: TextInputType.datetime,
-                              autofillHints: const [AutofillHints.name],
                               forceErrorText: _fieldServerErrors['start_time'],
                               onChanged: (_) {
                                 if (_fieldServerErrors
@@ -629,7 +1205,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               focusNode: _endTimeFocus,
                               textInputAction: TextInputAction.next,
                               keyboardType: TextInputType.datetime,
-                              autofillHints: const [AutofillHints.name],
                               forceErrorText: _fieldServerErrors['end_time'],
                               onChanged: (_) {
                                 if (_fieldServerErrors
@@ -664,7 +1239,18 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           ),
                         ],
                       ),
-                      SizedBox(height: d.xs),
+                    ],
+                  ),
+                  SizedBox(height: d.md),
+
+                  // SECTION D: Registration Period
+                  _FormSectionCard(
+                    header: const SectionHeader(
+                      title: 'Registration Period',
+                      subtitle:
+                          'Configure registration cutoff window, participant capacity, and walk-in rules',
+                    ),
+                    children: [
                       ResponsiveGrid(
                         minItemWidth: 260,
                         maxColumns: 2,
@@ -679,7 +1265,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               focusNode: _registrationStartFocus,
                               textInputAction: TextInputAction.next,
                               keyboardType: TextInputType.datetime,
-                              autofillHints: const [AutofillHints.name],
                               forceErrorText:
                                   _fieldServerErrors['registration_start'],
                               onChanged: (_) {
@@ -713,7 +1298,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               focusNode: _registrationEndFocus,
                               textInputAction: TextInputAction.next,
                               keyboardType: TextInputType.datetime,
-                              autofillHints: const [AutofillHints.name],
                               forceErrorText:
                                   _fieldServerErrors['registration_end'],
                               onChanged: (_) {
@@ -739,18 +1323,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                  SizedBox(height: d.md),
-
-                  // Section 3: Capacity & Attendance Rules
-                  _FormSectionCard(
-                    header: const SectionHeader(
-                      title: 'Capacity & Attendance Rules',
-                      subtitle:
-                          'Configure participant cap, late grace period, and walk-in rules',
-                    ),
-                    children: [
+                      SizedBox(height: d.xs),
                       ResponsiveGrid(
                         minItemWidth: 260,
                         maxColumns: 2,
@@ -765,7 +1338,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               focusNode: _maxParticipantsFocus,
                               textInputAction: TextInputAction.next,
                               keyboardType: TextInputType.number,
-                              autofillHints: const [AutofillHints.name],
                               forceErrorText:
                                   _fieldServerErrors['max_participants'],
                               decoration: _inputDecoration(
@@ -794,10 +1366,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               focusNode: _lateGraceFocus,
                               textInputAction: TextInputAction.done,
                               keyboardType: TextInputType.number,
-                              autofillHints: const [AutofillHints.name],
                               forceErrorText: _fieldServerErrors[
                                   'late_grace_period_minutes'],
-                              onFieldSubmitted: (_) => _saveEvent(),
                               decoration: _inputDecoration(
                                 hintText: '15',
                                 prefixIcon: LucideIcons.timer,
@@ -855,56 +1425,347 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       ),
                     ],
                   ),
-                  SizedBox(height: d.lg),
+                  SizedBox(height: d.md),
 
-                  // Action Buttons
-                  AppButton(
-                    key: const ValueKey<String>('save-event-button'),
-                    pill: true,
-                    onPressed:
-                        _isSaving || _isSubmittingAction ? null : _saveEvent,
-                    isLoading: _isSaving,
-                    icon: _isEditing ? LucideIcons.save : LucideIcons.plus,
-                    label: _isEditing
-                        ? 'Save Event Changes'
-                        : 'Create Event Draft',
-                  ),
-                  if (_isEditing && _currentStatus == 'draft') ...[
-                    SizedBox(height: d.gap),
-                    AppButton(
-                      key: const ValueKey<String>('submit-approval-button'),
-                      variant: AppButtonVariant.outline,
-                      pill: true,
-                      onPressed: _isSaving || _isSubmittingAction
-                          ? null
-                          : _submitForApproval,
-                      isLoading: _isSubmittingAction,
-                      icon: LucideIcons.send,
-                      label: 'Submit for Admin Approval',
+                  // SECTION E: Notification Settings
+                  _FormSectionCard(
+                    header: const SectionHeader(
+                      title: 'Notification Settings',
+                      subtitle:
+                          'Configure announcement dispatch and reminders',
                     ),
-                  ],
-                  if (_isEditing && _currentStatus == 'published') ...[
-                    SizedBox(height: d.gap),
-                    AppButton(
-                      key: const ValueKey<String>(
-                        'request-cancellation-button',
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: d.isDark ? d.muted : const Color(0xFFFBFBFA),
+                          borderRadius: BorderRadius.circular(d.radiusControl),
+                          border: Border.all(
+                            color: d.isDark
+                                ? d.border
+                                : d.authDark.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: SwitchListTile(
+                            key: const ValueKey<String>(
+                              'send-announcement-switch',
+                            ),
+                            title: Text(
+                              'Send announcement notification when published',
+                              style: d.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Dispatches push and in-app alerts to matching students upon admin approval',
+                              style: d.supporting,
+                            ),
+                            value: _sendAnnouncement,
+                            onChanged: (val) =>
+                                setState(() => _sendAnnouncement = val),
+                          ),
+                        ),
                       ),
-                      variant: AppButtonVariant.destructive,
-                      pill: true,
-                      onPressed: _isSaving || _isSubmittingAction
-                          ? null
-                          : _requestCancellation,
-                      isLoading: _isSubmittingAction,
-                      icon: LucideIcons.ban,
-                      label: 'Request Event Cancellation',
+                      SizedBox(height: d.sm),
+                      Container(
+                        padding: EdgeInsets.all(d.sm + 2),
+                        decoration: BoxDecoration(
+                          color: d.isDark
+                              ? d.muted.withValues(alpha: 0.4)
+                              : const Color(0xFFF9F9F8),
+                          borderRadius: BorderRadius.circular(d.radiusControl),
+                          border: Border.all(color: d.border),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Icon(
+                                LucideIcons.info,
+                                size: 16,
+                                color: d.foreground,
+                              ),
+                            ),
+                            SizedBox(width: d.sm),
+                            Expanded(
+                              child: Text(
+                                'Notifications will only be sent to students matching the selected audience. Event reminders will only be sent to students who actively register.',
+                                style: d.supporting.copyWith(
+                                  color: d.mutedForeground,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: d.md),
+
+                  // SECTION F: Review & Publish
+                  _FormSectionCard(
+                    header: const SectionHeader(
+                      title: 'Review & Publish',
+                      subtitle:
+                          'Review event details and select submission action',
                     ),
-                  ],
+                    children: [
+                      // Live Summary Card
+                      Container(
+                        key: const ValueKey<String>('live-summary-card'),
+                        padding: EdgeInsets.all(d.md),
+                        decoration: BoxDecoration(
+                          color: d.isDark
+                              ? d.card
+                              : const Color(0xFFFAFAFA),
+                          borderRadius: BorderRadius.circular(d.radiusControl),
+                          border: Border.all(color: d.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  'Live Event Summary',
+                                  style: d.cardTitle.copyWith(fontSize: 15),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: d.foreground,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    _selectedCategory.toUpperCase(),
+                                    style: TextStyle(
+                                      color: d.background,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: d.sm),
+                            _SummaryInfoRow(
+                              icon: LucideIcons.fileText,
+                              text:
+                                  'Title: ${_titleController.text.trim().isEmpty ? "Untitled Event" : _titleController.text.trim()}',
+                            ),
+                            const SizedBox(height: 4),
+                            _SummaryInfoRow(
+                              icon: LucideIcons.calendar,
+                              text:
+                                  '${_eventDateController.text.trim()} • ${_startTimeController.text.trim()} - ${_endTimeController.text.trim()}',
+                            ),
+                            const SizedBox(height: 4),
+                            _SummaryInfoRow(
+                              icon: LucideIcons.mapPin,
+                              text: _venueController.text.trim().isEmpty
+                                  ? 'No venue specified'
+                                  : _venueController.text.trim(),
+                            ),
+                            const SizedBox(height: 4),
+                            _SummaryInfoRow(
+                              icon: LucideIcons.users,
+                              text:
+                                  'Audience: $_audienceSummaryText',
+                            ),
+                            const SizedBox(height: 4),
+                            _SummaryInfoRow(
+                              icon: LucideIcons.ticket,
+                              text:
+                                  'Capacity: ${_maxParticipantsController.text.trim().isEmpty ? "Unlimited" : "${_maxParticipantsController.text.trim()} attendees"} • Walk-in: ${_walkInAllowed ? "Allowed" : "Disabled"}',
+                            ),
+                            const SizedBox(height: 4),
+                            _SummaryInfoRow(
+                              icon: LucideIcons.bell,
+                              text:
+                                  'Announcement: ${_sendAnnouncement ? "Active on publish" : "Disabled"}',
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: d.md),
+
+                      // Form Actions
+                      if (_isEditing) ...[
+                        AppButton(
+                          key: const ValueKey<String>('save-event-button'),
+                          pill: true,
+                          onPressed: _isSaving || _isSubmittingAction
+                              ? null
+                              : _saveEvent,
+                          isLoading: _isSaving,
+                          icon: LucideIcons.save,
+                          label: 'Save Event Changes',
+                        ),
+                        if (_currentStatus == 'draft') ...[
+                          SizedBox(height: d.gap),
+                          AppButton(
+                            key: const ValueKey<String>(
+                              'submit-approval-button',
+                            ),
+                            variant: AppButtonVariant.outline,
+                            pill: true,
+                            onPressed: _isSaving || _isSubmittingAction
+                                ? null
+                                : _submitForApproval,
+                            isLoading: _isSubmittingAction,
+                            icon: LucideIcons.send,
+                            label: 'Submit for Admin Approval',
+                          ),
+                        ],
+                      ] else ...[
+                        AppButton(
+                          key: const ValueKey<String>('submit-event-button'),
+                          pill: true,
+                          onPressed: _isSaving || _isSubmittingAction
+                              ? null
+                              : _saveEvent,
+                          isLoading: _isSaving && !_isSubmittingAction,
+                          icon: LucideIcons.send,
+                          label: 'Submit for Approval',
+                        ),
+                        SizedBox(height: d.gap),
+                        AppButton(
+                          key: const ValueKey<String>('save-draft-button'),
+                          variant: AppButtonVariant.outline,
+                          pill: true,
+                          onPressed: _isSaving || _isSubmittingAction
+                              ? null
+                              : () => _saveEvent(saveAsDraft: true),
+                          isLoading: _isSubmittingAction,
+                          icon: LucideIcons.fileEdit,
+                          label: 'Save as Draft',
+                        ),
+                      ],
+                      if (_isEditing && _currentStatus == 'published') ...[
+                        SizedBox(height: d.gap),
+                        AppButton(
+                          key: const ValueKey<String>(
+                            'request-cancellation-button',
+                          ),
+                          variant: AppButtonVariant.destructive,
+                          pill: true,
+                          onPressed: _isSaving || _isSubmittingAction
+                              ? null
+                              : _requestCancellation,
+                          isLoading: _isSubmittingAction,
+                          icon: LucideIcons.ban,
+                          label: 'Request Event Cancellation',
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AudienceScopeChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _AudienceScopeChip({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? d.foreground : d.card,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? d.foreground : d.border,
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected ? d.background : d.foreground,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? d.background : d.foreground,
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                ),
+                softWrap: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryInfoRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _SummaryInfoRow({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final d = context.design;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, size: 14, color: d.mutedForeground),
+        ),
+        SizedBox(width: d.xs + 2),
+        Expanded(
+          child: Text(
+            text,
+            style: d.supporting.copyWith(
+              color: d.foreground,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

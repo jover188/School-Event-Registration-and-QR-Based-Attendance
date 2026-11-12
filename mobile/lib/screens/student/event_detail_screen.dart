@@ -18,12 +18,17 @@ class EventDetailScreen extends StatefulWidget {
   final EventModel? initialEvent;
   final String? initialErrorMessage;
 
+  /// Role slug of the viewer. When null, the role is read from [ApiClient].
+  /// Only `student` viewers see the registration pane.
+  final String? viewerRole;
+
   const EventDetailScreen({
     super.key,
     this.eventId,
     this.event,
     this.initialEvent,
     this.initialErrorMessage,
+    this.viewerRole,
   });
 
   @override
@@ -35,6 +40,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   bool _isLoading = false;
   bool _isSubmitting = false;
   String? _errorMessage;
+  String? _role;
+  bool _roleResolved = false;
+
+  /// Unknown role (legacy/no stored role) falls back to the student view;
+  /// the backend still enforces registration authorization.
+  bool get _isStudentViewer =>
+      _role == null || _role!.trim().toLowerCase() == 'student';
+
+  Future<void> _resolveRole() async {
+    String? role;
+    try {
+      role = await ApiClient().getUserRole();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _role = role;
+      _roleResolved = true;
+    });
+  }
 
   bool get _hasFixtureData =>
       widget.initialEvent != null || widget.initialErrorMessage != null;
@@ -49,6 +73,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.viewerRole != null) {
+      _role = widget.viewerRole;
+      _roleResolved = true;
+    } else {
+      _resolveRole();
+    }
     _event = widget.initialEvent ?? widget.event;
     _errorMessage = widget.initialErrorMessage;
     if (_hasFixtureData) {
@@ -254,6 +284,61 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   StatusBadge(status: event.status),
                 ],
               ),
+              SizedBox(height: d.sm),
+              Wrap(
+                spacing: d.xs + 2,
+                runSpacing: d.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: d.foreground,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      event.category.toUpperCase(),
+                      style: TextStyle(
+                        color: d.background,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    constraints: const BoxConstraints(maxWidth: 240),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: d.card,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: d.border, width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.users,
+                            size: 11, color: d.mutedForeground),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            event.audienceSummary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: d.foreground,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               SizedBox(height: d.gap),
               _EventInfoRow(
                 icon: LucideIcons.mapPin,
@@ -448,6 +533,56 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
+  /// Read-only overview for administrator / organizer / management viewers.
+  Widget _buildStaffOverviewPane(BuildContext context, EventModel event) {
+    final d = context.design;
+    final remaining = event.remainingSlots;
+    return Container(
+      key: const ValueKey('event-detail-staff-pane'),
+      padding: EdgeInsets.all(d.md),
+      decoration: BoxDecoration(
+        color: d.card,
+        borderRadius: BorderRadius.circular(d.radiusCard),
+        border: Border.all(color: d.border, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SectionHeader(title: 'Event Overview'),
+          SizedBox(height: d.gap),
+          Text('Status', style: d.supporting),
+          SizedBox(height: d.xs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: StatusBadge(status: event.status),
+          ),
+          Divider(height: d.lg, color: d.border),
+          Text('Registrations', style: d.supporting),
+          const SizedBox(height: 2),
+          Text(
+            '${event.currentRegisteredCount}${event.maxParticipants != null ? ' / ${event.maxParticipants}' : ''}',
+            style: d.cardTitle.copyWith(fontWeight: FontWeight.w700),
+          ),
+          SizedBox(height: d.xs),
+          Text(
+            remaining == null
+                ? 'Unlimited capacity'
+                : '${remaining < 0 ? 0 : remaining} slots remaining',
+            style: d.supporting,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget? _buildSidePane(BuildContext context, EventModel event) {
+    if (!_roleResolved) return null;
+    return _isStudentViewer
+        ? _buildActionPane(context, event)
+        : _buildStaffOverviewPane(context, event);
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = context.design;
@@ -479,6 +614,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         final useSidePane =
                             constraints.maxWidth >= 960 && textScale < 1.5;
 
+                        final sidePane = _buildSidePane(context, event);
+
                         if (useSidePane) {
                           return SingleChildScrollView(
                             child: Row(
@@ -487,11 +624,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 Expanded(
                                   child: _buildMainDetails(context, event),
                                 ),
-                                SizedBox(width: d.lg),
-                                SizedBox(
-                                  width: 320,
-                                  child: _buildActionPane(context, event),
-                                ),
+                                if (sidePane != null) ...[
+                                  SizedBox(width: d.lg),
+                                  SizedBox(width: 320, child: sidePane),
+                                ],
                               ],
                             ),
                           );
@@ -502,8 +638,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               _buildMainDetails(context, event),
-                              SizedBox(height: d.md),
-                              _buildActionPane(context, event),
+                              if (sidePane != null) ...[
+                                SizedBox(height: d.md),
+                                sidePane,
+                              ],
                             ],
                           ),
                         );
