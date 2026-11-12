@@ -57,24 +57,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       id: 'overview',
       label: 'Overview',
       icon: LucideIcons.layoutDashboard,
+      compactPrimary: true,
       essential: true,
     ),
     AppDestination(
       id: 'reviews',
       label: 'Reviews',
       icon: LucideIcons.folderCheck,
+      compactPrimary: true,
       essential: true,
+    ),
+    AppDestination(
+      id: 'users',
+      label: 'Users',
+      icon: LucideIcons.users,
+      compactPrimary: true,
     ),
     AppDestination(
       id: 'calendar',
       label: 'Calendar',
       icon: LucideIcons.calendarDays,
       compactPrimary: false,
-    ),
-    AppDestination(
-      id: 'users',
-      label: 'Users',
-      icon: LucideIcons.users,
     ),
     AppDestination(
       id: 'qr-records',
@@ -603,6 +606,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       selectedId: _selectedDestinationId,
       onDestinationSelected: _selectDestination,
       onLogout: _logout,
+      showCompactMore: false,
       actions: [
         IconButton(
           icon: const Icon(LucideIcons.bell, size: 20),

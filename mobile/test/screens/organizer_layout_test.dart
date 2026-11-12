@@ -154,5 +154,34 @@ void main() {
 
     expect(find.text('Draft Robotics Workshop'), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    // On compact view, exactly 3 bottom navigation destinations exist
+    expect(find.byKey(const ValueKey('destination-overview')), findsOneWidget);
+    expect(find.byKey(const ValueKey('destination-calendar')), findsOneWidget);
+    expect(find.byKey(const ValueKey('destination-events')), findsOneWidget);
+
+    // destination-reports is NOT in the bottom bar
+    expect(find.byKey(const ValueKey('destination-reports')), findsNothing);
+    expect(find.byKey(const ValueKey('destination-more')), findsNothing);
+
+    // Accessible in mobile drawer
+    final drawerTrigger = find.byKey(const ValueKey('mobile-drawer-trigger'));
+    expect(drawerTrigger, findsOneWidget);
+    await tester.tap(drawerTrigger);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('drawer-destination-reports')),
+      findsOneWidget,
+    );
+
+    // Dismiss drawer
+    await tester.tap(find.byTooltip('Close navigation drawer'));
+    await tester.pumpAndSettle();
+
+    // On desktop view, destination-reports is accessible in the sidebar
+    tester.view.physicalSize = const Size(1280, 800);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('destination-reports')), findsOneWidget);
   });
 }

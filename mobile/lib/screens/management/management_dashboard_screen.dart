@@ -46,23 +46,26 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
       id: 'overview',
       label: 'Overview',
       icon: LucideIcons.layoutDashboard,
+      compactPrimary: true,
       essential: true,
     ),
     AppDestination(
       id: 'events',
       label: 'Events',
       icon: LucideIcons.calendarRange,
+      compactPrimary: true,
     ),
     AppDestination(
       id: 'calendar',
       label: 'Calendar',
       icon: LucideIcons.calendarDays,
+      compactPrimary: true,
     ),
     AppDestination(
       id: 'reports',
       label: 'Reports',
       icon: LucideIcons.chartBar,
-      essential: true,
+      compactPrimary: false,
     ),
   ];
 
@@ -595,6 +598,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
         setState(() => _selectedDestination = id);
       },
       onLogout: _logout,
+      showCompactMore: false,
       actions: [
         IconButton(
           icon: const Icon(LucideIcons.bell, size: 20),

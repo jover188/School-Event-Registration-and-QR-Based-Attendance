@@ -281,7 +281,7 @@ void main() {
     );
 
     testWidgets(
-      'mobile 390x844 shows 4 primary bottom tabs, 3-up metric strip, and unread notification badge',
+      'mobile 390x844 shows 3 primary bottom tabs, 3-up metric strip, and unread notification badge',
       (tester) async {
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = const Size(390, 844);
@@ -304,7 +304,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // 4 primary tabs on compact phone bottom bar (no redundant More button; History & Profile in drawer)
+        // Exactly 3 primary destinations on compact phone bottom bar (no redundant More button; QR, History & Profile in drawer)
         expect(find.byKey(const ValueKey('destination-events')), findsOneWidget);
         expect(
           find.byKey(const ValueKey('destination-calendar')),
@@ -314,10 +314,24 @@ void main() {
           find.byKey(const ValueKey('destination-registrations')),
           findsOneWidget,
         );
-        expect(find.byKey(const ValueKey('destination-qr')), findsOneWidget);
+        expect(find.byKey(const ValueKey('destination-qr')), findsNothing);
         expect(find.byKey(const ValueKey('destination-more')), findsNothing);
         expect(find.byKey(const ValueKey('destination-history')), findsNothing);
         expect(find.byKey(const ValueKey('destination-profile')), findsNothing);
+
+        // destination-qr is accessible in the drawer / sidebar
+        final drawerTrigger = find.byKey(const ValueKey('mobile-drawer-trigger'));
+        expect(drawerTrigger, findsOneWidget);
+        await tester.tap(drawerTrigger);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('drawer-destination-qr')), findsOneWidget);
+        expect(find.byKey(const ValueKey('drawer-destination-profile')), findsOneWidget);
+        expect(find.byKey(const ValueKey('drawer-destination-history')), findsOneWidget);
+
+        // Dismiss drawer
+        await tester.tap(find.byTooltip('Close navigation drawer'));
+        await tester.pumpAndSettle();
 
         // 3 summary metric cards aligned on a single horizontal row on 390px phone
         final regTop = tester.getTopLeft(find.text('Registered')).dy;

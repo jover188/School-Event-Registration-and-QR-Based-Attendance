@@ -39,7 +39,7 @@ void main() {
             size: Size(360, 640),
             textScaler: TextScaler.linear(2),
           ),
-          child: _ShellFixture(),
+          child: _ShellFixture(showCompactMore: true),
         ),
       ),
     );
@@ -204,8 +204,9 @@ void main() {
 }
 
 class _ShellFixture extends StatefulWidget {
-  const _ShellFixture({this.onLogout});
+  const _ShellFixture({this.onLogout, this.showCompactMore = false});
   final VoidCallback? onLogout;
+  final bool showCompactMore;
   @override
   State<_ShellFixture> createState() => _ShellFixtureState();
 }
@@ -249,6 +250,7 @@ class _ShellFixtureState extends State<_ShellFixture> {
     selectedId: selected,
     onDestinationSelected: (id) => setState(() => selected = id),
     onLogout: widget.onLogout,
+    showCompactMore: widget.showCompactMore,
     body: AppDestinationStack(
       selectedId: selected,
       builders: {

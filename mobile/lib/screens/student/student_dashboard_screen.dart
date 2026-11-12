@@ -69,14 +69,16 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     ),
     AppDestination(
       id: 'registrations',
-      label: 'My Registrations',
+      label: 'My Registration',
       icon: LucideIcons.clipboardCheck,
+      compactPrimary: true,
       category: 'ATTENDANCE',
     ),
     AppDestination(
       id: 'qr',
       label: 'My QR',
       icon: LucideIcons.qrCode,
+      compactPrimary: false,
       essential: true,
       category: 'ATTENDANCE',
     ),

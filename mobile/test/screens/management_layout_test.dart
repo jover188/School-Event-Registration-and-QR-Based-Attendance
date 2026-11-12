@@ -91,6 +91,14 @@ void main() {
           expect(find.byTooltip('Notifications'), findsOneWidget);
           expect(find.byTooltip('My Profile'), findsOneWidget);
           _assertNoMutationControls();
+
+          if (size == const Size(390, 844)) {
+            expect(find.byKey(const ValueKey('destination-overview')), findsOneWidget);
+            expect(find.byKey(const ValueKey('destination-events')), findsOneWidget);
+            expect(find.byKey(const ValueKey('destination-calendar')), findsOneWidget);
+            expect(find.byKey(const ValueKey('destination-more')), findsNothing);
+            expect(find.byKey(const ValueKey('destination-reports')), findsNothing);
+          }
         }
       },
     );
@@ -156,7 +164,7 @@ void main() {
     );
 
     testWidgets(
-      'renders 320x568 at 2x text scale without overflow and keeps More menu strictly read-only',
+      'renders 320x568 at 2x text scale without overflow, has 3 bottom nav items, and accesses Reports via drawer strictly read-only',
       (tester) async {
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = const Size(320, 568);
@@ -182,17 +190,24 @@ void main() {
         expect(tester.takeException(), isNull);
         _assertNoMutationControls();
 
-        // At 2x text scale on 320x568, Overview and Reports are essential and Events is in More
-        expect(find.byKey(const ValueKey('destination-more')), findsOneWidget);
-        await tester.tap(find.byKey(const ValueKey('destination-more')));
+        // Exactly 3 bottom nav items: Overview, Events, Calendar
+        expect(find.byKey(const ValueKey('destination-overview')), findsOneWidget);
+        expect(find.byKey(const ValueKey('destination-events')), findsOneWidget);
+        expect(find.byKey(const ValueKey('destination-calendar')), findsOneWidget);
+        expect(find.byKey(const ValueKey('destination-more')), findsNothing);
+        expect(find.byKey(const ValueKey('destination-reports')), findsNothing);
+
+        // Access Reports via drawer
+        expect(find.byKey(const ValueKey('mobile-drawer-trigger')), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('mobile-drawer-trigger')));
         await tester.pumpAndSettle();
 
         _assertNoMutationControls();
-        expect(find.text('Events'), findsOneWidget);
-        await tester.tap(find.text('Events'));
+        expect(find.byKey(const ValueKey('drawer-destination-reports')), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('drawer-destination-reports')));
         await tester.pumpAndSettle();
 
-        expect(find.text('Campus Events (Read-Only)'), findsOneWidget);
+        expect(find.text('Reports & Analytics'), findsOneWidget);
         expect(tester.takeException(), isNull);
         _assertNoMutationControls();
       },

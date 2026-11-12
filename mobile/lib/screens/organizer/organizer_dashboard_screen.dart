@@ -65,6 +65,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       id: 'reports',
       label: 'Reports',
       icon: LucideIcons.chartBar,
+      compactPrimary: false,
     ),
   ];
 
@@ -432,6 +433,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   Widget build(BuildContext context) {
     return AppShell(
       title: _shellTitle,
+      showCompactMore: false,
       destinations: _destinations,
       selectedId: _selectedDestinationId,
       onDestinationSelected: (id) =>

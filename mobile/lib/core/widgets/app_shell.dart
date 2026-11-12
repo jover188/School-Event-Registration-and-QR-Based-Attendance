@@ -16,7 +16,7 @@ class AppShell extends StatelessWidget {
     required this.body,
     this.actions = const [],
     this.onLogout,
-    this.showCompactMore = true,
+    this.showCompactMore = false,
   });
   final String title;
   final List<AppDestination> destinations;
@@ -354,7 +354,7 @@ class AppShell extends StatelessWidget {
         !(sizeClass == AppWindowClass.medium && largeText);
     final expanded = sizeClass == AppWindowClass.expanded;
     var primary = destinations.where((item) => item.compactPrimary).toList();
-    if (largeText) {
+    if (showCompactMore && largeText) {
       final essential = primary.where((item) => item.essential).toList();
       primary = essential.isEmpty
           ? primary.take(2).toList()
@@ -485,11 +485,16 @@ class AppShell extends StatelessWidget {
                                   IconButton(
                                     key: const ValueKey('mobile-drawer-trigger'),
                                     tooltip: 'Open navigation drawer',
-                                    onPressed: () => _showSlideOverDrawer(
-                                      context,
-                                      destinations,
-                                      keyPrefix: 'drawer-destination',
-                                    ),
+                                    onPressed: () {
+                                      final secondary = destinations
+                                          .where((item) => !item.compactPrimary)
+                                          .toList();
+                                      _showSlideOverDrawer(
+                                        context,
+                                        secondary.isNotEmpty ? secondary : destinations,
+                                        keyPrefix: 'drawer-destination',
+                                      );
+                                    },
                                     icon: Image.asset(
                                       'assets/images/logo_mark.png',
                                       key: const ValueKey('mobile-drawer-logo'),

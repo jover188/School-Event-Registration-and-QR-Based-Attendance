@@ -49,7 +49,7 @@ void main() {
   ];
 
   testWidgets(
-    'AdminDashboardScreen navigates across compact More sheet (390x844) and expanded sidebar (1440x900)',
+    'AdminDashboardScreen navigates across compact 3-item bar with drawer (390x844) and expanded sidebar (1440x900)',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
@@ -94,45 +94,61 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Primary destinations visible in compact bottom bar; secondary tucked into More.
+      // Primary destinations visible in compact bottom bar (exactly 3 items). More is removed.
       expect(find.byKey(const ValueKey('destination-overview')), findsOneWidget);
       expect(find.byKey(const ValueKey('destination-reviews')), findsOneWidget);
       expect(find.byKey(const ValueKey('destination-users')), findsOneWidget);
-      expect(find.byKey(const ValueKey('destination-more')), findsOneWidget);
+      expect(find.byKey(const ValueKey('destination-more')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('destination-calendar')),
+        findsNothing,
+      );
       expect(
         find.byKey(const ValueKey('destination-qr-records')),
         findsNothing,
       );
+      expect(
+        find.byKey(const ValueKey('destination-reports')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('destination-activity')),
+        findsNothing,
+      );
 
-      // Open More dialog and navigate to QR Records.
-      await tester.tap(find.byKey(const ValueKey('destination-more')));
+      // Open mobile drawer via mobile-drawer-trigger and navigate to QR Records.
+      expect(find.byKey(const ValueKey('mobile-drawer-trigger')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('mobile-drawer-trigger')));
       await tester.pumpAndSettle();
+
+      expect(find.text('Calendar'), findsWidgets);
       expect(find.text('QR Records'), findsWidgets);
       expect(find.text('Reports'), findsWidgets);
       expect(find.text('Activity'), findsWidgets);
 
-      await tester.tap(find.byKey(const ValueKey('destination-qr-records')));
+      await tester.tap(find.byKey(const ValueKey('drawer-destination-qr-records')));
       await tester.pumpAndSettle();
       expect(
         find.text('Student QR Identity Directory'),
         findsOneWidget,
       );
 
-      // Open More again and navigate to Activity logs.
-      await tester.tap(find.text('More'));
+      // Open drawer again and navigate to Activity logs.
+      await tester.tap(find.byKey(const ValueKey('mobile-drawer-trigger')));
       await tester.pumpAndSettle();
       expect(find.text('Activity'), findsWidgets);
-      await tester.tap(find.byKey(const ValueKey('destination-activity')));
+      await tester.tap(find.byKey(const ValueKey('drawer-destination-activity')));
       await tester.pumpAndSettle();
       expect(find.text('Audit Trail & Activity Logs'), findsOneWidget);
 
-      // Resize to 1440x900 desktop and verify all 6 destinations are directly visible in sidebar.
+      // Resize to 1440x900 desktop and verify all 7 destinations are directly visible in sidebar.
       tester.view.physicalSize = const Size(1440, 900);
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('destination-overview')), findsOneWidget);
       expect(find.byKey(const ValueKey('destination-reviews')), findsOneWidget);
       expect(find.byKey(const ValueKey('destination-users')), findsOneWidget);
+      expect(find.byKey(const ValueKey('destination-calendar')), findsOneWidget);
       expect(
         find.byKey(const ValueKey('destination-qr-records')),
         findsOneWidget,
