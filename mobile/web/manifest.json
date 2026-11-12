@@ -1,11 +1,11 @@
 {
-    "name": "school_event_attendance",
-    "short_name": "school_event_attendance",
-    "start_url": ".",
+    "name": "Attendify",
+    "short_name": "Attendify",
+    "start_url": "/",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "School Event Registration and QR-Based Attendance Management System",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
