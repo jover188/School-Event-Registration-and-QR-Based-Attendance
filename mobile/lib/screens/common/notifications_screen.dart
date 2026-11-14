@@ -13,6 +13,7 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../core/utils/notification_sound_helper.dart';
 import 'notification_preferences_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -62,6 +63,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _notifications = (response.data as List)
             .map((item) => Map<String, dynamic>.from(item as Map))
             .toList();
+
+        // Check for any unread sound-enabled notifications to alert user
+        for (final item in _notifications) {
+          final isRead = item['is_read'] == true || item['is_read'] == 1;
+          if (!isRead) {
+            final id = (item['id'] as num?)?.toInt();
+            final type = item['notification_type'] as String?;
+            final payload = item['payload'];
+            String? sound;
+            if (payload is Map) {
+              sound = payload['sound'] as String?;
+            } else if (payload is String && payload.isNotEmpty) {
+              try {
+                final decoded = jsonDecode(payload);
+                if (decoded is Map) sound = decoded['sound'] as String?;
+              } catch (_) {}
+            }
+            NotificationSoundHelper.playIfSoundEnabled(
+              notificationId: id,
+              soundName: sound,
+              notificationType: type,
+            );
+          }
+        }
       } else if (!response.success) {
         _errorMessage = response.message ?? 'Failed to load notifications.';
       }

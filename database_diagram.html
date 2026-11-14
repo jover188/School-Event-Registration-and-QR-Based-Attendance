@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendify — Database Entity-Relationship Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      background: #1e293b;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #334155;
+      z-index: 10;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .brand span {
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+    }
+    button {
+      background: #334155;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    button:hover {
+      background: #475569;
+      border-color: #64748b;
+    }
+    button.primary {
+      background: #0284c7;
+      border-color: #0369a1;
+    }
+    button.primary:hover {
+      background: #0369a1;
+    }
+    #diagram-container {
+      flex: 1;
+      width: 100%;
+      height: calc(100vh - 60px);
+      background: radial-gradient(circle, #1e293b 10%, transparent 11%);
+      background-size: 20px 20px;
+      overflow: hidden;
+      position: relative;
+    }
+    #diagram {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .badge {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .footer-hint {
+      position: absolute;
+      bottom: 12px;
+      left: 20px;
+      font-size: 0.75rem;
+      color: #64748b;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Attendify</h1>
+      <span class="badge">12 Tables</span>
+      <span>MySQL Entity-Relationship Diagram</span>
+    </div>
+    <div class="controls">
+      <button onclick="panZoom.zoomIn()">➕ Zoom In</button>
+      <button onclick="panZoom.zoomOut()">➖ Zoom Out</button>
+      <button onclick="panZoom.reset()">↺ Reset</button>
+      <button class="primary" onclick="exportSvg()">⬇ Export SVG / Print</button>
+    </div>
+  </header>
+
+  <div id="diagram-container">
+    <div id="diagram">
+      <pre class="mermaid">
+erDiagram
+    ROLES ||--o{ USERS : "assigned to"
+    USERS ||--o| STUDENTS : "has profile"
+    STUDENTS ||--o{ STUDENT_QRS : "owns"
+    USERS ||--o{ EVENTS : "organizes"
+    USERS ||--o{ EVENT_APPROVALS : "reviews"
+    EVENTS ||--o{ EVENT_APPROVALS : "receives"
+    EVENTS ||--o{ EVENT_REGISTRATIONS : "has"
+    STUDENTS ||--o{ EVENT_REGISTRATIONS : "registers for"
+    EVENT_REGISTRATIONS ||--o| ATTENDANCES : "results in"
+    EVENTS ||--o{ ATTENDANCES : "recorded for"
+    STUDENTS ||--o{ ATTENDANCES : "participates in"
+    USERS ||--o{ ATTENDANCES : "scanned by"
+    ATTENDANCES ||--o{ ATTENDANCE_CORRECTIONS : "modified by"
+    USERS ||--o{ ATTENDANCE_CORRECTIONS : "corrected by"
+    USERS ||--o{ NOTIFICATIONS : "receives"
+    USERS ||--o| NOTIFICATION_PREFERENCES : "configures"
+    USERS ||--o{ DEVICE_TOKENS : "registers"
+    USERS ||--o{ ACTIVITY_LOGS : "triggers"
+
+    ROLES {
+        bigint id PK
+        string name
+        string slug UK
+        string description
+    }
+
+    USERS {
+        bigint id PK
+        bigint role_id FK
+        string email UK
+        string password
+        enum status
+        string active_session_id
+    }
+
+    STUDENTS {
+        bigint id PK
+        bigint user_id FK_UK
+        string student_id_number UK
+        string first_name
+        string last_name
+        string course
+        string year_level
+        string section
+        string department
+    }
+
+    STUDENT_QRS {
+        bigint id PK
+        bigint student_id FK
+        char qr_token UK
+        enum status
+        timestamp revoked_at
+    }
+
+    EVENTS {
+        bigint id PK
+        bigint organizer_id FK
+        string title
+        text description
+        string venue
+        date event_date
+        time start_time
+        time end_time
+        int max_participants
+        int late_grace_period_minutes
+        boolean walk_in_allowed
+        enum status
+    }
+
+    EVENT_APPROVALS {
+        bigint id PK
+        bigint event_id FK
+        bigint admin_id FK
+        enum approval_type
+        enum status
+        text remarks
+    }
+
+    EVENT_REGISTRATIONS {
+        bigint id PK
+        bigint event_id FK
+        bigint student_id FK
+        enum status
+        int waiting_list_position
+        datetime registered_at
+    }
+
+    ATTENDANCES {
+        bigint id PK
+        bigint event_id FK
+        bigint student_id FK
+        bigint event_registration_id FK
+        bigint scanner_id FK
+        datetime check_in_time
+        datetime check_out_time
+        enum status
+    }
+
+    ATTENDANCE_CORRECTIONS {
+        bigint id PK
+        bigint attendance_id FK
+        bigint corrected_by FK
+        enum original_status
+        enum new_status
+        text reason
+    }
+
+    NOTIFICATIONS {
+        bigint id PK
+        bigint user_id FK
+        string title
+        text message
+        string notification_type
+        boolean is_read
+    }
+
+    NOTIFICATION_PREFERENCES {
+        bigint id PK
+        bigint user_id FK_UK
+        boolean new_event_published
+        boolean registration_confirmed
+        boolean event_reminders
+        boolean event_updates
+        boolean waiting_list_promoted
+        boolean admin_announcements
+    }
+
+    DEVICE_TOKENS {
+        bigint id PK
+        bigint user_id FK
+        string fcm_token UK
+        enum platform
+    }
+
+    ACTIVITY_LOGS {
+        bigint id PK
+        bigint user_id FK
+        string action
+        string module
+        bigint record_id
+        json metadata
+        string ip_address
+    }
+      </pre>
+    </div>
+    <div class="footer-hint">💡 Scroll to Zoom • Drag to Pan around the diagram</div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#0f172a',
+        primaryColor: '#1e293b',
+        primaryTextColor: '#f8fafc',
+        primaryBorderColor: '#38bdf8',
+        lineColor: '#38bdf8',
+        secondaryColor: '#334155',
+        tertiaryColor: '#1e293b'
+      }
+    });
+
+    let panZoom;
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        const svg = document.querySelector('#diagram svg');
+        if (svg) {
+          svg.setAttribute('width', '100%');
+          svg.setAttribute('height', '100%');
+          panZoom = svgPanZoom(svg, {
+            zoomEnabled: true,
+            controlIconsEnabled: false,
+            fit: true,
+            center: true,
+            minZoom: 0.3,
+            maxZoom: 5
+          });
+        }
+      }, 500);
+    });
+
+    function exportSvg() {
+      const svg = document.querySelector('#diagram svg');
+      if (!svg) return;
+      const serializer = new XMLSerializer();
+      const source = serializer.serializeToString(svg);
+      const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = url;
+      downloadLink.download = "attendify_database_erd.svg";
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    }
+  </script>
+</body>
+</html>

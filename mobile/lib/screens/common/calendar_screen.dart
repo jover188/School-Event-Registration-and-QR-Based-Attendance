@@ -12,6 +12,7 @@ import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../models/event_model.dart';
 import '../student/event_detail_screen.dart';
+import '../../core/utils/notification_sound_helper.dart';
 import 'notifications_screen.dart';
 
 /// Strict monochrome color palette for the Attendify Calendar.
@@ -122,10 +123,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
     try {
       final res = await ApiClient().get(ApiConstants.notifications);
       if (res.success && res.data is List && mounted) {
-        final unread = (res.data as List)
-            .where((n) => n is Map && (n['is_read'] != true && n['is_read'] != 1))
+        final list = (res.data as List).whereType<Map>().toList();
+        final unread = list
+            .where((n) => n['is_read'] != true && n['is_read'] != 1)
             .length;
         setState(() => _unreadNotifications = unread);
+
+        for (final n in list) {
+          final isRead = n['is_read'] == true || n['is_read'] == 1;
+          if (!isRead) {
+            final id = (n['id'] as num?)?.toInt();
+            final type = n['notification_type'] as String?;
+            final payload = n['payload'];
+            String? sound;
+            if (payload is Map) {
+              sound = payload['sound'] as String?;
+            }
+            NotificationSoundHelper.playIfSoundEnabled(
+              notificationId: id,
+              soundName: sound,
+              notificationType: type,
+            );
+          }
+        }
       }
     } catch (_) {}
   }

@@ -234,4 +234,105 @@ class NotificationServiceTest extends TestCase
             'title' => 'Campus Maintenance Notice',
         ]);
     }
+
+    public function test_sound_is_attached_to_sound_enabled_notification_categories(): void
+    {
+        $studentUser = User::where('role_id', 3)->first();
+
+        // 1. New event announcement
+        $n1 = NotificationService::send(
+            $studentUser->id,
+            'New Event',
+            'Event announced.',
+            'new_event_published',
+            ['event_id' => 1]
+        );
+        $this->assertNotNull($n1);
+        $this->assertEquals(NotificationService::SOUND_CHIME_07, $n1->payload['sound']);
+        $this->assertEquals(NotificationService::NOTIFICATION_CHANNEL_ID, $n1->payload['channel_id']);
+
+        // 2. Admin broadcast announcement
+        $n2 = NotificationService::send(
+            $studentUser->id,
+            'Admin Broadcast',
+            'Important announcement.',
+            'admin_announcement'
+        );
+        $this->assertNotNull($n2);
+        $this->assertEquals(NotificationService::SOUND_CHIME_07, $n2->payload['sound']);
+        $this->assertEquals(NotificationService::NOTIFICATION_CHANNEL_ID, $n2->payload['channel_id']);
+
+        // 3. Event reminders (24h and 1h)
+        $n3 = NotificationService::send(
+            $studentUser->id,
+            '24h Reminder',
+            'Event starts in 24 hours.',
+            'event_reminder_24h',
+            ['event_id' => 1]
+        );
+        $this->assertNotNull($n3);
+        $this->assertEquals(NotificationService::SOUND_CHIME_07, $n3->payload['sound']);
+        $this->assertEquals(NotificationService::NOTIFICATION_CHANNEL_ID, $n3->payload['channel_id']);
+
+        $n4 = NotificationService::send(
+            $studentUser->id,
+            '1h Reminder',
+            'Event starts in 1 hour.',
+            'event_reminder_1h',
+            ['event_id' => 1]
+        );
+        $this->assertNotNull($n4);
+        $this->assertEquals(NotificationService::SOUND_CHIME_07, $n4->payload['sound']);
+        $this->assertEquals(NotificationService::NOTIFICATION_CHANNEL_ID, $n4->payload['channel_id']);
+
+        // 4. Event cancellation announcement
+        $n5 = NotificationService::send(
+            $studentUser->id,
+            'Event Cancelled',
+            'Event was cancelled.',
+            'event_cancellation',
+            ['event_id' => 1]
+        );
+        $this->assertNotNull($n5);
+        $this->assertEquals(NotificationService::SOUND_CHIME_07, $n5->payload['sound']);
+        $this->assertEquals(NotificationService::NOTIFICATION_CHANNEL_ID, $n5->payload['channel_id']);
+    }
+
+    public function test_sound_is_not_attached_to_non_sound_categories(): void
+    {
+        $studentUser = User::where('role_id', 3)->first();
+
+        // Registration confirmed
+        $n1 = NotificationService::send(
+            $studentUser->id,
+            'Registered',
+            'Registration confirmed.',
+            'registration_confirmed',
+            ['event_id' => 1]
+        );
+        $this->assertNotNull($n1);
+        $this->assertArrayNotHasKey('sound', $n1->payload ?? []);
+
+        // Attendance recorded
+        $n2 = NotificationService::send(
+            $studentUser->id,
+            'Attendance',
+            'Check-in recorded.',
+            'attendance_recorded',
+            ['event_id' => 1]
+        );
+        $this->assertNotNull($n2);
+        $this->assertArrayNotHasKey('sound', $n2->payload ?? []);
+
+        // Waiting list promoted
+        $n3 = NotificationService::send(
+            $studentUser->id,
+            'Promoted',
+            'Slot opened.',
+            'waiting_list_promoted',
+            ['event_id' => 1]
+        );
+        $this->assertNotNull($n3);
+        $this->assertArrayNotHasKey('sound', $n3->payload ?? []);
+    }
 }

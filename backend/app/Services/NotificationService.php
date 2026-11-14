@@ -16,6 +16,32 @@ class NotificationService
     ];
 
     /**
+     * Official notification sound resource for important announcements and events.
+     */
+    public const SOUND_CHIME_07 = 'sfxmint_ready_chime_07';
+
+    /**
+     * Notification channel ID matching Android NotificationChannel configuration.
+     */
+    public const NOTIFICATION_CHANNEL_ID = 'attendify_important_v1';
+
+    /**
+     * Notification categories that play the audible Notification Chime 07:
+     * 1. New event announcements
+     * 2. Admin broadcast announcements
+     * 3. Event reminders (24h and 1h)
+     * 4. Event cancellation announcements
+     */
+    public const SOUND_ENABLED_TYPES = [
+        'new_event_published',
+        'admin_announcement',
+        'admin_announcements',
+        'event_reminder_24h',
+        'event_reminder_1h',
+        'event_cancellation',
+    ];
+
+    /**
      * Maps notification_type strings to NotificationPreference boolean column names.
      */
     public const PREFERENCE_MAP = [
@@ -52,6 +78,13 @@ class NotificationService
             if ($pref && !$pref->{$column}) {
                 return null;
             }
+        }
+
+        if (in_array($type, self::SOUND_ENABLED_TYPES, true)) {
+            $payload = array_merge([
+                'sound' => self::SOUND_CHIME_07,
+                'channel_id' => self::NOTIFICATION_CHANNEL_ID,
+            ], $payload);
         }
 
         return Notification::create([
