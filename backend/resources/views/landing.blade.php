@@ -81,7 +81,7 @@
     </ul>
     <div style="display: flex; flex-direction: column; gap: 12px; margin-top: auto;">
       <a href="{{ url('/app') }}" class="btn btn-secondary" style="width: 100%;">Open Web App</a>
-      <a href="#download" class="btn btn-primary mobile-nav-action" style="width: 100%;">Download Android App</a>
+      <a href="{{ url('/download/apk') }}" download="attendify-release.apk" class="btn btn-primary mobile-nav-action" style="width: 100%;">Download Android App</a>
     </div>
   </div>
 
@@ -102,7 +102,7 @@
         </p>
 
         <div class="hero-cta">
-          <a href="#download" class="btn btn-primary btn-lg">
+          <a href="{{ url('/download/apk') }}" download="attendify-release.apk" class="btn btn-primary btn-lg">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             <span>Download Attendify APK</span>
           </a>
@@ -581,7 +581,7 @@
               </p>
 
               <div class="download-actions">
-                <a href="https://github.com/jover188/School-Event-Registration-and-QR-Based-Attendance/releases/latest/download/attendify-release.apk" class="btn btn-primary btn-lg" id="downloadApkBtn" title="Download Attendify APK">
+                <a href="{{ url('/download/apk') }}" download="attendify-release.apk" class="btn btn-primary btn-lg" id="downloadApkBtn" title="Download Attendify APK">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   <span>Download Attendify APK</span>
                 </a>

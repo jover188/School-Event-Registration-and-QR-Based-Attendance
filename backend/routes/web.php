@@ -14,17 +14,18 @@ Route::get('/landing', function () {
 });
 
 /**
- * Direct APK Download Route (Redirects to verified GitHub Release or local APK)
+ * Direct APK Download Route (Downloads APK directly or redirects to GitHub Release binary)
  */
 Route::get('/download/apk', function () {
     $localApk = public_path('downloads/attendify-release.apk');
     if (file_exists($localApk)) {
         return response()->download($localApk, 'attendify-release.apk', [
             'Content-Type' => 'application/vnd.android.package-archive',
+            'Content-Disposition' => 'attachment; filename="attendify-release.apk"',
         ]);
     }
-    // Fallback to official GitHub Release asset
-    return redirect('https://github.com/jover188/School-Event-Registration-and-QR-Based-Attendance/releases/latest/download/attendify-release.apk');
+    // Direct binary download link from GitHub Release
+    return redirect('https://github.com/jover188/School-Event-Registration-and-QR-Based-Attendance/releases/download/v1.1.0/attendify-release.apk');
 })->name('download.apk');
 
 /**

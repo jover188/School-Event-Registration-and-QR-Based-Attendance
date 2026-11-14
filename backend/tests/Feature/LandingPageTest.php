@@ -76,7 +76,7 @@ class LandingPageTest extends TestCase
     {
         $response = $this->get('/download/apk');
 
-        $response->assertRedirect('https://github.com/jover188/School-Event-Registration-and-QR-Based-Attendance/releases/latest/download/attendify-release.apk');
+        $response->assertRedirect('https://github.com/jover188/School-Event-Registration-and-QR-Based-Attendance/releases/download/v1.1.0/attendify-release.apk');
     }
 
     /**
