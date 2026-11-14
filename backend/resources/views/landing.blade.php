@@ -16,8 +16,10 @@
   <meta property="og:url" content="{{ url('/') }}">
   
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
-  <link rel="apple-touch-icon" href="{{ asset('icons/Icon-192.png') }}">
+  <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}?v=1.1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}?v=1.1.0">
+  <link rel="shortcut icon" href="{{ asset('favicon.ico') }}?v=1.1.0">
+  <link rel="apple-touch-icon" href="{{ asset('icons/Icon-192.png') }}?v=1.1.0">
   
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
