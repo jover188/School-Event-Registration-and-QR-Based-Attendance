@@ -335,4 +335,106 @@ class NotificationServiceTest extends TestCase
         $this->assertNotNull($n3);
         $this->assertArrayNotHasKey('sound', $n3->payload ?? []);
     }
+
+    public function test_unread_count_endpoint_and_after_id_filtering(): void
+    {
+        $studentUser = User::where('role_id', 3)->first();
+
+        // Log in as student to get token
+        $loginRes = $this->postJson('/api/v1/auth/login', [
+            'login' => $studentUser->email,
+            'password' => 'Student@12345',
+        ]);
+        $token = $loginRes->json('data.token');
+
+        // Clean existing notifications
+        Notification::where('user_id', $studentUser->id)->delete();
+
+        // 1. Initial unread count should be 0
+        $countRes = $this->requestAs($token, 'GET', '/api/v1/notifications/unread-count');
+        $countRes->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'unread_count' => 0,
+                'latest_id' => 0,
+            ]);
+
+        // 2. Create two notifications
+        $n1 = NotificationService::send(
+            $studentUser->id,
+            'Notice 1',
+            'First notification.',
+            'admin_announcement'
+        );
+        $n2 = NotificationService::send(
+            $studentUser->id,
+            'Notice 2',
+            'Second notification.',
+            'admin_announcement'
+        );
+
+        // Verify unread count is 2 and latest_id is $n2->id
+        $countRes2 = $this->requestAs($token, 'GET', '/api/v1/notifications/unread-count');
+        $countRes2->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'unread_count' => 2,
+                'latest_id' => $n2->id,
+            ]);
+
+        // 3. Query with after_id = $n1->id: only $n2 should be returned
+        $afterRes = $this->requestAs($token, 'GET', "/api/v1/notifications?after_id={$n1->id}");
+        $afterRes->assertStatus(200);
+        $items = $afterRes->json('data');
+        $this->assertCount(1, $items);
+        $this->assertEquals($n2->id, $items[0]['id']);
+    }
+
+    public function test_fcm_dispatch_with_mocked_http_prunes_unregistered_tokens(): void
+    {
+        $studentUser = User::where('role_id', 3)->first();
+        \App\Models\DeviceToken::where('user_id', $studentUser->id)->delete();
+
+        $validToken = \App\Models\DeviceToken::create([
+            'user_id' => $studentUser->id,
+            'fcm_token' => 'valid_fcm_token_123',
+            'platform' => 'android',
+        ]);
+
+        $expiredToken = \App\Models\DeviceToken::create([
+            'user_id' => $studentUser->id,
+            'fcm_token' => 'expired_fcm_token_456',
+            'platform' => 'android',
+        ]);
+
+        // Set fake server key
+        config(['services.fcm.server_key' => 'fake_server_key']);
+
+        \Illuminate\Support\Facades\Http::fake([
+            'https://fcm.googleapis.com/fcm/send' => \Illuminate\Support\Facades\Http::response([
+                'multicast_id' => 12345,
+                'success' => 1,
+                'failure' => 1,
+                'canonical_ids' => 0,
+                'results' => [
+                    ['message_id' => '0:123456789'],
+                    ['error' => 'NotRegistered'],
+                ],
+            ], 200),
+        ]);
+
+        // Trigger notification send
+        $notif = NotificationService::send(
+            $studentUser->id,
+            'Broadcast',
+            'Important announcement.',
+            'admin_announcement'
+        );
+
+        $this->assertNotNull($notif);
+
+        // Verify expired token was pruned and valid token remained
+        $this->assertDatabaseHas('device_tokens', ['fcm_token' => 'valid_fcm_token_123']);
+        $this->assertDatabaseMissing('device_tokens', ['fcm_token' => 'expired_fcm_token_456']);
+    }
 }

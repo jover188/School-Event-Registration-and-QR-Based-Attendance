@@ -15,17 +15,17 @@ void main() {
       'email': 'thea@school.edu',
       'role': 'student',
       'status': 'active',
-      'student_profile': {
-        'student_id': '2026-0001',
-        'first_name': 'Thea',
-        'last_name': 'Queen',
-        'middle_name': 'DeMerteuil',
-        'course': 'BS Computer Science',
-        'year_level': '3rd Year',
-        'section': 'CS-3A',
-        'contact_number': '+639123456789',
-        'department': 'College of Computer Studies',
-      },
+    },
+    'student_profile': {
+      'student_id_number': '2026-0001',
+      'first_name': 'Thea',
+      'last_name': 'Queen',
+      'middle_name': 'DeMerteuil',
+      'course': 'BS Computer Science',
+      'year_level': '3rd Year',
+      'section': 'CS-3A',
+      'contact_number': '+639123456789',
+      'department': 'College of Computer Studies',
     },
   };
 
@@ -51,7 +51,7 @@ void main() {
 
       // Check official institutional banner
       expect(
-        find.textContaining('Your official student information is managed by the school'),
+        find.textContaining('Institutional records are synchronized with the School Student Information System (SIS)'),
         findsOneWidget,
       );
 

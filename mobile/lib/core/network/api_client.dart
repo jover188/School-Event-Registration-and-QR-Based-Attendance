@@ -293,16 +293,20 @@ class ApiClient {
     }
   }
 
-  Future<ApiResponse> delete(String endpoint) async {
+  Future<ApiResponse> delete(String endpoint, {dynamic body}) async {
     if (mockHandler != null) {
-      return mockHandler!('DELETE', endpoint, null);
+      return mockHandler!('DELETE', endpoint, body);
     }
     try {
       await _ensureAndroidHost();
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
       final headers = await _getHeaders();
       final response = await http
-          .delete(uri, headers: headers)
+          .delete(
+            uri,
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          )
           .timeout(const Duration(seconds: 15));
       return _handleResponse(response);
     } catch (e) {

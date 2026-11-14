@@ -4,6 +4,7 @@ import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/navigation/app_destination.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/realtime_notification_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_shell.dart';
@@ -211,6 +212,10 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         final dashData = Map<String, dynamic>.from(dashResponse.data as Map);
         if (dashData['stats'] is Map) {
           _stats = Map<String, dynamic>.from(dashData['stats'] as Map);
+          final count = (_stats?['unread_notifications'] as num?)?.toInt();
+          if (count != null) {
+            RealtimeNotificationService().updateUnreadCount(count);
+          }
         }
       } else if (!dashResponse.success && response.success) {
         _partialWarningMessage =
@@ -495,7 +500,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final d = context.design;
-    final unreadCount =
+    final unreadFallback =
         (_stats?['unread_notifications'] as num?)?.toInt() ?? 0;
 
     return AppShell(
@@ -508,25 +513,31 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       onLogout: _logout,
       showCompactMore: false,
       actions: [
-        IconButton(
-          icon: Badge.count(
-            key: const ValueKey('student-notifications-badge'),
-            count: unreadCount,
-            isLabelVisible: unreadCount > 0,
-            backgroundColor: d.destructive,
-            textColor: d.destructiveForeground,
-            child: Icon(LucideIcons.bell, size: 18, color: d.primary),
-          ),
-          tooltip: 'Notifications',
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const NotificationsScreen(),
+        ValueListenableBuilder<int>(
+          valueListenable: RealtimeNotificationService().unreadCount,
+          builder: (context, liveUnreadCount, _) {
+            final effectiveCount = liveUnreadCount > 0 ? liveUnreadCount : unreadFallback;
+            return IconButton(
+              icon: Badge.count(
+                key: const ValueKey('student-notifications-badge'),
+                count: effectiveCount,
+                isLabelVisible: effectiveCount > 0,
+                backgroundColor: d.destructive,
+                textColor: d.destructiveForeground,
+                child: Icon(LucideIcons.bell, size: 18, color: d.primary),
               ),
+              tooltip: 'Notifications',
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsScreen(),
+                  ),
+                );
+                if (!mounted) return;
+                _fetchEvents();
+              },
             );
-            if (!mounted) return;
-            _fetchEvents();
           },
         ),
       ],

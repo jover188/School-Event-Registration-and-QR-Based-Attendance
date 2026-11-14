@@ -18,23 +18,57 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
-        $notifications = Notification::where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->paginate($request->query('per_page', 20));
+        $query = Notification::where('user_id', $user->id)
+            ->orderBy('id', 'desc');
+
+        if ($request->filled('after_id')) {
+            $query->where('id', '>', (int) $request->query('after_id'));
+        }
+
+        if ($request->boolean('unread_only')) {
+            $query->where('is_read', false);
+        }
+
+        $notifications = $query->paginate($request->query('per_page', 20));
 
         $unreadCount = Notification::where('user_id', $user->id)
             ->where('is_read', false)
             ->count();
 
+        $latestId = Notification::where('user_id', $user->id)
+            ->max('id') ?? 0;
+
         return response()->json([
             'success' => true,
             'data' => $notifications->items(),
             'unread_count' => $unreadCount,
+            'latest_id' => $latestId,
             'meta' => [
                 'current_page' => $notifications->currentPage(),
                 'last_page' => $notifications->lastPage(),
                 'total' => $notifications->total(),
             ],
+        ]);
+    }
+
+    /**
+     * Get Lightweight Unread Notification Count & Latest ID
+     */
+    public function unreadCount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $unreadCount = Notification::where('user_id', $user->id)
+            ->where('is_read', false)
+            ->count();
+
+        $latestId = Notification::where('user_id', $user->id)
+            ->max('id') ?? 0;
+
+        return response()->json([
+            'success' => true,
+            'unread_count' => $unreadCount,
+            'latest_id' => $latestId,
         ]);
     }
 

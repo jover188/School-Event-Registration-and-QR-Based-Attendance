@@ -4,6 +4,7 @@ import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/navigation/app_destination.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/realtime_notification_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_shell.dart';
@@ -608,13 +609,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       onLogout: _logout,
       showCompactMore: false,
       actions: [
-        IconButton(
-          icon: const Icon(LucideIcons.bell, size: 20),
-          tooltip: 'Notifications',
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+        ValueListenableBuilder<int>(
+          valueListenable: RealtimeNotificationService().unreadCount,
+          builder: (context, unreadCount, _) {
+            final d = context.design;
+            return IconButton(
+              icon: Badge.count(
+                key: const ValueKey('admin-notifications-badge'),
+                count: unreadCount,
+                isLabelVisible: unreadCount > 0,
+                backgroundColor: d.destructive,
+                textColor: d.destructiveForeground,
+                child: const Icon(LucideIcons.bell, size: 20),
+              ),
+              tooltip: 'Notifications',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                );
+              },
             );
           },
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'core/network/api_client.dart';
+import 'core/services/realtime_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -30,8 +31,12 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
     super.initState();
     _initialScreen = _resolveInitialScreen();
 
+    // Start real-time notification synchronization service
+    RealtimeNotificationService().initialize();
+
     // Global listener for single-session termination
     ApiClient().onSessionTerminated = () {
+      RealtimeNotificationService().stop();
       final context = navigatorKey.currentContext;
       if (context != null) {
         showDialog(

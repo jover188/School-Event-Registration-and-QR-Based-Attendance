@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\DeviceToken;
 use App\Models\Notification;
 use App\Models\NotificationPreference;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
@@ -87,13 +90,81 @@ class NotificationService
             ], $payload);
         }
 
-        return Notification::create([
+        $notification = Notification::create([
             'user_id'           => $userId,
             'title'             => $title,
             'message'           => $message,
             'notification_type' => $type,
             'payload'           => $payload,
         ]);
+
+        self::dispatchFcm($notification);
+
+        return $notification;
+    }
+
+    /**
+     * Dispatch push notification to registered devices via FCM.
+     * Prunes invalid or unregistered tokens automatically.
+     */
+    public static function dispatchFcm(Notification $notification): void
+    {
+        try {
+            $deviceTokens = DeviceToken::where('user_id', $notification->user_id)->get();
+            if ($deviceTokens->isEmpty()) {
+                return;
+            }
+
+            $serverKey = config('services.fcm.server_key') ?: env('FCM_SERVER_KEY');
+            if (empty($serverKey)) {
+                Log::info("FCM push omitted for notification #{$notification->id}: FCM_SERVER_KEY not configured.");
+                return;
+            }
+
+            $registrationIds = $deviceTokens->pluck('fcm_token')->values()->all();
+            $payload = [
+                'registration_ids' => $registrationIds,
+                'notification' => [
+                    'title' => $notification->title,
+                    'body' => $notification->message,
+                    'sound' => self::SOUND_CHIME_07,
+                    'channel_id' => self::NOTIFICATION_CHANNEL_ID,
+                ],
+                'data' => array_merge([
+                    'notification_id' => (string) $notification->id,
+                    'notification_type' => $notification->notification_type,
+                    'title' => $notification->title,
+                    'message' => $notification->message,
+                    'sound' => self::SOUND_CHIME_07,
+                    'channel_id' => self::NOTIFICATION_CHANNEL_ID,
+                ], is_array($notification->payload) ? $notification->payload : []),
+                'priority' => 'high',
+            ];
+
+            $response = Http::withHeaders([
+                'Authorization' => 'key=' . $serverKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(5)->post('https://fcm.googleapis.com/fcm/send', $payload);
+
+            if ($response->successful()) {
+                $body = $response->json();
+                if (isset($body['results']) && is_array($body['results'])) {
+                    foreach ($body['results'] as $idx => $result) {
+                        if (isset($result['error']) && in_array($result['error'], ['NotRegistered', 'InvalidRegistration', 'MismatchSenderId'], true)) {
+                            $staleToken = $registrationIds[$idx] ?? null;
+                            if ($staleToken) {
+                                DeviceToken::where('fcm_token', $staleToken)->delete();
+                                Log::info("Pruned expired FCM device token: {$staleToken}");
+                            }
+                        }
+                    }
+                }
+            } else {
+                Log::warning("FCM delivery returned status {$response->status()} for notification #{$notification->id}: " . $response->body());
+            }
+        } catch (\Throwable $e) {
+            Log::warning("FCM dispatch failed for notification #{$notification->id}: " . $e->getMessage());
+        }
     }
 
     /**

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:convert';
 import '../student/event_detail_screen.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/realtime_notification_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
@@ -13,7 +15,6 @@ import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/status_badge.dart';
-import '../../core/utils/notification_sound_helper.dart';
 import 'notification_preferences_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   List<Map<String, dynamic>> _notifications = [];
+  StreamSubscription<Map<String, dynamic>>? _notificationSubscription;
 
   @override
   void initState() {
@@ -41,6 +43,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } else {
       _fetchNotifications();
     }
+
+    // Listen for real-time incoming broadcasts and update inbox immediately
+    _notificationSubscription =
+        RealtimeNotificationService().onNotificationReceived.listen((newNotif) {
+      if (!mounted) return;
+      setState(() {
+        final id = (newNotif['id'] as num?)?.toInt();
+        if (id == null || !_notifications.any((n) => (n['id'] as num?)?.toInt() == id)) {
+          _notifications.insert(0, Map<String, dynamic>.from(newNotif));
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationSubscription?.cancel();
+    super.dispose();
   }
 
   int get _unreadCount => _notifications
@@ -64,29 +84,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .map((item) => Map<String, dynamic>.from(item as Map))
             .toList();
 
-        // Check for any unread sound-enabled notifications to alert user
-        for (final item in _notifications) {
-          final isRead = item['is_read'] == true || item['is_read'] == 1;
-          if (!isRead) {
-            final id = (item['id'] as num?)?.toInt();
-            final type = item['notification_type'] as String?;
-            final payload = item['payload'];
-            String? sound;
-            if (payload is Map) {
-              sound = payload['sound'] as String?;
-            } else if (payload is String && payload.isNotEmpty) {
-              try {
-                final decoded = jsonDecode(payload);
-                if (decoded is Map) sound = decoded['sound'] as String?;
-              } catch (_) {}
-            }
-            NotificationSoundHelper.playIfSoundEnabled(
-              notificationId: id,
-              soundName: sound,
-              notificationType: type,
-            );
-          }
-        }
+        // Synchronize global unread badge with fetched count
+        RealtimeNotificationService().updateUnreadCount(_unreadCount);
       } else if (!response.success) {
         _errorMessage = response.message ?? 'Failed to load notifications.';
       }
@@ -136,6 +135,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           'is_read': true,
         };
       });
+      RealtimeNotificationService().updateUnreadCount(_unreadCount);
     }
   }
 
@@ -153,6 +153,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .map((item) => {...item, 'is_read': true})
             .toList();
       });
+      RealtimeNotificationService().updateUnreadCount(0);
       AppToast.info(context, 'All notifications marked as read.');
     }
   }
