@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/file_downloader.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_spinner.dart';
@@ -107,9 +107,43 @@ class _ReportsScreenState extends State<ReportsScreen> {
   String _selectedReportType = 'event_attendance';
   List<EventModel> _availableEvents = [];
   bool _isLoadingReport = false;
-  bool _isExporting = false;
+  String? _exportingFormat;
+  bool get _isExporting => _exportingFormat != null;
   String? _errorMessage;
   dynamic _reportPayload;
+
+  bool get _hasAvailableReportData {
+    if (_reportPayload == null) return false;
+    if (_reportPayload is List) {
+      return (_reportPayload as List).isNotEmpty;
+    }
+    if (_reportPayload is Map<String, dynamic>) {
+      final map = _reportPayload as Map<String, dynamic>;
+      final rawList = map['records'] ??
+          map['items'] ??
+          map['data'] ??
+          map['attendances'] ??
+          map['events'] ??
+          map['organizers'] ??
+          map['absentees'] ??
+          map['registrations'];
+      if (rawList is List && rawList.isNotEmpty) return true;
+      final summary = map['summary'];
+      if (summary is Map && summary.isNotEmpty) {
+        final total = summary['total_records'] ??
+            summary['total_attendances'] ??
+            summary['total_registrations'] ??
+            summary['total_events'] ??
+            summary['total_students'];
+        if (total is num && total == 0) return false;
+        return true;
+      }
+      final primitiveEntries =
+          map.entries.where((e) => e.value is! List && e.value is! Map);
+      return primitiveEntries.isNotEmpty;
+    }
+    return false;
+  }
 
   bool get _hasFixtures =>
       widget.initialEvents != null ||
@@ -301,6 +335,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _exportReportFormat(String format) async {
+    if (_isExporting) return;
+
     final config = _currentConfig;
     final eventId = int.tryParse(_eventIdController.text.trim());
     final studentId = int.tryParse(_studentIdController.text.trim());
@@ -321,6 +357,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
       return;
     }
 
+    if (_reportPayload == null || !_hasAvailableReportData) {
+      AppToast.error(
+        context,
+        'No report data available to export. Please generate a report with valid records first.',
+      );
+      return;
+    }
+
     final queryParams = <String, String>{
       'report_type': _selectedReportType,
       'format': format,
@@ -334,112 +378,67 @@ class _ReportsScreenState extends State<ReportsScreen> {
       queryParams['student_id'] = '$studentId';
     }
 
-    setState(() => _isExporting = true);
+    setState(() => _exportingFormat = format);
 
-    final result = await ApiClient().downloadBytes(
-      ApiConstants.exportReport,
-      queryParams: queryParams,
-    );
-
-    if (!mounted) return;
-    setState(() => _isExporting = false);
-
-    final upperFormat = format.toUpperCase();
-    if (result.statusCode >= 200 &&
-        result.statusCode < 300 &&
-        result.bytes.isNotEmpty) {
-      final bytes = result.bytes;
-      AppToast.success(
-        context,
-        '$upperFormat report generated (${bytes.length} bytes received).',
+    try {
+      final result = await ApiClient().downloadBytes(
+        ApiConstants.exportReport,
+        queryParams: queryParams,
       );
-      await _showExportPreviewDialog(upperFormat, bytes);
-    } else {
-      AppToast.error(
-        context,
-        result.errorMessage ??
-            'Export not available for $_selectedReportType in $upperFormat format.',
-      );
-    }
-  }
 
-  Future<void> _showExportPreviewDialog(
-    String upperFormat,
-    List<int> bytes,
-  ) async {
-    final isTextFormat = upperFormat == 'CSV';
-    String previewText;
-    if (isTextFormat) {
-      try {
-        final decoded = utf8.decode(bytes, allowMalformed: true);
-        previewText =
-            decoded.length > 600 ? '${decoded.substring(0, 600)}…' : decoded;
-      } catch (_) {
-        previewText = 'CSV report payload (${bytes.length} bytes).';
-      }
-    } else {
-      final sizeKb = (bytes.length / 1024).toStringAsFixed(1);
-      previewText = '$upperFormat document generated successfully ($sizeKb KB).\nPayload ready for saving or export.';
-    }
+      if (!mounted) return;
 
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        final d = ctx.design;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(d.radiusCard),
-            side: BorderSide(
-              color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
-            ),
-          ),
-          title: Row(
-            children: [
-              Icon(LucideIcons.fileCheck, size: 20, color: d.primary),
-              SizedBox(width: d.sm),
-              Expanded(child: Text('$upperFormat Export Ready')),
-            ],
-          ),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Report payload received from server (${bytes.length} bytes)',
-                    style: d.body.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: d.sm),
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(d.sm),
-                    decoration: BoxDecoration(
-                      color: d.muted,
-                      borderRadius: BorderRadius.circular(d.radiusControl),
-                      border: Border.all(color: d.border),
-                    ),
-                    child: Text(
-                      previewText,
-                      style: d.supporting,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            AppButton(
-              pill: true,
-              variant: AppButtonVariant.primary,
-              label: 'Close',
-              onPressed: () => Navigator.of(ctx).pop(),
-            ),
-          ],
+      final upperFormat = format.toUpperCase();
+      if (result.statusCode >= 200 &&
+          result.statusCode < 300 &&
+          result.bytes.isNotEmpty) {
+        final bytes = result.bytes;
+        final dateStr = DateTime.now().toIso8601String().split('T')[0];
+        final filename = 'attendify_${_selectedReportType}_$dateStr.$format';
+
+        final mimeType = switch (format) {
+          'csv' => 'text/csv',
+          'xlsx' =>
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'pdf' => 'application/pdf',
+          _ => 'application/octet-stream',
+        };
+
+        final downloadRes = await downloadFile(
+          bytes: bytes,
+          filename: filename,
+          mimeType: mimeType,
         );
-      },
-    );
+
+        if (!mounted) return;
+
+        if (downloadRes.success) {
+          AppToast.success(
+            context,
+            '$upperFormat report downloaded successfully ($filename).',
+          );
+        } else {
+          AppToast.error(
+            context,
+            downloadRes.errorMessage ?? 'Failed to download $upperFormat file.',
+          );
+        }
+      } else {
+        AppToast.error(
+          context,
+          result.errorMessage ??
+              'Export not available for $_selectedReportType in $upperFormat format.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.error(context, 'Export request failed: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _exportingFormat = null);
+      }
+    }
   }
 
   @override
@@ -674,6 +673,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               _ReportExportButtonsCard(
                 reportType: _selectedReportType,
                 isExporting: _isExporting,
+                exportingFormat: _exportingFormat,
                 onExportPdf: () => _exportReportFormat('pdf'),
                 onExportCsv: () => _exportReportFormat('csv'),
                 onExportExcel: () => _exportReportFormat('xlsx'),
@@ -712,6 +712,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 class _ReportExportButtonsCard extends StatelessWidget {
   final String reportType;
   final bool isExporting;
+  final String? exportingFormat;
   final VoidCallback onExportPdf;
   final VoidCallback onExportCsv;
   final VoidCallback onExportExcel;
@@ -719,6 +720,7 @@ class _ReportExportButtonsCard extends StatelessWidget {
   const _ReportExportButtonsCard({
     required this.reportType,
     required this.isExporting,
+    this.exportingFormat,
     required this.onExportPdf,
     required this.onExportCsv,
     required this.onExportExcel,
@@ -771,6 +773,7 @@ class _ReportExportButtonsCard extends StatelessWidget {
                   key: const ValueKey<String>('export-csv-button'),
                   pill: true,
                   variant: AppButtonVariant.outline,
+                  isLoading: exportingFormat == 'csv',
                   onPressed: isExporting ? null : onExportCsv,
                   icon: LucideIcons.fileSpreadsheet,
                   label: 'Export CSV',
@@ -779,6 +782,7 @@ class _ReportExportButtonsCard extends StatelessWidget {
                   key: const ValueKey<String>('export-excel-button'),
                   pill: true,
                   variant: AppButtonVariant.outline,
+                  isLoading: exportingFormat == 'xlsx',
                   onPressed: isExporting ? null : onExportExcel,
                   icon: LucideIcons.table,
                   label: 'Export XLSX',
@@ -788,6 +792,7 @@ class _ReportExportButtonsCard extends StatelessWidget {
                     key: const ValueKey<String>('export-pdf-button'),
                     pill: true,
                     variant: AppButtonVariant.outline,
+                    isLoading: exportingFormat == 'pdf',
                     onPressed: isExporting ? null : onExportPdf,
                     icon: LucideIcons.fileText,
                     label: 'Export PDF',
