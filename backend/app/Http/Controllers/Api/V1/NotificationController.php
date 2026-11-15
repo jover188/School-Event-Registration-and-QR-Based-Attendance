@@ -198,7 +198,11 @@ class NotificationController extends Controller
     public function diagnostic(): JsonResponse
     {
         $credentials = \App\Services\NotificationService::getFirebaseCredentials();
-        $secretFiles = @glob('/etc/secrets/*') ?: [];
+        $secretFiles = array_merge(
+            @glob('/etc/secrets/*') ?: [],
+            @glob('/tmp/secrets/*') ?: [],
+            @glob(storage_path('*.json')) ?: []
+        );
         $secretFileDetails = [];
         foreach ($secretFiles as $file) {
             $secretFileDetails[] = [

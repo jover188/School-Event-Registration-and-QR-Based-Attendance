@@ -300,14 +300,17 @@ class NotificationService
         // 2. Check JSON credentials file path (explicit env var or Render secret files)
         $credentialsPath = config('services.firebase.credentials_path') ?: env('FIREBASE_CREDENTIALS');
         $secretGlob = @glob('/etc/secrets/*') ?: [];
+        $tmpSecretGlob = @glob('/tmp/secrets/*') ?: [];
         $candidatePaths = array_filter(array_merge([
             $credentialsPath,
+            '/tmp/secrets/firebase-credentials.json',
+            storage_path('firebase-credentials.json'),
             '/etc/secrets/firebase-credentials.json',
             '/etc/secrets/serviceAccountKey.json',
             '/etc/secrets/firebase_credentials.json',
             base_path('serviceAccountKey.json'),
             base_path('firebase-credentials.json'),
-        ], $secretGlob));
+        ], $secretGlob, $tmpSecretGlob));
 
         foreach ($candidatePaths as $path) {
             if (file_exists($path)) {

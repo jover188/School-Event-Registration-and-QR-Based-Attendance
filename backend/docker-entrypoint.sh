@@ -19,6 +19,11 @@ chmod -R 775 storage bootstrap/cache
 # Ensure Render secret files are accessible to Apache www-data
 if [ -d /etc/secrets ]; then
     chmod -R 755 /etc/secrets 2>/dev/null || true
+    mkdir -p /tmp/secrets
+    cp -f /etc/secrets/* /tmp/secrets/ 2>/dev/null || true
+    cp -f /etc/secrets/* storage/ 2>/dev/null || true
+    chmod -R 755 /tmp/secrets 2>/dev/null || true
+    chown -R www-data:www-data /tmp/secrets storage/ 2>/dev/null || true
 fi
 
 # Cache Laravel configuration, routes, and views in production
