@@ -31,7 +31,13 @@ Route::get('/download/apk', function () {
 /**
  * Attendify Web Application Portal (Flutter Web Client)
  */
-Route::get('/app', function () {
+Route::get('/app/{any?}', function (?string $any = null) {
+    if ($any) {
+        $assetPath = public_path($any);
+        if (file_exists($assetPath) && !is_dir($assetPath)) {
+            return response()->file($assetPath);
+        }
+    }
     $indexPath = public_path('index.html');
     if (file_exists($indexPath)) {
         return response()->file($indexPath, [
@@ -39,7 +45,7 @@ Route::get('/app', function () {
         ]);
     }
     return redirect()->route('landing');
-})->name('app');
+})->where('any', '.*')->name('app');
 
 /**
  * Catch-All Web Fallback:
