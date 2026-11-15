@@ -40,6 +40,7 @@ class ApiClient {
 
   static const String _tokenKey = 'auth_bearer_token';
   static const String _userRoleKey = 'auth_user_role';
+  static const String _userIdKey = 'auth_user_id';
 
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
 
@@ -48,6 +49,9 @@ class ApiClient {
 
   VoidCallback? onSessionTerminated;
   VoidCallback? onUnauthenticated;
+
+  String? token;
+  int? userId;
 
   static bool _checkedAndroidHost = false;
 
@@ -87,32 +91,51 @@ class ApiClient {
     try {
       final secureToken = await _secureStorage.read(key: _tokenKey);
       if (secureToken != null && secureToken.isNotEmpty) {
+        token = secureToken;
         return secureToken;
       }
     } catch (_) {
       // Fallback to SharedPreferences in headless test environments or unsupported platforms
     }
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final prefToken = prefs.getString(_tokenKey);
+      token = prefToken;
+      return prefToken;
+    } catch (_) {
+      return null;
+    }
   }
 
-  Future<void> saveToken(String token, [String? role]) async {
+  Future<void> saveToken(String tokenValue, [String? role, int? userIdValue]) async {
+    token = tokenValue;
+    if (userIdValue != null) {
+      userId = userIdValue;
+    }
     bool secureSaved = false;
     try {
-      await _secureStorage.write(key: _tokenKey, value: token);
+      await _secureStorage.write(key: _tokenKey, value: tokenValue);
       if (role != null) {
         await _secureStorage.write(key: _userRoleKey, value: role);
+      }
+      if (userIdValue != null) {
+        await _secureStorage.write(key: _userIdKey, value: userIdValue.toString());
       }
       secureSaved = true;
     } catch (_) {
       // Fallback to SharedPreferences when secure storage channel is unavailable
     }
     if (!secureSaved) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_tokenKey, token);
-      if (role != null) {
-        await prefs.setString(_userRoleKey, role);
-      }
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, tokenValue);
+        if (role != null) {
+          await prefs.setString(_userRoleKey, role);
+        }
+        if (userIdValue != null) {
+          await prefs.setInt(_userIdKey, userIdValue);
+        }
+      } catch (_) {}
     }
   }
 
@@ -125,20 +148,50 @@ class ApiClient {
     } catch (_) {
       // Fallback to SharedPreferences
     }
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_userRoleKey);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_userRoleKey);
+    } catch (_) {
+      return null;
+    }
   }
 
-  Future<void> clearToken() async {
+  Future<int?> getUserId() async {
+    if (userId != null) return userId;
     try {
-      await _secureStorage.delete(key: _tokenKey);
-      await _secureStorage.delete(key: _userRoleKey);
+      final secureId = await _secureStorage.read(key: _userIdKey);
+      if (secureId != null && secureId.isNotEmpty) {
+        userId = int.tryParse(secureId);
+        return userId;
+      }
     } catch (_) {
       // Fallback to SharedPreferences
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
-    await prefs.remove(_userRoleKey);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      userId = prefs.getInt(_userIdKey) ?? int.tryParse(prefs.getString(_userIdKey) ?? '');
+      return userId;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clearToken() async {
+    token = null;
+    userId = null;
+    try {
+      await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage.delete(key: _userRoleKey);
+      await _secureStorage.delete(key: _userIdKey);
+    } catch (_) {
+      // Fallback to SharedPreferences
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
+      await prefs.remove(_userRoleKey);
+      await prefs.remove(_userIdKey);
+    } catch (_) {}
   }
 
   Future<void> clearSession() async {

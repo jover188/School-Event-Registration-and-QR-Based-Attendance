@@ -356,6 +356,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         await RealtimeNotificationService().deregisterDeviceToken(fcmToken);
       } catch (_) {}
     }
+    PushNotificationService().resetRegistrationState();
     RealtimeNotificationService().stop();
     await ApiClient().post(ApiConstants.logout, {});
     await ApiClient().clearSession();

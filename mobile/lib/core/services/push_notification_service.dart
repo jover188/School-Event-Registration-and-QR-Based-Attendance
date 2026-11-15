@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../main.dart';
 import '../../screens/common/notifications_screen.dart';
 import '../../screens/student/event_detail_screen.dart';
+import '../network/api_client.dart';
 import '../utils/notification_sound_helper.dart';
 import 'realtime_notification_service.dart';
 
@@ -36,6 +37,12 @@ class PushNotificationService {
 
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
+
+  String? _lastRegisteredToken;
+  String? get lastRegisteredToken => _lastRegisteredToken;
+
+  int? _lastRegisteredUserId;
+  int? get lastRegisteredUserId => _lastRegisteredUserId;
 
   /// Initialize Firebase and configure FCM messaging listeners.
   ///
@@ -70,19 +77,21 @@ class PushNotificationService {
       );
       debugPrint('FCM notification permission status: ${settings.authorizationStatus}');
 
-      // 3. Retrieve and register initial FCM device token
+      // 3. Retrieve and cache initial FCM device token
       final String? token = await FirebaseMessaging.instance.getToken();
       if (token != null && token.isNotEmpty) {
         _fcmToken = token;
         debugPrint('FCM Device Token retrieved: $token');
-        await RealtimeNotificationService().registerDeviceToken(token);
+        if (ApiClient().token != null && ApiClient().token!.isNotEmpty) {
+          await syncDeviceToken();
+        }
       }
 
       // 4. Listen for token refreshes
       FirebaseMessaging.instance.onTokenRefresh.listen((String newToken) async {
         debugPrint('FCM Device Token refreshed: $newToken');
         _fcmToken = newToken;
-        await RealtimeNotificationService().registerDeviceToken(newToken);
+        await syncDeviceToken();
       });
 
       // 5. Handle incoming foreground messages
@@ -166,6 +175,45 @@ class PushNotificationService {
     }
   }
 
+  /// Synchronize FCM device token with the Attendify backend.
+  ///
+  /// Guarantees:
+  /// - Only attempts registration when authenticated ([ApiClient.token] is non-empty).
+  /// - Deduplicates calls when token and [userId] have already been registered and [force] is false.
+  /// - Returns true on success or when successfully skipped due to deduplication.
+  Future<bool> syncDeviceToken({bool force = false}) async {
+    if (_fcmToken == null || _fcmToken!.isEmpty) {
+      return false;
+    }
+
+    final token = ApiClient().token;
+    if (token == null || token.isEmpty) {
+      return false;
+    }
+
+    final userId = await ApiClient().getUserId();
+
+    if (!force && _lastRegisteredToken == _fcmToken && _lastRegisteredUserId == userId) {
+      return true;
+    }
+
+    final success = await RealtimeNotificationService().registerDeviceToken(_fcmToken!);
+    if (success) {
+      _lastRegisteredToken = _fcmToken;
+      _lastRegisteredUserId = userId;
+    }
+    return success;
+  }
+
+  /// Resets the device token registration cache.
+  ///
+  /// Called upon user logout or session termination so that the next user
+  /// logging in on this device will unconditionally register their FCM token.
+  void resetRegistrationState() {
+    _lastRegisteredToken = null;
+    _lastRegisteredUserId = null;
+  }
+
   @visibleForTesting
   void handleNotificationTapForTesting(RemoteMessage message) => _handleNotificationTap(message);
 
@@ -175,8 +223,16 @@ class PushNotificationService {
   }
 
   @visibleForTesting
+  void setLastRegisteredForTesting({String? token, int? userId}) {
+    _lastRegisteredToken = token;
+    _lastRegisteredUserId = userId;
+  }
+
+  @visibleForTesting
   void resetStateForTesting() {
     _isInitialized = false;
     _fcmToken = null;
+    _lastRegisteredToken = null;
+    _lastRegisteredUserId = null;
   }
 }

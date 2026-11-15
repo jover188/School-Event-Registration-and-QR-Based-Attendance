@@ -40,6 +40,7 @@ return [
         'client_email' => env('FIREBASE_CLIENT_EMAIL'),
         'private_key' => env('FIREBASE_PRIVATE_KEY'),
         'credentials_path' => env('FIREBASE_CREDENTIALS'),
+        'credentials_json' => env('FIREBASE_CREDENTIALS_JSON'),
     ],
 
 ];

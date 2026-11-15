@@ -232,6 +232,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         await RealtimeNotificationService().deregisterDeviceToken(fcmToken);
       } catch (_) {}
     }
+    PushNotificationService().resetRegistrationState();
     RealtimeNotificationService().stop();
     await ApiClient().post(ApiConstants.logout, {});
     await ApiClient().clearSession();

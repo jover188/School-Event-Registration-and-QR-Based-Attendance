@@ -155,10 +155,12 @@ class NotificationController extends Controller
             'platform' => ['required', 'in:android,ios,web'],
         ]);
 
+        $user = $request->user();
+
         DeviceToken::updateOrCreate(
             ['fcm_token' => $validated['fcm_token']],
             [
-                'user_id' => $request->user()->id,
+                'user_id' => $user->id,
                 'platform' => $validated['platform'],
             ]
         );
@@ -178,8 +180,10 @@ class NotificationController extends Controller
             'fcm_token' => ['required', 'string'],
         ]);
 
+        $user = $request->user();
+
         DeviceToken::where('fcm_token', $validated['fcm_token'])
-            ->where('user_id', $request->user()->id)
+            ->where('user_id', $user->id)
             ->delete();
 
         return response()->json([

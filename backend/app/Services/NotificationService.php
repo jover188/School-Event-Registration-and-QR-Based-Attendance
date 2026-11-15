@@ -201,12 +201,14 @@ class NotificationService
             } else {
                 $status = $response->status();
                 $body = $response->json() ?? [];
+                $errorResponseText = $response->body();
+                $detailedErrorMessage = $body['error']['message'] ?? $errorResponseText;
 
                 if (self::isUnregisteredOrNotFound($body, $status)) {
                     DeviceToken::where('fcm_token', $deviceToken->fcm_token)->delete();
-                    Log::info("Pruned unregistered FCM device token (HTTP v1): {$deviceToken->fcm_token}");
+                    Log::info("Pruned unregistered FCM device token (HTTP v1) [HTTP {$status}]: {$deviceToken->fcm_token}. Error: {$detailedErrorMessage}");
                 } else {
-                    Log::warning("FCM HTTP v1 delivery returned status {$status} for token {$deviceToken->fcm_token}: " . $response->body());
+                    Log::warning("FCM HTTP v1 delivery returned status {$status} for token {$deviceToken->fcm_token}. Error: {$detailedErrorMessage} | Response: {$errorResponseText}");
                 }
             }
         }
@@ -272,13 +274,20 @@ class NotificationService
     }
 
     /**
-     * Resolve Firebase Service Account credentials from JSON file or individual config / environment variables.
+     * Resolve Firebase Service Account credentials from JSON string/array, JSON file, or individual config / environment variables.
      */
-    protected static function getFirebaseCredentials(): ?array
+    public static function getFirebaseCredentials(): ?array
     {
-        $credentialsPath = config('services.firebase.credentials_path') ?: env('FIREBASE_CREDENTIALS');
-        if (!empty($credentialsPath) && file_exists($credentialsPath)) {
-            $json = @json_decode(file_get_contents($credentialsPath), true);
+        // 1. Check raw JSON credentials string or parsed array
+        $credentialsJson = config('services.firebase.credentials_json') ?: env('FIREBASE_CREDENTIALS_JSON');
+        if (!empty($credentialsJson)) {
+            $json = is_array($credentialsJson) ? $credentialsJson : @json_decode((string) $credentialsJson, true);
+            if (!is_array($json) && is_string($credentialsJson)) {
+                $decoded = base64_decode($credentialsJson, true);
+                if ($decoded !== false) {
+                    $json = @json_decode($decoded, true);
+                }
+            }
             if (is_array($json) && !empty($json['project_id']) && !empty($json['client_email']) && !empty($json['private_key'])) {
                 return [
                     'project_id' => (string) $json['project_id'],
@@ -288,6 +297,32 @@ class NotificationService
             }
         }
 
+        // 2. Check JSON credentials file path (explicit env var or Render secret files)
+        $credentialsPath = config('services.firebase.credentials_path') ?: env('FIREBASE_CREDENTIALS');
+        $secretGlob = @glob('/etc/secrets/*.json') ?: [];
+        $candidatePaths = array_filter(array_merge([
+            $credentialsPath,
+            '/etc/secrets/firebase-credentials.json',
+            '/etc/secrets/serviceAccountKey.json',
+            '/etc/secrets/firebase_credentials.json',
+            base_path('serviceAccountKey.json'),
+            base_path('firebase-credentials.json'),
+        ], $secretGlob));
+
+        foreach ($candidatePaths as $path) {
+            if (file_exists($path)) {
+                $json = @json_decode(file_get_contents($path), true);
+                if (is_array($json) && !empty($json['project_id']) && !empty($json['client_email']) && !empty($json['private_key'])) {
+                    return [
+                        'project_id' => (string) $json['project_id'],
+                        'client_email' => (string) $json['client_email'],
+                        'private_key' => str_replace(["\\n", '\n'], "\n", (string) $json['private_key']),
+                    ];
+                }
+            }
+        }
+
+        // 3. Check discrete environment variables / config keys
         $projectId = config('services.firebase.project_id') ?: env('FIREBASE_PROJECT_ID');
         $clientEmail = config('services.firebase.client_email') ?: env('FIREBASE_CLIENT_EMAIL');
         $privateKey = config('services.firebase.private_key') ?: env('FIREBASE_PRIVATE_KEY');
@@ -311,6 +346,7 @@ class NotificationService
         $token = Cache::remember('fcm_v1_access_token', now()->addMinutes(50), function () use ($credentials) {
             $jwt = self::generateJwtAssertion($credentials['client_email'], $credentials['private_key']);
             if (!$jwt) {
+                Log::warning('FCM HTTP v1: Failed to generate signed JWT assertion for OAuth token request.');
                 return null;
             }
 
@@ -323,7 +359,7 @@ class NotificationService
                 return $response->json('access_token');
             }
 
-            Log::warning('FCM HTTP v1: OAuth token request failed: ' . $response->body());
+            Log::warning("FCM HTTP v1: OAuth token request failed with status {$response->status()}: " . $response->body());
             return null;
         });
 

@@ -44,6 +44,7 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
 
     // Global listener for single-session termination
     ApiClient().onSessionTerminated = () {
+      PushNotificationService().resetRegistrationState();
       RealtimeNotificationService().stop();
       if (_isSessionDialogActive) return;
       _isSessionDialogActive = true;
@@ -82,6 +83,7 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
 
     // Global listener for expired/unauthenticated session
     ApiClient().onUnauthenticated = () {
+      PushNotificationService().resetRegistrationState();
       if (_isSessionDialogActive) return;
       RealtimeNotificationService().stop();
       navigatorKey.currentState?.pushAndRemoveUntil(
@@ -112,6 +114,9 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
     if (token == null || role == null) {
       return const LoginScreen();
     }
+
+    RealtimeNotificationService().initialize();
+    PushNotificationService().syncDeviceToken();
 
     switch (role) {
       case 'student':
