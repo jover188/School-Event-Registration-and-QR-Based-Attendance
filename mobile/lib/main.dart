@@ -15,6 +15,8 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize theme mode preference before mounting widget tree
+  await AppThemeController().initialize();
   // Initialize PushNotificationService before runApp so background handlers are registered
   await PushNotificationService().initialize();
   runApp(const SchoolAttendanceApp());
@@ -102,6 +104,7 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
 
   @override
   void dispose() {
+    RealtimeNotificationService().stop();
     ApiClient().onSessionTerminated = null;
     ApiClient().onUnauthenticated = null;
     super.dispose();
@@ -134,34 +137,40 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ShadApp.custom(
-      theme: AppTheme.shadTheme,
-      darkTheme: AppTheme.shadDarkTheme,
-      themeMode: ThemeMode.system,
-      appBuilder: (context) => MaterialApp(
-        title: 'School Event Attendance',
-        debugShowCheckedModeBanner: false,
-        navigatorKey: navigatorKey,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        localizationsDelegates: const [GlobalShadLocalizations.delegate],
-        scrollBehavior: const ShadScrollBehavior(),
-        builder: (context, child) => ShadAppBuilder(child: child),
-        home: FutureBuilder<Widget>(
-          future: _initialScreen,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(
-                  child: CircularProgressIndicator(color: AppTheme.primary),
-                ),
-              );
-            }
-            return snapshot.data ?? const LoginScreen();
-          },
-        ),
-      ),
+    return ListenableBuilder(
+      listenable: AppThemeController(),
+      builder: (context, _) {
+        final themeMode = AppThemeController().themeMode;
+        return ShadApp.custom(
+          theme: AppTheme.shadTheme,
+          darkTheme: AppTheme.shadDarkTheme,
+          themeMode: themeMode,
+          appBuilder: (context) => MaterialApp(
+            title: 'School Event Attendance',
+            debugShowCheckedModeBanner: false,
+            navigatorKey: navigatorKey,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeMode,
+            localizationsDelegates: const [GlobalShadLocalizations.delegate],
+            scrollBehavior: const ShadScrollBehavior(),
+            builder: (context, child) => ShadAppBuilder(child: child),
+            home: FutureBuilder<Widget>(
+              future: _initialScreen,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(
+                      child: CircularProgressIndicator(color: AppTheme.primary),
+                    ),
+                  );
+                }
+                return snapshot.data ?? const LoginScreen();
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }

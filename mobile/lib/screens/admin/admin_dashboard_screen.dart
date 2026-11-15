@@ -16,6 +16,7 @@ import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/stat_metric_card.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../core/widgets/theme_toggle_button.dart';
 import '../auth/account_input.dart';
 import '../auth/login_screen.dart';
 import '../common/notification_preferences_screen.dart';
@@ -642,6 +643,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             );
           },
         ),
+        const ThemeToggleIconButton(),
         PopupMenuButton<String>(
           key: const ValueKey<String>('admin-account-menu'),
           tooltip: 'Account & Profile Menu',

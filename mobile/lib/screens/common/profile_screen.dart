@@ -142,6 +142,322 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildThemeSection(AppDesignTokens d) {
+    return ListenableBuilder(
+      listenable: AppThemeController(),
+      builder: (context, _) {
+        final themeController = AppThemeController();
+        final currentMode = themeController.themeMode;
+
+        final options = [
+          (
+            key: const ValueKey<String>('theme-option-light'),
+            title: 'Light Mode',
+            subtitle: 'Clean & bright appearance',
+            icon: LucideIcons.sun,
+            mode: ThemeMode.light,
+          ),
+          (
+            key: const ValueKey<String>('theme-option-dark'),
+            title: 'Dark Mode',
+            subtitle: 'Reduced eye strain',
+            icon: LucideIcons.moon,
+            mode: ThemeMode.dark,
+          ),
+          (
+            key: const ValueKey<String>('theme-option-system'),
+            title: 'System Default',
+            subtitle: 'Follow device preferences',
+            icon: LucideIcons.laptop,
+            mode: ThemeMode.system,
+          ),
+        ];
+
+        return Container(
+          key: const ValueKey<String>('appearance-theme-card'),
+          padding: EdgeInsets.all(d.md),
+          decoration: BoxDecoration(
+            color: d.card,
+            borderRadius: BorderRadius.circular(d.radiusCard),
+            border: Border.all(color: d.border, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: d.authDark.withValues(alpha: 0.04),
+                offset: const Offset(0, 2),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    LucideIcons.sunMedium,
+                    size: 18,
+                    color: d.primary,
+                  ),
+                  SizedBox(width: d.sm),
+                  Expanded(
+                    child: Text(
+                      'Appearance & Theme',
+                      style: d.cardTitle,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Choose your preferred interface theme',
+                style: d.supporting,
+              ),
+              Divider(height: d.lg, color: d.border),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 520;
+                  if (isWide) {
+                    return Row(
+                      children: [
+                        for (int i = 0; i < options.length; i++) ...[
+                          if (i > 0) SizedBox(width: d.sm),
+                          Expanded(
+                            child: _buildThemeOptionCard(
+                              key: options[i].key,
+                              title: options[i].title,
+                              subtitle: options[i].subtitle,
+                              icon: options[i].icon,
+                              mode: options[i].mode,
+                              isSelected: currentMode == options[i].mode,
+                              d: d,
+                              onTap: () =>
+                                  themeController.setThemeMode(options[i].mode),
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  } else {
+                    return Column(
+                      children: [
+                        for (int i = 0; i < options.length; i++) ...[
+                          if (i > 0) SizedBox(height: d.sm),
+                          _buildThemeOptionTile(
+                            key: options[i].key,
+                            title: options[i].title,
+                            subtitle: options[i].subtitle,
+                            icon: options[i].icon,
+                            mode: options[i].mode,
+                            isSelected: currentMode == options[i].mode,
+                            d: d,
+                            onTap: () =>
+                                themeController.setThemeMode(options[i].mode),
+                          ),
+                        ],
+                      ],
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildThemeOptionTile({
+    required ValueKey<String> key,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required ThemeMode mode,
+    required bool isSelected,
+    required AppDesignTokens d,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '$title theme option',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: key,
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(d.radiusControl),
+          child: AnimatedContainer(
+            duration: d.interactionDuration,
+            padding: EdgeInsets.symmetric(horizontal: d.md, vertical: d.sm + 4),
+            decoration: BoxDecoration(
+              color: isSelected ? d.selection : d.card,
+              borderRadius: BorderRadius.circular(d.radiusControl),
+              border: Border.all(
+                color: isSelected ? d.primary : d.border,
+                width: isSelected ? 1.5 : 1.0,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(d.sm),
+                  decoration: BoxDecoration(
+                    color: isSelected ? d.primary : d.muted,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 18,
+                    color: isSelected ? d.primaryForeground : d.foreground,
+                  ),
+                ),
+                SizedBox(width: d.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: d.body.copyWith(
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: d.supporting,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: d.sm),
+                AnimatedContainer(
+                  duration: d.interactionDuration,
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected ? d.primary : Colors.transparent,
+                    border: Border.all(
+                      color: isSelected ? d.primary : d.border,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: isSelected
+                      ? Icon(
+                          LucideIcons.check,
+                          key: ValueKey<String>('${key.value}-check'),
+                          size: 14,
+                          color: d.primaryForeground,
+                        )
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeOptionCard({
+    required ValueKey<String> key,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required ThemeMode mode,
+    required bool isSelected,
+    required AppDesignTokens d,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '$title theme option',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: key,
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(d.radiusControl),
+          child: AnimatedContainer(
+            duration: d.interactionDuration,
+            padding: EdgeInsets.all(d.md),
+            decoration: BoxDecoration(
+              color: isSelected ? d.selection : d.card,
+              borderRadius: BorderRadius.circular(d.radiusControl),
+              border: Border.all(
+                color: isSelected ? d.primary : d.border,
+                width: isSelected ? 1.5 : 1.0,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(d.sm),
+                      decoration: BoxDecoration(
+                        color: isSelected ? d.primary : d.muted,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        icon,
+                        size: 18,
+                        color: isSelected ? d.primaryForeground : d.foreground,
+                      ),
+                    ),
+                    AnimatedContainer(
+                      duration: d.interactionDuration,
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected ? d.primary : Colors.transparent,
+                        border: Border.all(
+                          color: isSelected ? d.primary : d.border,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: isSelected
+                          ? Icon(
+                              LucideIcons.check,
+                              key: ValueKey<String>('${key.value}-check'),
+                              size: 14,
+                              color: d.primaryForeground,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+                SizedBox(height: d.md),
+                Text(
+                  title,
+                  style: d.body.copyWith(
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: d.supporting,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = context.design;
@@ -215,6 +531,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                         ),
+                        SizedBox(height: d.md),
+
+                        // Appearance & Theme Card
+                        _buildThemeSection(d),
                         SizedBox(height: d.md),
 
                         // Notification Preferences Link Card

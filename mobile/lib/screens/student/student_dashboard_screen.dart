@@ -15,6 +15,7 @@ import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/event_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/stat_metric_card.dart';
+import '../../core/widgets/theme_toggle_button.dart';
 import '../../models/event_model.dart';
 import '../auth/login_screen.dart';
 import '../common/calendar_screen.dart';
@@ -550,6 +551,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             );
           },
         ),
+        const ThemeToggleIconButton(),
       ],
       body: AppDestinationStack(
         selectedId: _selectedId,

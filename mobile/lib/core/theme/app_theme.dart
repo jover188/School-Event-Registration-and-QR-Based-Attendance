@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'app_tokens.dart';
 export 'app_tokens.dart';
+export 'theme_controller.dart';
 
 abstract final class AppColors {
   static const primary = AppPalette.primary;

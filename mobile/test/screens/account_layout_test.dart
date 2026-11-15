@@ -151,7 +151,7 @@ void main() {
     );
   });
 
-  testWidgets('login fields stay white when the app uses dark mode',
+  testWidgets('login fields adapt to dark mode with theme tokens',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
@@ -173,11 +173,11 @@ void main() {
         matching: find.byType(ShadInput),
       );
       expect(tester.widget<ShadInput>(input).decoration?.color,
-          const Color(0xFFFFFFFF));
+          const Color(0xFF18181B));
     }
   });
 
-  testWidgets('login fields keep a dark cursor when focused in dark mode',
+  testWidgets('login fields use light cursor when focused in dark mode',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
@@ -203,13 +203,13 @@ void main() {
         matching: find.byType(EditableText),
       );
       expect(tester.widget<EditableText>(editable).cursorColor,
-          const Color(0xFF0A0A0A));
+          const Color(0xFFFAFAFA));
       expect(tester.widget<EditableText>(editable).selectionColor,
-          const Color(0x240A0A0A));
+          const Color(0x24FAFAFA));
     }
   });
 
-  testWidgets('login button stays black when hovered in dark mode',
+  testWidgets('login button adapts to dark mode with authDark token',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
@@ -228,7 +228,7 @@ void main() {
       matching: find.byType(ShadDecorator),
     );
     expect(tester.widget<ShadDecorator>(decorator).decoration?.color,
-        const Color(0xFF0A0A0A));
+        const Color(0xFFFAFAFA));
 
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     addTearDown(mouse.removePointer);
@@ -237,7 +237,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.widget<ShadDecorator>(decorator).decoration?.color,
-        const Color(0xFF0A0A0A));
+        const Color(0xFFFAFAFA));
   });
 
   testWidgets(

@@ -305,11 +305,11 @@ class AppDesignTokens extends ThemeExtension<AppDesignTokens> {
   double get railWidth => 88;
   double get sidebarWidth => 256;
   double get contentMaxWidth => 1280;
-  Color get authPage => const Color(0xFFE6E6E4);
-  Color get authSurface => const Color(0xFFF6F6F4);
-  Color get authDark => const Color(0xFF0A0A0A);
-  Color get authDarkSelection => const Color(0x240A0A0A);
-  Color get authLight => const Color(0xFFFFFFFF);
+  Color get authPage => isDark ? const Color(0xFF09090B) : const Color(0xFFE6E6E4);
+  Color get authSurface => isDark ? const Color(0xFF121214) : const Color(0xFFF6F6F4);
+  Color get authDark => isDark ? const Color(0xFFFAFAFA) : const Color(0xFF0A0A0A);
+  Color get authDarkSelection => isDark ? const Color(0x24FAFAFA) : const Color(0x240A0A0A);
+  Color get authLight => isDark ? const Color(0xFF18181B) : const Color(0xFFFFFFFF);
   double get authSurfaceMaxWidth => 420;
   double get authSurfaceMinHeight => 780;
   double get authSurfaceRadius => 36;

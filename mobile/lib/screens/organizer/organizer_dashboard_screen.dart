@@ -16,6 +16,7 @@ import '../../core/widgets/error_state_view.dart';
 import '../../core/widgets/event_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/stat_metric_card.dart';
+import '../../core/widgets/theme_toggle_button.dart';
 import '../../models/event_model.dart';
 import '../auth/login_screen.dart';
 import '../common/notifications_screen.dart';
@@ -474,6 +475,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
             );
           },
         ),
+        const ThemeToggleIconButton(),
         IconButton(
           icon: const Icon(LucideIcons.user, size: 20),
           tooltip: 'My Profile',
