@@ -15,6 +15,8 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize PushNotificationService before runApp so background handlers are registered
+  await PushNotificationService().initialize();
   runApp(const SchoolAttendanceApp());
 }
 

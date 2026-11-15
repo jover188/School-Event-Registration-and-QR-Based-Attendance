@@ -788,6 +788,8 @@ class NotificationServiceTest extends TestCase
                         && ($androidNotif['channel_id'] ?? null) === 'attendify_important_v1'
                         && ($androidNotif['sound'] ?? null) === 'sfxmint_ready_chime_07'
                         && ($androidNotif['click_action'] ?? null) === 'FLUTTER_NOTIFICATION_CLICK'
+                        && ($androidNotif['notification_priority'] ?? null) === 'PRIORITY_MAX'
+                        && ($androidNotif['default_vibrate_timings'] ?? null) === true
                         && ($dataBlock['notification_id'] ?? null) === (string) $notif->id
                         && ($dataBlock['notification_type'] ?? null) === 'admin_announcement'
                         && ($dataBlock['title'] ?? null) === 'V1 System Announcement'

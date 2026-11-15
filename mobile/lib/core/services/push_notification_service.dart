@@ -129,27 +129,40 @@ class PushNotificationService {
   /// Route user to the appropriate screen based on payload contents.
   void _handleNotificationTap(RemoteMessage message) {
     debugPrint('FCM notification tapped: ${message.data}');
-    final navState = navigatorKey.currentState;
-    if (navState == null) return;
 
-    final rawEventId = message.data['event_id'];
-    int? eventId;
-    if (rawEventId != null) {
-      eventId = int.tryParse(rawEventId.toString());
+    void performNavigation() {
+      final navState = navigatorKey.currentState;
+      if (navState == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => performNavigation());
+        return;
+      }
+
+      final rawEventId = message.data['event_id'];
+      int? eventId;
+      if (rawEventId != null) {
+        eventId = int.tryParse(rawEventId.toString());
+      }
+
+      if (eventId != null && eventId > 0) {
+        navState.push(
+          MaterialPageRoute(
+            builder: (_) => EventDetailScreen(eventId: eventId),
+          ),
+        );
+      } else {
+        navState.push(
+          MaterialPageRoute(
+            builder: (_) => const NotificationsScreen(),
+          ),
+        );
+      }
     }
 
-    if (eventId != null && eventId > 0) {
-      navState.push(
-        MaterialPageRoute(
-          builder: (_) => EventDetailScreen(eventId: eventId),
-        ),
-      );
+    final navState = navigatorKey.currentState;
+    if (navState == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => performNavigation());
     } else {
-      navState.push(
-        MaterialPageRoute(
-          builder: (_) => const NotificationsScreen(),
-        ),
-      );
+      performNavigation();
     }
   }
 
