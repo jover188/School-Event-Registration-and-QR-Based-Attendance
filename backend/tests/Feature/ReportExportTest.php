@@ -252,4 +252,43 @@ class ReportExportTest extends TestCase
             }
         }
     }
+
+    public function test_organizer_summary_export_scopes_to_own_organizer_data_for_organizer_role(): void
+    {
+        // Create a second organizer
+        $otherOrganizer = User::create([
+            'role_id' => 2,
+            'email' => 'other.organizer@school.edu',
+            'password' => bcrypt('Organizer@12345'),
+            'status' => 'active',
+        ]);
+
+        $myOrganizer = User::where('role_id', 2)->where('email', '!=', 'other.organizer@school.edu')->first();
+
+        // Login as myOrganizer
+        $loginResp = $this->postJson('/api/v1/auth/login', [
+            'login' => $myOrganizer->email,
+            'password' => 'Organizer@12345',
+        ]);
+        $orgToken = $loginResp->json('data.token');
+
+        // Export organizer_summary as CSV
+        $resp = $this->withHeader('Authorization', "Bearer {$orgToken}")
+            ->get('/api/v1/reports/export?report_type=organizer_summary&format=csv');
+
+        $resp->assertStatus(200);
+        $content = $resp->streamedContent();
+
+        // Assert myOrganizer email is present in CSV
+        $this->assertStringContainsString($myOrganizer->email, $content);
+
+        // Assert otherOrganizer email is NOT present in CSV
+        $this->assertStringNotContainsString('other.organizer@school.edu', $content);
+
+        // Also verify the Excel export class directly with organizerId
+        $export = new \App\Exports\OrganizerSummaryExport('tester', null, null, $myOrganizer->id);
+        $collection = $export->collection();
+        $this->assertCount(1, $collection);
+        $this->assertEquals($myOrganizer->id, $collection->first()->id);
+    }
 }

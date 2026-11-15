@@ -47,19 +47,36 @@ class ApiClient {
       mockHandler;
 
   VoidCallback? onSessionTerminated;
+  VoidCallback? onUnauthenticated;
 
   static bool _checkedAndroidHost = false;
 
+  @visibleForTesting
+  static void resetAndroidHostCheck() {
+    _checkedAndroidHost = false;
+  }
+
+  @visibleForTesting
+  ApiResponse handleResponseForTesting(http.Response response) =>
+      _handleResponse(response);
+
+  @visibleForTesting
+  Future<void> ensureAndroidHostForTesting() => _ensureAndroidHost();
+
   Future<void> _ensureAndroidHost() async {
-    if (_checkedAndroidHost || kIsWeb || !Platform.isAndroid) return;
+    if (_checkedAndroidHost || kIsWeb || !Platform.isAndroid || ApiConstants.customBaseUrl != null) return;
     _checkedAndroidHost = true;
-    if (ApiConstants.customBaseUrl != null) return;
+
+    // Only run emulator host probe if baseUrl explicitly targets localhost / loopback!
+    final currentBase = ApiConstants.baseUrl;
+    if (!currentBase.contains('127.0.0.1') && !currentBase.contains('localhost')) {
+      return;
+    }
 
     try {
       final socket = await Socket.connect('127.0.0.1', 8000,
-          timeout: const Duration(milliseconds: 400));
+          timeout: const Duration(milliseconds: 200));
       socket.destroy();
-      ApiConstants.customBaseUrl = 'http://127.0.0.1:8000/api/v1';
     } catch (_) {
       // 127.0.0.1 not reachable; fallback to 10.0.2.2 for Android QEMU emulator
       ApiConstants.customBaseUrl = 'http://10.0.2.2:8000/api/v1';
@@ -150,10 +167,11 @@ class ApiClient {
 
     if (response.statusCode == 401) {
       clearSession();
-      if (onSessionTerminated != null &&
-          jsonBody is Map<String, dynamic> &&
+      if (jsonBody is Map<String, dynamic> &&
           jsonBody['error_code'] == 'ERR_SESSION_TERMINATED') {
-        onSessionTerminated!();
+        onSessionTerminated?.call();
+      } else {
+        onUnauthenticated?.call();
       }
     }
 
@@ -429,6 +447,7 @@ class ApiClient {
     Map<String, String>? queryParams,
   }) async {
     try {
+      await _ensureAndroidHost();
       var uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
       if (queryParams != null && queryParams.isNotEmpty) {
         uri = uri.replace(queryParameters: queryParams);
@@ -445,7 +464,7 @@ class ApiClient {
 
       if (response.statusCode == 401) {
         clearSession();
-        onSessionTerminated?.call();
+        onUnauthenticated?.call();
       }
 
       final contentType = response.headers['content-type'];

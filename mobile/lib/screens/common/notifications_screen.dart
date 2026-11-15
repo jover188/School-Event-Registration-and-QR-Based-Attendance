@@ -52,6 +52,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         final id = (newNotif['id'] as num?)?.toInt();
         if (id == null || !_notifications.any((n) => (n['id'] as num?)?.toInt() == id)) {
           _notifications.insert(0, Map<String, dynamic>.from(newNotif));
+          _errorMessage = null;
+          _isLoading = false;
         }
       });
     });

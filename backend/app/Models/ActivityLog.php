@@ -44,7 +44,7 @@ class ActivityLog extends Model
             'record_id' => $recordId,
             'metadata' => $metadata,
             'ip_address' => request()->ip(),
-            'user_agent' => request()->userAgent(),
+            'user_agent' => substr((string) request()->userAgent(), 0, 1000),
         ]);
     }
 }

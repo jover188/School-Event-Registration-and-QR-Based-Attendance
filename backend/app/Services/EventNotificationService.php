@@ -39,6 +39,41 @@ class EventNotificationService
     }
 
     /**
+     * User IDs of students affected by cancellation (either registered or on waiting list).
+     *
+     * @return Collection<int, int>
+     */
+    public static function affectedCancellationRecipientUserIds(Event $event): Collection
+    {
+        return User::query()
+            ->where('status', 'active')
+            ->whereHas('role', fn ($q) => $q->where('slug', 'student'))
+            ->whereHas('student.eventRegistrations', function ($q) use ($event) {
+                $q->where('event_id', $event->id)
+                    ->whereIn('status', ['registered', 'waiting_list']);
+            })
+            ->pluck('id');
+    }
+
+    /**
+     * Send cancellation notification to all affected students (both registered and waitlisted).
+     */
+    public static function notifyCancellation(
+        Event $event,
+        string $title,
+        string $message,
+        array $payload = []
+    ): int {
+        return NotificationService::sendToMany(
+            self::affectedCancellationRecipientUserIds($event),
+            $title,
+            $message,
+            'event_cancellation',
+            array_merge(['event_id' => $event->id], $payload)
+        );
+    }
+
+    /**
      * Send an event-specific notification to eligible registered students only.
      * Preference handling (and mandatory types) stay in NotificationService.
      */

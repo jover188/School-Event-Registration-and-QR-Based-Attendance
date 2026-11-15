@@ -235,6 +235,34 @@ class NotificationServiceTest extends TestCase
         ]);
     }
 
+    public function test_announcement_title_validation_length_boundary(): void
+    {
+        $adminLogin = $this->postJson('/api/v1/auth/login', [
+            'login' => 'admin@school.edu',
+            'password' => 'Admin@12345',
+        ]);
+        $adminToken = $adminLogin->json('data.token');
+
+        // 150 characters: should pass validation
+        $title150 = str_repeat('A', 150);
+        $passResp = $this->requestAs($adminToken, 'POST', '/api/v1/admin/announcements', [
+            'title' => $title150,
+            'message' => 'Testing 150 char title',
+            'target_role' => 'all',
+        ]);
+        $passResp->assertStatus(200);
+
+        // 151 characters: should fail validation with 422
+        $title151 = str_repeat('B', 151);
+        $failResp = $this->requestAs($adminToken, 'POST', '/api/v1/admin/announcements', [
+            'title' => $title151,
+            'message' => 'Testing 151 char title',
+            'target_role' => 'all',
+        ]);
+        $failResp->assertStatus(422)
+            ->assertJsonValidationErrors(['title']);
+    }
+
     public function test_sound_is_attached_to_sound_enabled_notification_categories(): void
     {
         $studentUser = User::where('role_id', 3)->first();
@@ -436,5 +464,342 @@ class NotificationServiceTest extends TestCase
         // Verify expired token was pruned and valid token remained
         $this->assertDatabaseHas('device_tokens', ['fcm_token' => 'valid_fcm_token_123']);
         $this->assertDatabaseMissing('device_tokens', ['fcm_token' => 'expired_fcm_token_456']);
+    }
+
+    public function test_device_token_registration_and_removal_with_web_platform(): void
+    {
+        $studentUser = User::where('role_id', 3)->first();
+
+        $loginRes = $this->postJson('/api/v1/auth/login', [
+            'login' => $studentUser->email,
+            'password' => 'Student@12345',
+        ]);
+        $token = $loginRes->json('data.token');
+
+        // Register web device token via /device-tokens
+        $registerRes = $this->requestAs($token, 'POST', '/api/v1/device-tokens', [
+            'fcm_token' => 'web_token_fcm_xyz123',
+            'platform' => 'web',
+        ]);
+
+        $registerRes->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Device token registered successfully for push notifications.',
+            ]);
+
+        $this->assertDatabaseHas('device_tokens', [
+            'user_id' => $studentUser->id,
+            'fcm_token' => 'web_token_fcm_xyz123',
+            'platform' => 'web',
+        ]);
+
+        // Deregister web device token
+        $deleteRes = $this->requestAs($token, 'DELETE', '/api/v1/device-tokens', [
+            'fcm_token' => 'web_token_fcm_xyz123',
+        ]);
+
+        $deleteRes->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Device token removed.',
+            ]);
+
+        $this->assertDatabaseMissing('device_tokens', [
+            'fcm_token' => 'web_token_fcm_xyz123',
+        ]);
+    }
+
+    public function test_notification_cancellation_reaches_both_registered_and_waitlisted_attendees(): void
+    {
+        $adminLogin = $this->postJson('/api/v1/auth/login', [
+            'login' => 'admin@school.edu',
+            'password' => 'Admin@12345',
+        ]);
+        $adminToken = $adminLogin->json('data.token');
+
+        $organizer = User::where('role_id', 2)->first();
+        $event = Event::create([
+            'organizer_id' => $organizer->id,
+            'title' => 'Annual Hackathon',
+            'description' => 'Coding competition',
+            'venue' => 'Innovation Lab',
+            'event_date' => now()->addDays(10)->toDateString(),
+            'start_time' => '09:00:00',
+            'end_time' => '17:00:00',
+            'registration_start' => now()->subDay(),
+            'registration_end' => now()->addDays(8),
+            'max_participants' => 50,
+            'status' => 'published',
+        ]);
+
+        $studentUsers = User::where('role_id', 3)->has('student')->take(3)->get();
+        $this->assertGreaterThanOrEqual(2, $studentUsers->count());
+
+        $registeredUser = $studentUsers[0];
+        $waitlistedUser = $studentUsers[1];
+        $unregisteredUser = $studentUsers->count() > 2 ? $studentUsers[2] : null;
+
+        $event->registrations()->create([
+            'student_id' => $registeredUser->student->id,
+            'status' => 'registered',
+            'registered_at' => now(),
+        ]);
+
+        $event->registrations()->create([
+            'student_id' => $waitlistedUser->student->id,
+            'status' => 'waiting_list',
+            'waiting_list_position' => 1,
+            'registered_at' => now(),
+        ]);
+
+        // Clean existing notifications for these users
+        Notification::whereIn('user_id', $studentUsers->pluck('id'))->delete();
+
+        // Admin approves cancellation
+        $reviewResp = $this->requestAs($adminToken, 'POST', "/api/v1/admin/events/{$event->id}/review-cancellation", [
+            'action' => 'approved',
+            'remarks' => 'Facility renovation conflict',
+        ]);
+        $reviewResp->assertStatus(200);
+
+        // Both registered and waitlisted receive cancellation notification
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $registeredUser->id,
+            'notification_type' => 'event_cancellation',
+        ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $waitlistedUser->id,
+            'notification_type' => 'event_cancellation',
+        ]);
+
+        if ($unregisteredUser) {
+            $this->assertDatabaseMissing('notifications', [
+                'user_id' => $unregisteredUser->id,
+                'notification_type' => 'event_cancellation',
+            ]);
+        }
+    }
+
+    public function test_fcm_payload_contains_click_action_channel_sound_and_notification_id(): void
+    {
+        $studentUser = User::where('role_id', 3)->first();
+        \App\Models\DeviceToken::where('user_id', $studentUser->id)->delete();
+
+        \App\Models\DeviceToken::create([
+            'user_id' => $studentUser->id,
+            'fcm_token' => 'fcm_payload_test_token_789',
+            'platform' => 'android',
+        ]);
+
+        config(['services.fcm.server_key' => 'test_fcm_server_key']);
+
+        \Illuminate\Support\Facades\Http::fake([
+            'https://fcm.googleapis.com/fcm/send' => \Illuminate\Support\Facades\Http::response([
+                'multicast_id' => 99999,
+                'success' => 1,
+                'failure' => 0,
+                'canonical_ids' => 0,
+                'results' => [['message_id' => '0:payload123']],
+            ], 200),
+        ]);
+
+        $notif = NotificationService::send(
+            $studentUser->id,
+            'Targeted Alert',
+            'Please proceed to Hall A.',
+            'event_reminder_1h',
+            ['event_id' => 42]
+        );
+
+        $this->assertNotNull($notif);
+
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) use ($notif) {
+            $data = $request->data();
+
+            // Verify top-level registration_ids
+            $hasToken = in_array('fcm_payload_test_token_789', $data['registration_ids'] ?? [], true);
+
+            // Verify notification block
+            $notifBlock = $data['notification'] ?? [];
+            $hasNotifClickAction = ($notifBlock['click_action'] ?? null) === 'FLUTTER_NOTIFICATION_CLICK';
+            $hasNotifChannel = ($notifBlock['channel_id'] ?? null) === NotificationService::NOTIFICATION_CHANNEL_ID;
+            $hasNotifSound = ($notifBlock['sound'] ?? null) === NotificationService::SOUND_CHIME_07;
+
+            // Verify data block
+            $dataBlock = $data['data'] ?? [];
+            $hasDataClickAction = ($dataBlock['click_action'] ?? null) === 'FLUTTER_NOTIFICATION_CLICK';
+            $hasDataChannel = ($dataBlock['channel_id'] ?? null) === NotificationService::NOTIFICATION_CHANNEL_ID;
+            $hasDataSound = ($dataBlock['sound'] ?? null) === NotificationService::SOUND_CHIME_07;
+            $hasNotifId = ($dataBlock['notification_id'] ?? null) === (string) $notif->id;
+            $hasNotifType = ($dataBlock['notification_type'] ?? null) === 'event_reminder_1h';
+            $hasEventId = ($dataBlock['event_id'] ?? null) === '42';
+
+            return $hasToken
+                && $hasNotifClickAction
+                && $hasNotifChannel
+                && $hasNotifSound
+                && $hasDataClickAction
+                && $hasDataChannel
+                && $hasDataSound
+                && $hasNotifId
+                && $hasNotifType
+                && $hasEventId;
+        });
+    }
+
+    public function test_fcm_http_v1_dispatch_with_mocked_jwt_and_google_api(): void
+    {
+        // 1. Generate ephemeral RSA key pair for testing without hardcoding private keys
+        $sslConfig = [];
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $candidateConfigs = [
+                'C:/xampp/apache/conf/openssl.cnf',
+                'C:/xampp/php/extras/ssl/openssl.cnf',
+                getenv('OPENSSL_CONF'),
+            ];
+            foreach ($candidateConfigs as $cand) {
+                if ($cand && file_exists($cand)) {
+                    $sslConfig['config'] = $cand;
+                    break;
+                }
+            }
+        }
+
+        $rsaKey = openssl_pkey_new(array_merge([
+            'private_key_bits' => 1024,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ], $sslConfig));
+
+        $privateKeyPem = '';
+        openssl_pkey_export($rsaKey, $privateKeyPem, null, $sslConfig);
+
+        // 2. Set Firebase service account config
+        config([
+            'services.firebase.project_id' => 'attendify-school-app',
+            'services.firebase.client_email' => 'firebase-adminsdk@attendify-school-app.iam.gserviceaccount.com',
+            'services.firebase.private_key' => $privateKeyPem,
+            'services.fcm.server_key' => null,
+        ]);
+
+        \Illuminate\Support\Facades\Cache::forget('fcm_v1_access_token');
+
+        // 3. Prepare user & device tokens
+        $studentUser = User::where('role_id', 3)->first();
+        \App\Models\DeviceToken::where('user_id', $studentUser->id)->delete();
+
+        \App\Models\DeviceToken::create([
+            'user_id' => $studentUser->id,
+            'fcm_token' => 'fcm_v1_active_device_token_abc',
+            'platform' => 'android',
+        ]);
+
+        \App\Models\DeviceToken::create([
+            'user_id' => $studentUser->id,
+            'fcm_token' => 'fcm_v1_stale_device_token_xyz',
+            'platform' => 'android',
+        ]);
+
+        // 4. Mock Google OAuth 2.0 & FCM HTTP v1 API
+        \Illuminate\Support\Facades\Http::fake([
+            'https://oauth2.googleapis.com/token' => \Illuminate\Support\Facades\Http::response([
+                'access_token' => 'mock_google_oauth_bearer_token_777',
+                'expires_in' => 3600,
+                'token_type' => 'Bearer',
+            ], 200),
+            'https://fcm.googleapis.com/v1/projects/attendify-school-app/messages:send' => function ($request) {
+                $payload = $request->data();
+                $token = $payload['message']['token'] ?? null;
+
+                if ($token === 'fcm_v1_active_device_token_abc') {
+                    return \Illuminate\Support\Facades\Http::response([
+                        'name' => 'projects/attendify-school-app/messages/msg_valid_123',
+                    ], 200);
+                }
+
+                if ($token === 'fcm_v1_stale_device_token_xyz') {
+                    return \Illuminate\Support\Facades\Http::response([
+                        'error' => [
+                            'code' => 404,
+                            'message' => 'Requested entity was not found.',
+                            'status' => 'NOT_FOUND',
+                            'details' => [
+                                [
+                                    '@type' => 'type.googleapis.com/google.firebase.fcm.v1.FcmError',
+                                    'errorCode' => 'UNREGISTERED',
+                                ],
+                            ],
+                        ],
+                    ], 404);
+                }
+
+                return \Illuminate\Support\Facades\Http::response(['error' => ['code' => 400]], 400);
+            },
+        ]);
+
+        // 5. Send notification
+        $notif = NotificationService::send(
+            $studentUser->id,
+            'V1 System Announcement',
+            'All school operations normal.',
+            'admin_announcement',
+            ['event_id' => 88]
+        );
+
+        $this->assertNotNull($notif);
+
+        // 6. Verify OAuth token was requested using signed JWT
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) {
+            if ($request->url() === 'https://oauth2.googleapis.com/token') {
+                $data = $request->data();
+                $jwt = $data['assertion'] ?? '';
+                $parts = explode('.', $jwt);
+
+                return ($data['grant_type'] ?? '') === 'urn:ietf:params:oauth:grant-type:jwt-bearer'
+                    && count($parts) === 3;
+            }
+            return false;
+        });
+
+        // 7. Verify OAuth token was cached
+        $this->assertEquals('mock_google_oauth_bearer_token_777', \Illuminate\Support\Facades\Cache::get('fcm_v1_access_token'));
+
+        // 8. Verify FCM HTTP v1 dispatch payload and Bearer token
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) use ($notif) {
+            if ($request->url() === 'https://fcm.googleapis.com/v1/projects/attendify-school-app/messages:send') {
+                $authHeader = $request->header('Authorization');
+                $hasBearer = is_array($authHeader)
+                    ? in_array('Bearer mock_google_oauth_bearer_token_777', $authHeader, true)
+                    : ($authHeader === 'Bearer mock_google_oauth_bearer_token_777');
+
+                $data = $request->data();
+                $msg = $data['message'] ?? [];
+                if (($msg['token'] ?? null) === 'fcm_v1_active_device_token_abc') {
+                    $notifBlock = $msg['notification'] ?? [];
+                    $androidBlock = $msg['android'] ?? [];
+                    $androidNotif = $androidBlock['notification'] ?? [];
+                    $dataBlock = $msg['data'] ?? [];
+
+                    return $hasBearer
+                        && ($notifBlock['title'] ?? null) === 'V1 System Announcement'
+                        && ($notifBlock['body'] ?? null) === 'All school operations normal.'
+                        && ($androidBlock['priority'] ?? null) === 'HIGH'
+                        && ($androidNotif['channel_id'] ?? null) === 'attendify_important_v1'
+                        && ($androidNotif['sound'] ?? null) === 'sfxmint_ready_chime_07'
+                        && ($androidNotif['click_action'] ?? null) === 'FLUTTER_NOTIFICATION_CLICK'
+                        && ($dataBlock['notification_id'] ?? null) === (string) $notif->id
+                        && ($dataBlock['notification_type'] ?? null) === 'admin_announcement'
+                        && ($dataBlock['title'] ?? null) === 'V1 System Announcement'
+                        && ($dataBlock['message'] ?? null) === 'All school operations normal.'
+                        && ($dataBlock['event_id'] ?? null) === '88';
+                }
+            }
+            return false;
+        });
+
+        // 9. Verify token pruning on UNREGISTERED response
+        $this->assertDatabaseHas('device_tokens', ['fcm_token' => 'fcm_v1_active_device_token_abc']);
+        $this->assertDatabaseMissing('device_tokens', ['fcm_token' => 'fcm_v1_stale_device_token_xyz']);
     }
 }

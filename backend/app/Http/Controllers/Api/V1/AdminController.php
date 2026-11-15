@@ -192,7 +192,7 @@ class AdminController extends Controller
     public function sendAnnouncement(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'title' => ['required', 'string', 'max:191'],
+            'title' => ['required', 'string', 'max:150'],
             'message' => ['required', 'string', 'max:2000'],
             'target_role' => ['nullable', 'in:all,student,organizer,management'],
         ]);

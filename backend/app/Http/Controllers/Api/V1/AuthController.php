@@ -10,6 +10,7 @@ use App\Models\StudentQR;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -304,14 +305,12 @@ class AuthController extends Controller
     }
 
     /**
-     * Verify School Email / Activate Pending Account
+     * Resend Email Verification Code
      */
-    public function verifyEmail(Request $request): JsonResponse
+    public function resendVerification(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'email' => ['required', 'email'],
-            'code' => ['nullable', 'string'],
-            'token' => ['nullable', 'string'],
         ]);
 
         $user = User::where('email', $validated['email'])->first();
@@ -344,6 +343,35 @@ class AuthController extends Controller
             ]);
         }
 
+        $code = sprintf('%06d', random_int(100000, 999999));
+
+        Cache::put("email_verify_{$user->id}", hash('sha256', $code), now()->addMinutes(15));
+        Cache::put("email_verify_email_{$user->email}", [
+            'code_hash' => hash('sha256', $code),
+            'user_id' => $user->id,
+        ], now()->addMinutes(15));
+
+        ActivityLog::log('verification_code_sent', 'auth', $user->id, [
+            'email' => $user->email,
+        ], $user->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Verification code sent to your email.',
+        ]);
+    }
+
+    /**
+     * Verify School Email / Activate Pending Account
+     */
+    public function verifyEmail(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['nullable', 'string'],
+            'token' => ['nullable', 'string'],
+        ]);
+
         $code = $validated['code'] ?? $validated['token'] ?? null;
         if (empty($code)) {
             return response()->json([
@@ -352,6 +380,63 @@ class AuthController extends Controller
                 'message' => 'A verification code or token is required to activate your account.',
             ], 422);
         }
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_USER_NOT_FOUND',
+                'message' => 'No user account found with that email address.',
+            ], 404);
+        }
+
+        if ($user->status === 'inactive') {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_ACCOUNT_INACTIVE',
+                'message' => 'Your account has been deactivated. Please contact an administrator.',
+            ], 403);
+        }
+
+        if ($user->status === 'active') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Email is already verified. Your account is active.',
+                'data' => [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'status' => $user->status,
+                ],
+            ]);
+        }
+
+        $cachedHash = Cache::get("email_verify_{$user->id}");
+        if (!$cachedHash) {
+            $emailCache = Cache::get("email_verify_email_{$user->email}");
+            if ($emailCache && isset($emailCache['code_hash'])) {
+                $cachedHash = $emailCache['code_hash'];
+            }
+        }
+
+        if (!$cachedHash) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_TOKEN_EXPIRED',
+                'message' => 'Verification code has expired or was not requested.',
+            ], 422);
+        }
+
+        if (!hash_equals($cachedHash, hash('sha256', $code))) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ERR_INVALID_TOKEN',
+                'message' => 'The verification code provided is invalid.',
+            ], 422);
+        }
+
+        Cache::forget("email_verify_{$user->id}");
+        Cache::forget("email_verify_email_{$user->email}");
 
         $user->update([
             'status' => 'active',

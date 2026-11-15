@@ -4,6 +4,7 @@ import '../../core/constants/api_constants.dart';
 import '../../core/layout/responsive_layout.dart';
 import '../../core/navigation/app_destination.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/services/realtime_notification_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
@@ -192,6 +193,13 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
   }
 
   Future<void> _logout() async {
+    final fcmToken = PushNotificationService().fcmToken;
+    if (fcmToken != null && fcmToken.isNotEmpty) {
+      try {
+        await RealtimeNotificationService().deregisterDeviceToken(fcmToken);
+      } catch (_) {}
+    }
+    RealtimeNotificationService().stop();
     await ApiClient().post(ApiConstants.logout, {});
     await ApiClient().clearSession();
     if (!mounted) return;

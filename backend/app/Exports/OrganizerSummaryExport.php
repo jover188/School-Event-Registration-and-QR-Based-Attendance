@@ -27,7 +27,8 @@ class OrganizerSummaryExport implements
     public function __construct(
         protected string $generatedBy,
         protected ?string $dateFrom = null,
-        protected ?string $dateTo = null
+        protected ?string $dateTo = null,
+        protected ?int $organizerId = null
     ) {}
 
     public function title(): string
@@ -37,8 +38,12 @@ class OrganizerSummaryExport implements
 
     public function collection()
     {
-        return User::where('role_id', 2)
-            ->get()
+        $query = User::where('role_id', 2);
+        if ($this->organizerId) {
+            $query->where('id', $this->organizerId);
+        }
+
+        return $query->get()
             ->map(function (User $organizer) {
                 $eventsQuery = $organizer->organizedEvents();
                 if ($this->dateFrom) {

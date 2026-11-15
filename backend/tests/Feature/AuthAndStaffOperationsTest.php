@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActivityLog;
 use App\Models\Attendance;
 use App\Models\AttendanceCorrection;
 use App\Models\Event;
@@ -10,6 +11,7 @@ use App\Models\Student;
 use App\Models\StudentQR;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class AuthAndStaffOperationsTest extends TestCase
@@ -47,10 +49,25 @@ class AuthAndStaffOperationsTest extends TestCase
         $loginBefore->assertStatus(403)
             ->assertJsonPath('error_code', 'ERR_EMAIL_UNVERIFIED');
 
+        // Request verification code via resend-verification endpoint
+        $resendResp = $this->postJson('/api/v1/auth/resend-verification', [
+            'email' => 'pending.student@school.edu',
+        ]);
+        $resendResp->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        // Seed a known code in cache to verify
+        $code = '123456';
+        Cache::put("email_verify_{$user->id}", hash('sha256', $code), now()->addMinutes(15));
+        Cache::put("email_verify_email_{$user->email}", [
+            'code_hash' => hash('sha256', $code),
+            'user_id' => $user->id,
+        ], now()->addMinutes(15));
+
         // Verify email
         $verifyResp = $this->postJson('/api/v1/auth/verify-email', [
             'email' => 'pending.student@school.edu',
-            'code' => '123456',
+            'code' => $code,
         ]);
         $verifyResp->assertStatus(200)
             ->assertJsonPath('success', true);
@@ -65,6 +82,95 @@ class AuthAndStaffOperationsTest extends TestCase
             'password' => 'Pending@12345',
         ]);
         $loginAfter->assertStatus(200);
+    }
+
+    public function test_verify_email_rejects_invalid_token(): void
+    {
+        $user = User::create([
+            'role_id' => 3,
+            'email' => 'wrong.token@school.edu',
+            'password' => bcrypt('Pending@12345'),
+            'status' => 'pending',
+            'email_verified_at' => null,
+        ]);
+
+        Cache::put("email_verify_{$user->id}", hash('sha256', '123456'), now()->addMinutes(15));
+
+        $resp = $this->postJson('/api/v1/auth/verify-email', [
+            'email' => 'wrong.token@school.edu',
+            'code' => '999999',
+        ]);
+
+        $resp->assertStatus(422)
+            ->assertJsonPath('error_code', 'ERR_INVALID_TOKEN');
+    }
+
+    public function test_verify_email_rejects_expired_token(): void
+    {
+        $user = User::create([
+            'role_id' => 3,
+            'email' => 'expired.token@school.edu',
+            'password' => bcrypt('Pending@12345'),
+            'status' => 'pending',
+            'email_verified_at' => null,
+        ]);
+
+        // Code not requested or expired in cache
+        $resp = $this->postJson('/api/v1/auth/verify-email', [
+            'email' => 'expired.token@school.edu',
+            'code' => '123456',
+        ]);
+
+        $resp->assertStatus(422)
+            ->assertJsonPath('error_code', 'ERR_TOKEN_EXPIRED');
+    }
+
+    public function test_verify_email_prevents_token_reuse(): void
+    {
+        $user = User::create([
+            'role_id' => 3,
+            'email' => 'reuse.token@school.edu',
+            'password' => bcrypt('Pending@12345'),
+            'status' => 'pending',
+            'email_verified_at' => null,
+        ]);
+
+        Cache::put("email_verify_{$user->id}", hash('sha256', '123456'), now()->addMinutes(15));
+
+        // First verification: succeeds
+        $firstResp = $this->postJson('/api/v1/auth/verify-email', [
+            'email' => 'reuse.token@school.edu',
+            'code' => '123456',
+        ]);
+        $firstResp->assertStatus(200);
+
+        // Reset user back to pending
+        User::where('id', $user->id)->update(['status' => 'pending', 'email_verified_at' => null]);
+
+        // Second verification with the same token: token was forgotten, must return ERR_TOKEN_EXPIRED
+        $secondResp = $this->postJson('/api/v1/auth/verify-email', [
+            'email' => 'reuse.token@school.edu',
+            'code' => '123456',
+        ]);
+        $secondResp->assertStatus(422)
+            ->assertJsonPath('error_code', 'ERR_TOKEN_EXPIRED');
+    }
+
+    public function test_activity_log_handles_long_user_agent_without_error(): void
+    {
+        $longUserAgent = str_repeat('Mozilla/5.0 (CustomLongBrowserAgent) ', 20); // > 500 chars
+        request()->headers->set('User-Agent', $longUserAgent);
+
+        $log = ActivityLog::log('test_long_ua', 'testing', null, ['foo' => 'bar']);
+        $this->assertNotNull($log->id);
+        $this->assertGreaterThan(255, strlen($log->user_agent));
+
+        $extremelyLongUserAgent = str_repeat('A', 1500);
+        request()->headers->set('User-Agent', $extremelyLongUserAgent);
+
+        $logTruncated = ActivityLog::log('test_truncate_ua', 'testing', null, ['foo' => 'bar']);
+        $this->assertNotNull($logTruncated->id);
+        $this->assertEquals(1000, strlen($logTruncated->user_agent));
     }
 
     public function test_verify_email_rejects_missing_token_and_inactive_accounts(): void

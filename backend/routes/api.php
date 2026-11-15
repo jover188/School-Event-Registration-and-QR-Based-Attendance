@@ -25,7 +25,10 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
         Route::post('/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:5,1');
+        Route::post('/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:5,1');
     });
+
+    Route::post('/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:5,1');
 
     // ========================================================================
     // 2. Protected Authenticated Routes (Requires Sanctum Token + Single Session)
@@ -48,6 +51,8 @@ Route::prefix('v1')->group(function () {
         Route::put('/notifications/preferences', [NotificationController::class, 'updatePreferences']);
         Route::post('/device-tokens', [NotificationController::class, 'storeDeviceToken']);
         Route::delete('/device-tokens', [NotificationController::class, 'destroyDeviceToken']);
+        Route::post('/notifications/device-token', [NotificationController::class, 'storeDeviceToken']);
+        Route::delete('/notifications/device-token', [NotificationController::class, 'destroyDeviceToken']);
 
         // General Event Discovery (Available to all authenticated roles)
         Route::get('/events', [EventController::class, 'index']);

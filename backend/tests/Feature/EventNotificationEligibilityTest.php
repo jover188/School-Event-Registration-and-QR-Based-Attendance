@@ -375,7 +375,8 @@ class EventNotificationEligibilityTest extends TestCase
         $this->assertSame(1, $this->notificationsFor($registered->user, 'event_updates', $event)->count());
         $this->assertSame(1, $this->notificationsFor($registered->user, 'event_cancellation', $event)->count());
         $this->assertSame(0, Notification::where('user_id', $unregistered->user_id)->count());
-        $this->assertSame(0, Notification::where('user_id', $waitlisted->user_id)->count());
+        $this->assertSame(0, $this->notificationsFor($waitlisted->user, 'event_updates', $event)->count());
+        $this->assertSame(1, $this->notificationsFor($waitlisted->user, 'event_cancellation', $event)->count());
         $this->assertSame(0, $this->notificationsFor($organizer, 'event_updates', $event)->count());
         $this->assertSame(0, $this->notificationsFor($organizer, 'event_cancellation', $event)->count());
     }

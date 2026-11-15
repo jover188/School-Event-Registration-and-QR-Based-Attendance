@@ -27,6 +27,7 @@ class Event extends Model
         'late_grace_period_minutes',
         'walk_in_allowed',
         'target_audience_type',
+        'target_departments',
         'target_courses',
         'target_year_levels',
         'target_sections',
@@ -44,6 +45,7 @@ class Event extends Model
             'walk_in_allowed' => 'boolean',
             'max_participants' => 'integer',
             'late_grace_period_minutes' => 'integer',
+            'target_departments' => 'array',
             'target_courses' => 'array',
             'target_year_levels' => 'array',
             'target_sections' => 'array',
@@ -122,6 +124,10 @@ class Event extends Model
             return true;
         }
 
+        if ($type === 'department') {
+            return in_array($student->department, $this->target_departments ?? [], true);
+        }
+
         if ($type === 'course') {
             return in_array($student->course, $this->target_courses ?? [], true);
         }
@@ -136,23 +142,25 @@ class Event extends Model
                     if (!is_array($rule)) {
                         continue;
                     }
+                    $matchesDept = empty($rule['department']) || $rule['department'] === $student->department;
                     $matchesCourse = empty($rule['course']) || $rule['course'] === $student->course;
                     $matchesYear = empty($rule['year_level']) || $rule['year_level'] === $student->year_level;
                     $matchesSection = empty($rule['section']) || $rule['section'] === $student->section;
 
-                    if ($matchesCourse && $matchesYear && $matchesSection) {
+                    if ($matchesDept && $matchesCourse && $matchesYear && $matchesSection) {
                         return true;
                     }
                 }
                 return false;
             }
 
-            if (!empty($this->target_courses) || !empty($this->target_year_levels) || !empty($this->target_sections)) {
+            if (!empty($this->target_departments) || !empty($this->target_courses) || !empty($this->target_year_levels) || !empty($this->target_sections)) {
+                $matchesDept = empty($this->target_departments) || in_array($student->department, (array) $this->target_departments, true);
                 $matchesCourse = empty($this->target_courses) || in_array($student->course, $this->target_courses, true);
                 $matchesYear = empty($this->target_year_levels) || in_array($student->year_level, $this->target_year_levels, true);
                 $matchesSection = empty($this->target_sections) || in_array($student->section, $this->target_sections, true);
 
-                return $matchesCourse && $matchesYear && $matchesSection;
+                return $matchesDept && $matchesCourse && $matchesYear && $matchesSection;
             }
 
             return false;

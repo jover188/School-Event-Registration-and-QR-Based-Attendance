@@ -455,6 +455,8 @@ class ReportController extends Controller
                     ], 403);
                 }
             }
+
+            $validated['organizer_id'] = $user->id;
         }
 
         ActivityLog::log('report_exported', 'reports', $validated['event_id'] ?? $validated['student_id'] ?? null, [
@@ -610,7 +612,10 @@ class ReportController extends Controller
                 }
             } elseif ($reportType === 'organizer_summary') {
                 fputcsv($handle, ['Organizer Email', 'Status', 'Events Organized', 'Total Registrations', 'Total Attendances']);
-                $organizers = User::where('role_id', 2)->get();
+                $organizerId = $validated['organizer_id'] ?? null;
+                $organizers = User::where('role_id', 2)
+                    ->when($organizerId, fn ($q) => $q->where('id', $organizerId))
+                    ->get();
 
                 foreach ($organizers as $org) {
                     $eventIds = $org->organizedEvents()->pluck('id');
@@ -775,7 +780,9 @@ class ReportController extends Controller
         }
 
         if ($reportType === 'organizer_summary') {
+            $organizerId = $params['organizer_id'] ?? null;
             $organizers = User::where('role_id', 2)
+                ->when($organizerId, fn ($q) => $q->where('id', $organizerId))
                 ->get()
                 ->map(function (User $organizer) {
                     $eventIds = $organizer->organizedEvents()->pluck('id');
@@ -850,7 +857,12 @@ class ReportController extends Controller
             $filename = "organizer_summary_{$timestamp}.xlsx";
 
             return Excel::download(
-                new OrganizerSummaryExport($generatedBy, $params['date_from'] ?? null, $params['date_to'] ?? null),
+                new OrganizerSummaryExport(
+                    $generatedBy,
+                    $params['date_from'] ?? null,
+                    $params['date_to'] ?? null,
+                    $params['organizer_id'] ?? null
+                ),
                 $filename
             );
         }

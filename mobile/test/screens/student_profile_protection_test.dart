@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import 'package:school_event_attendance/core/constants/api_constants.dart';
 import 'package:school_event_attendance/core/network/api_client.dart';
 import 'package:school_event_attendance/screens/common/profile_screen.dart';
 
@@ -34,7 +33,7 @@ void main() {
   });
 
   testWidgets(
-    'student role renders read-only fields with lock icons and single contact updater',
+    'student role renders institutional fields with read-only badges and presentation',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(800, 1200);
@@ -49,66 +48,78 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Check official institutional banner
+      // Check official institutional banner & card keys
       expect(
-        find.textContaining('Institutional records are synchronized with the School Student Information System (SIS)'),
+        find.byKey(const ValueKey('institutional-notice-banner')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('student-institutional-card')),
         findsOneWidget,
       );
 
-      // Check read-only labels and values
-      expect(find.text('Thea'), findsOneWidget);
-      expect(find.text('Queen'), findsOneWidget);
-      expect(find.text('DeMerteuil'), findsOneWidget);
+      // Verify institutional badges
+      expect(find.text('Institutional Record'), findsOneWidget);
+      expect(find.byIcon(LucideIcons.shieldCheck), findsOneWidget);
+      expect(find.byIcon(LucideIcons.idCard), findsOneWidget);
+
+      // Verify academic identity fields
       expect(find.text('2026-0001'), findsOneWidget);
-      expect(find.text('thea@school.edu'), findsNWidgets(2));
+      expect(find.text('Thea DeMerteuil Queen'), findsOneWidget);
       expect(find.text('BS Computer Science'), findsOneWidget);
       expect(find.text('3rd Year'), findsOneWidget);
       expect(find.text('CS-3A'), findsOneWidget);
       expect(find.text('College of Computer Studies'), findsOneWidget);
 
-      // Verify lock icons exist for read-only fields
-      expect(find.byIcon(LucideIcons.lock), findsWidgets);
+      // Verify account level summary badges
+      expect(find.text('thea@school.edu'), findsOneWidget);
+      expect(find.text('ROLE: STUDENT'), findsOneWidget);
+      expect(find.text('STATUS: ACTIVE'), findsOneWidget);
+    },
+  );
 
-      // Verify editable fields for academic info are NOT present as inputs
+  testWidgets(
+    'student role does not render editable form fields or submit buttons',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(800, 1200);
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        AppTestHost(
+          child: ProfileScreen(
+            initialData: studentProfileData,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Ensure no text editing input widgets exist
+      expect(find.byType(TextField), findsNothing);
+      expect(find.byType(TextFormField), findsNothing);
+      expect(find.byType(EditableText), findsNothing);
+
+      // Ensure no legacy mutation keys exist
       expect(find.byKey(const ValueKey('profile-first-name')), findsNothing);
       expect(find.byKey(const ValueKey('profile-last-name')), findsNothing);
+      expect(find.byKey(const ValueKey('profile-contact')), findsNothing);
       expect(find.byKey(const ValueKey('profile-course')), findsNothing);
       expect(find.byKey(const ValueKey('profile-department')), findsNothing);
 
-      // Contact number MUST be editable
-      expect(find.byKey(const ValueKey('profile-contact')), findsOneWidget);
-
-      // Button says "Update Contact Number"
-      expect(find.text('Update Contact Number'), findsOneWidget);
+      // Ensure no mutation buttons exist
+      expect(find.byKey(const ValueKey('save-profile-button')), findsNothing);
+      expect(find.byKey(const ValueKey('request-correction-button')), findsNothing);
       expect(find.text('Save Profile Changes'), findsNothing);
-
-      // Request correction button exists
-      expect(find.byKey(const ValueKey('request-correction-button')), findsOneWidget);
+      expect(find.text('Update Contact Number'), findsNothing);
     },
   );
 
   testWidgets(
-    'student saving contact number only sends contact_number payload',
+    'displays institutional academic identity section header and sis synchronization notice',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(800, 1200);
       addTearDown(tester.view.reset);
-
-      Map<String, dynamic>? capturedBody;
-      String? capturedEndpoint;
-
-      ApiClient.mockHandler = (method, endpoint, body) async {
-        if (method == 'PUT' && endpoint == ApiConstants.profile) {
-          capturedEndpoint = endpoint;
-          capturedBody = body as Map<String, dynamic>;
-          return ApiResponse(
-            success: true,
-            message: 'Contact number updated successfully.',
-            statusCode: 200,
-          );
-        }
-        return ApiResponse(success: true, statusCode: 200);
-      };
 
       await tester.pumpWidget(
         AppTestHost(
@@ -119,108 +130,36 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final contactField = find.byKey(const ValueKey('profile-contact'));
-      await tester.enterText(contactField, '+639998887777');
-      await tester.pump();
-
-      final updateBtn = find.byKey(const ValueKey('save-profile-button'));
-      await tester.ensureVisible(updateBtn);
-      await tester.tap(updateBtn);
-      await tester.pumpAndSettle();
-
-      expect(capturedEndpoint, ApiConstants.profile);
-      expect(capturedBody, {'contact_number': '+639998887777'});
-    },
-  );
-
-  testWidgets(
-    'request profile correction dialog allows selecting fields, entering reason, and submitting',
-    (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(800, 1200);
-      addTearDown(tester.view.reset);
-
-      Map<String, dynamic>? correctionPayload;
-
-      ApiClient.mockHandler = (method, endpoint, body) async {
-        if (method == 'POST' && endpoint == ApiConstants.profileCorrectionRequest) {
-          correctionPayload = body as Map<String, dynamic>;
-          return ApiResponse(
-            success: true,
-            message: 'Your correction request has been submitted.',
-            statusCode: 200,
-          );
-        }
-        return ApiResponse(success: true, statusCode: 200);
-      };
-
-      await tester.pumpWidget(
-        AppTestHost(
-          child: ProfileScreen(
-            initialData: studentProfileData,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final correctionBtn = find.byKey(const ValueKey('request-correction-button'));
-      await tester.ensureVisible(correctionBtn);
-      await tester.tap(correctionBtn);
-      await tester.pumpAndSettle();
-
-      // Dialog is open
-      expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.descendant(of: find.byType(AlertDialog), matching: find.text('Request Profile Correction')), findsOneWidget);
-
-      // Try submitting without selecting any fields
-      final submitBtn = find.byKey(const ValueKey('submit-correction-button'));
-      await tester.tap(submitBtn);
-      await tester.pumpAndSettle();
-      expect(find.text('Select at least one field requiring correction.'), findsOneWidget);
-
-      // Select 'Section' and 'Course/Program'
-      final sectionChip = find.byKey(const ValueKey('correction-chip-Section'));
-      await tester.tap(sectionChip);
-      await tester.pumpAndSettle();
-
-      final courseChip = find.byKey(const ValueKey('correction-chip-Course/Program'));
-      await tester.tap(courseChip);
-      await tester.pumpAndSettle();
-
-      // Try submitting without reason
-      await tester.tap(submitBtn);
-      await tester.pumpAndSettle();
+      // Check section header for institutional student information
+      expect(find.text('Institutional Academic Identity'), findsOneWidget);
       expect(
-        find.text('Please provide details for the correction request'),
+        find.text(
+          'Official student records synchronized with school information systems.',
+        ),
         findsOneWidget,
       );
 
-      // Fill in reason
-      final reasonField = find.byKey(const ValueKey('correction-reason-input'));
-      await tester.enterText(
-        reasonField,
-        'I officially shifted to BS Information Technology section IT-3B.',
-      );
-      await tester.pumpAndSettle();
-
-      // Submit
-      await tester.tap(submitBtn);
-      await tester.pumpAndSettle();
-
-      expect(correctionPayload, isNotNull);
-      expect(correctionPayload!['fields'], containsAll(['Section', 'Course/Program']));
+      // Check notice banner text explaining read-only SIS synchronization
       expect(
-        correctionPayload!['reason'],
-        'I officially shifted to BS Information Technology section IT-3B.',
+        find.textContaining(
+          'Institutional records are synchronized with the School Student Information System (SIS) and are read-only.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining(
+          "For official record corrections, contact the registrar's office.",
+        ),
+        findsOneWidget,
       );
 
-      // Dialog should be dismissed
-      expect(find.byKey(const ValueKey('submit-correction-button')), findsNothing);
+      // Verify notification preferences navigation link is accessible
+      expect(find.text('Notification Preferences'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'non-student role displays full editable form and Save Profile Changes button',
+    'non-student role displays their respective profile information without student institutional fields',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(800, 1200);
@@ -233,17 +172,6 @@ void main() {
           'email': 'admin@school.edu',
           'role': 'administrator',
           'status': 'active',
-          'student_profile': {
-            'student_id': 'ADM-001',
-            'first_name': 'Admin',
-            'last_name': 'User',
-            'middle_name': '',
-            'course': 'Faculty',
-            'year_level': '1st Year',
-            'section': 'ADMIN',
-            'contact_number': '+639111111111',
-            'department': 'Administration',
-          },
         },
       };
 
@@ -256,17 +184,38 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Non-students should NOT see the lock banner
+      // Non-students show their identity summary
+      expect(find.text('admin@school.edu'), findsOneWidget);
+      expect(find.text('ROLE: ADMINISTRATOR'), findsOneWidget);
+      expect(find.text('STATUS: ACTIVE'), findsOneWidget);
+
+      // Shows staff Account Information section header
+      expect(find.text('Account Information'), findsOneWidget);
       expect(
-        find.textContaining('Your official student information is managed by the school'),
-        findsNothing,
+        find.text(
+          'Staff credentials and access permissions are managed by system administrators.',
+        ),
+        findsOneWidget,
       );
 
-      // Non-students have editable fields
-      expect(find.byKey(const ValueKey('profile-first-name')), findsOneWidget);
-      expect(find.byKey(const ValueKey('profile-last-name')), findsOneWidget);
-      expect(find.text('Save Profile Changes'), findsOneWidget);
-      expect(find.text('Update Contact Number'), findsNothing);
+      // Non-students must NOT have student institutional fields or cards
+      expect(
+        find.byKey(const ValueKey('student-institutional-card')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('institutional-notice-banner')),
+        findsNothing,
+      );
+      expect(find.text('Institutional Academic Identity'), findsNothing);
+      expect(find.text('Institutional Record'), findsNothing);
+      expect(find.text('BS Computer Science'), findsNothing);
+      expect(find.text('2026-0001'), findsNothing);
+
+      // No editable fields or mutation buttons
+      expect(find.byType(TextField), findsNothing);
+      expect(find.byType(TextFormField), findsNothing);
+      expect(find.text('Save Profile Changes'), findsNothing);
     },
   );
 }

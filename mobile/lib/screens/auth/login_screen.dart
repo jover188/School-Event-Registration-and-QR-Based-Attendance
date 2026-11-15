@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/realtime_notification_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_pressable.dart';
@@ -79,6 +80,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final role = response.data['user']?['role']?.toString() ?? 'student';
 
       await ApiClient().saveToken(token, role);
+
+      RealtimeNotificationService().initialize();
+      RealtimeNotificationService().syncNotifications(isInitial: true);
 
       if (!mounted) return;
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'core/network/api_client.dart';
+import 'core/services/push_notification_service.dart';
 import 'core/services/realtime_notification_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/app_toast.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/management/management_dashboard_screen.dart';
@@ -25,6 +27,7 @@ class SchoolAttendanceApp extends StatefulWidget {
 
 class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
   late final Future<Widget> _initialScreen;
+  bool _isSessionDialogActive = false;
 
   @override
   void initState() {
@@ -34,9 +37,15 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
     // Start real-time notification synchronization service
     RealtimeNotificationService().initialize();
 
+    // Initialize Firebase Cloud Messaging push notification service
+    PushNotificationService().initialize();
+
     // Global listener for single-session termination
     ApiClient().onSessionTerminated = () {
       RealtimeNotificationService().stop();
+      if (_isSessionDialogActive) return;
+      _isSessionDialogActive = true;
+
       final context = navigatorKey.currentContext;
       if (context != null) {
         showDialog(
@@ -50,6 +59,7 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
             actions: [
               ElevatedButton(
                 onPressed: () {
+                  _isSessionDialogActive = false;
                   Navigator.pop(ctx);
                   navigatorKey.currentState?.pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -60,9 +70,37 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
               ),
             ],
           ),
+        ).then((_) {
+          _isSessionDialogActive = false;
+        });
+      } else {
+        _isSessionDialogActive = false;
+      }
+    };
+
+    // Global listener for expired/unauthenticated session
+    ApiClient().onUnauthenticated = () {
+      if (_isSessionDialogActive) return;
+      RealtimeNotificationService().stop();
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        AppToast.error(
+          context,
+          'Your session has expired. Please log in again.',
         );
       }
     };
+  }
+
+  @override
+  void dispose() {
+    ApiClient().onSessionTerminated = null;
+    ApiClient().onUnauthenticated = null;
+    super.dispose();
   }
 
   Future<Widget> _resolveInitialScreen() async {

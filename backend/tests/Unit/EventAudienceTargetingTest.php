@@ -127,6 +127,47 @@ class EventAudienceTargetingTest extends TestCase
         $this->assertFalse($event->isStudentEligible($it2));
     }
 
+    public function test_custom_targeting_with_department_in_rules(): void
+    {
+        $event = new Event([
+            'target_audience_type' => 'custom',
+            'target_rules' => [
+                ['department' => 'CITE', 'year_level' => '1st Year'],
+                ['department' => 'CBEA', 'course' => 'BS Accountancy'],
+            ],
+        ]);
+
+        $cite1 = new Student(['department' => 'CITE', 'year_level' => '1st Year', 'course' => 'BS Information Technology']);
+        $cbeaAccountancy = new Student(['department' => 'CBEA', 'course' => 'BS Accountancy', 'year_level' => '2nd Year']);
+        $cite2 = new Student(['department' => 'CITE', 'year_level' => '2nd Year', 'course' => 'BS Information Technology']);
+        $cbeaMarketing = new Student(['department' => 'CBEA', 'course' => 'BS Marketing', 'year_level' => '2nd Year']);
+        $cas1 = new Student(['department' => 'CAS', 'year_level' => '1st Year', 'course' => 'BA Communication']);
+
+        $this->assertTrue($event->isStudentEligible($cite1));
+        $this->assertTrue($event->isStudentEligible($cbeaAccountancy));
+        $this->assertFalse($event->isStudentEligible($cite2));
+        $this->assertFalse($event->isStudentEligible($cbeaMarketing));
+        $this->assertFalse($event->isStudentEligible($cas1));
+    }
+
+    public function test_custom_targeting_with_department_array_fallback(): void
+    {
+        $event = new Event([
+            'target_audience_type' => 'custom',
+            'target_departments' => ['CITE'],
+            'target_courses' => ['BS Information Technology'],
+            'target_rules' => [],
+        ]);
+
+        $citeIt = new Student(['department' => 'CITE', 'course' => 'BS Information Technology']);
+        $cbeaIt = new Student(['department' => 'CBEA', 'course' => 'BS Information Technology']);
+        $citeCs = new Student(['department' => 'CITE', 'course' => 'BS Computer Science']);
+
+        $this->assertTrue($event->isStudentEligible($citeIt));
+        $this->assertFalse($event->isStudentEligible($cbeaIt));
+        $this->assertFalse($event->isStudentEligible($citeCs));
+    }
+
     public function test_eligible_student_user_ids_returns_only_matching_active_students(): void
     {
         $this->seed();

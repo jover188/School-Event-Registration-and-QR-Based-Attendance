@@ -160,5 +160,108 @@ void main() {
       service.updateUnreadCount(0);
       expect(service.unreadCount.value, 0);
     });
+
+    test('account with 0 initial notifications receives first broadcast: chimes, emits, and increments count',
+        () async {
+      final service = RealtimeNotificationService();
+      // State is reset: _lastKnownId = 0, unreadCount = 0, _isInitialSeeded = false
+      service.resetState();
+
+      int getCount = 0;
+      ApiClient.mockHandler = (method, endpoint, body) async {
+        getCount++;
+        if (getCount == 1) {
+          // Initial sync: account has 0 notifications
+          return ApiResponse(
+            success: true,
+            statusCode: 200,
+            data: [],
+            rawBody: {'unread_count': 0},
+          );
+        } else {
+          // Incremental sync: first broadcast arrives
+          return ApiResponse(
+            success: true,
+            statusCode: 200,
+            data: [
+              {
+                'id': 101,
+                'title': 'Campus Wide Notice',
+                'message': 'Welcome to the new academic term!',
+                'notification_type': 'admin_announcement',
+                'is_read': false,
+                'payload': {'sound': 'sfxmint_ready_chime_07'},
+              },
+            ],
+            rawBody: {'unread_count': 1},
+          );
+        }
+      };
+
+      // 1. Initial sync seeds high watermark (0) without chime
+      await service.syncNotifications(isInitial: true);
+      expect(service.isInitialSeeded, isTrue);
+      expect(service.lastKnownId, 0);
+      expect(service.unreadCount.value, 0);
+      expect(methodCalls.where((c) => c.method == 'playChimeSound').length, 0);
+
+      // 2. Set up listener for real-time broadcast
+      Map<String, dynamic>? receivedNotification;
+      final sub = service.onNotificationReceived.listen((notif) {
+        receivedNotification = notif;
+      });
+
+      // 3. Incremental sync fires when first notification arrives
+      await service.syncNotifications();
+      await Future<void>.delayed(Duration.zero);
+
+      // Verify stream emission
+      expect(receivedNotification, isNotNull);
+      expect(receivedNotification?['id'], 101);
+      expect(receivedNotification?['title'], 'Campus Wide Notice');
+
+      // Verify sound played
+      expect(methodCalls.where((c) => c.method == 'playChimeSound').length, 1);
+
+      // Verify unread count incremented
+      expect(service.unreadCount.value, 1);
+      expect(service.lastKnownId, 101);
+
+      // 4. Subsequent sync with same notification must not replay sound (deduplication)
+      await service.syncNotifications();
+      expect(methodCalls.where((c) => c.method == 'playChimeSound').length, 1);
+
+      await sub.cancel();
+    });
+
+    test('stop() cancels timer and resets state cleanly', () {
+      final service = RealtimeNotificationService();
+      service.resetState(lastKnownId: 99, initialUnreadCount: 5, isInitialSeeded: true);
+
+      service.stop();
+
+      expect(service.lastKnownId, 0);
+      expect(service.unreadCount.value, 0);
+      expect(service.isInitialSeeded, isFalse);
+    });
+
+    test('registerDeviceToken registers token successfully with default platform', () async {
+      final service = RealtimeNotificationService();
+      Map<String, dynamic>? capturedBody;
+
+      ApiClient.mockHandler = (method, endpoint, body) async {
+        if (endpoint == ApiConstants.deviceTokens) {
+          capturedBody = body as Map<String, dynamic>?;
+          return ApiResponse(success: true, statusCode: 200, data: {'id': 1});
+        }
+        return ApiResponse(success: false, statusCode: 404);
+      };
+
+      final result = await service.registerDeviceToken('mock_fcm_token_xyz');
+      expect(result, isTrue);
+      expect(capturedBody, isNotNull);
+      expect(capturedBody?['fcm_token'], 'mock_fcm_token_xyz');
+      expect(capturedBody?['platform'], 'android');
+    });
   });
 }

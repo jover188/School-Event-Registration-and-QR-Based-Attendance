@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../main.dart';
 import '../constants/api_constants.dart';
@@ -33,15 +34,24 @@ class RealtimeNotificationService with WidgetsBindingObserver {
 
   Timer? _pollTimer;
   int _lastKnownId = 0;
+  bool _isInitialSeeded = false;
   bool _isInitialized = false;
   bool _isSyncing = false;
   Duration pollInterval = const Duration(seconds: 4);
 
+  bool get isInitialSeeded => _isInitialSeeded;
+  int get lastKnownId => _lastKnownId;
+
   /// Visible for testing to reset state between test cases.
   @visibleForTesting
-  void resetState({int lastKnownId = 0, int initialUnreadCount = 0}) {
+  void resetState({
+    int lastKnownId = 0,
+    int initialUnreadCount = 0,
+    bool? isInitialSeeded,
+  }) {
     _pollTimer?.cancel();
     _lastKnownId = lastKnownId;
+    _isInitialSeeded = isInitialSeeded ?? (lastKnownId > 0);
     unreadCount.value = initialUnreadCount;
     _isSyncing = false;
     _isInitialized = false;
@@ -52,7 +62,9 @@ class RealtimeNotificationService with WidgetsBindingObserver {
     if (_isInitialized) return;
     _isInitialized = true;
 
-    WidgetsBinding.instance.addObserver(this);
+    try {
+      WidgetsBinding.instance.addObserver(this);
+    } catch (_) {}
     _startTimer();
     syncNotifications(isInitial: true);
   }
@@ -90,7 +102,7 @@ class RealtimeNotificationService with WidgetsBindingObserver {
 
     _isSyncing = true;
     try {
-      if (_lastKnownId == 0) {
+      if (!_isInitialSeeded || (isInitial && _lastKnownId == 0)) {
         // Initial sync: fetch latest page to establish the high-watermark ID
         final response = await ApiClient().get('${ApiConstants.notifications}?per_page=10');
         if (response.success && response.data is List) {
@@ -103,6 +115,7 @@ class RealtimeNotificationService with WidgetsBindingObserver {
             }
           }
           _lastKnownId = maxId;
+          _isInitialSeeded = true;
 
           final count = (response.rawBody?['unread_count'] as num?)?.toInt();
           if (count != null) {
@@ -111,9 +124,10 @@ class RealtimeNotificationService with WidgetsBindingObserver {
         }
       } else {
         // Incremental sync: only ask for notifications newer than _lastKnownId
-        final response = await ApiClient().get(
-          '${ApiConstants.notifications}?after_id=$_lastKnownId&per_page=10',
-        );
+        final endpoint = _lastKnownId > 0
+            ? '${ApiConstants.notifications}?after_id=$_lastKnownId&per_page=10'
+            : '${ApiConstants.notifications}?after_id=0&per_page=10';
+        final response = await ApiClient().get(endpoint);
 
         if (response.success && response.data is List) {
           final List list = response.data as List;
@@ -208,11 +222,12 @@ class RealtimeNotificationService with WidgetsBindingObserver {
   }
 
   /// Register FCM Device Token with the backend.
-  Future<bool> registerDeviceToken(String fcmToken, [String platform = 'android']) async {
+  Future<bool> registerDeviceToken(String fcmToken, [String? platform]) async {
+    final effectivePlatform = platform ?? (kIsWeb ? 'web' : 'android');
     try {
       final response = await ApiClient().post(ApiConstants.deviceTokens, {
         'fcm_token': fcmToken,
-        'platform': platform,
+        'platform': effectivePlatform,
       });
       return response.success;
     } catch (e) {
@@ -237,8 +252,12 @@ class RealtimeNotificationService with WidgetsBindingObserver {
   /// Stop polling and tear down state upon logout.
   void stop() {
     _stopTimer();
+    _isInitialSeeded = false;
     _lastKnownId = 0;
     unreadCount.value = 0;
     _isInitialized = false;
+    try {
+      WidgetsBinding.instance.removeObserver(this);
+    } catch (_) {}
   }
 }

@@ -541,13 +541,12 @@ class EventController extends Controller
                     'remarks' => $validated['remarks'] ?? null,
                 ]);
 
-                // Notify registered attendees of cancellation (mandatory notification).
+                // Notify affected attendees (registered and waitlisted) of cancellation (mandatory notification).
                 // Recipients come solely from the backend eligibility gate.
-                $notified = EventNotificationService::notifyRegistered(
+                $notified = EventNotificationService::notifyCancellation(
                     $event,
                     "Event Cancelled: {$event->title}",
-                    "The event '{$event->title}' scheduled for {$event->event_date} has been cancelled.",
-                    'event_cancellation'
+                    "The event '{$event->title}' scheduled for {$event->event_date} has been cancelled."
                 );
 
                 ActivityLog::log('event_cancellation_approved', 'events', $event->id, [
