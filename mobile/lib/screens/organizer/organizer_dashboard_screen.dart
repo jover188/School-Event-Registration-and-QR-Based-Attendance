@@ -89,6 +89,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    PushNotificationService().syncDeviceToken();
     if (_hasFixtures) {
       _isLoading = false;
       _myEvents = List<EventModel>.from(widget.initialEvents ?? const []);

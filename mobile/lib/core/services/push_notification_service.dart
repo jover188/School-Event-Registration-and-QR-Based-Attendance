@@ -183,10 +183,22 @@ class PushNotificationService {
   /// - Returns true on success or when successfully skipped due to deduplication.
   Future<bool> syncDeviceToken({bool force = false}) async {
     if (_fcmToken == null || _fcmToken!.isEmpty) {
+      try {
+        _fcmToken = await FirebaseMessaging.instance.getToken();
+        debugPrint('FCM Device Token retrieved on sync: $_fcmToken');
+      } catch (e) {
+        debugPrint('Error retrieving FCM token on sync: $e');
+      }
+    }
+
+    if (_fcmToken == null || _fcmToken!.isEmpty) {
       return false;
     }
 
-    final token = ApiClient().token;
+    String? token = ApiClient().token;
+    if (token == null || token.isEmpty) {
+      token = await ApiClient().getToken();
+    }
     if (token == null || token.isEmpty) {
       return false;
     }

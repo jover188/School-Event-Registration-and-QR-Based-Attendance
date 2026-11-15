@@ -91,6 +91,7 @@ class _ManagementDashboardScreenState extends State<ManagementDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    PushNotificationService().syncDeviceToken();
     if (_hasFixtures) {
       _isLoading = false;
       _metrics = Map<String, dynamic>.from(widget.initialMetrics ?? const {});

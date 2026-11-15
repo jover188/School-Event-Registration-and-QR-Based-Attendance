@@ -119,6 +119,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    PushNotificationService().syncDeviceToken();
     if (_hasInitialFixtures) {
       _isLoading = false;
       _errorMessage = widget.initialErrorMessage;

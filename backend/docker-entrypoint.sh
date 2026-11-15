@@ -16,6 +16,11 @@ mkdir -p storage/framework/cache/data \
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 
+# Ensure Render secret files are accessible to Apache www-data
+if [ -d /etc/secrets ]; then
+    chmod -R 755 /etc/secrets 2>/dev/null || true
+fi
+
 # Cache Laravel configuration, routes, and views in production
 if [ "$APP_ENV" = "production" ] || [ "$APP_ENV" = "staging" ]; then
     echo "Caching Laravel configuration, routes, and views..."

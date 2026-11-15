@@ -123,8 +123,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/admin/students/{id}/qr', [StudentQRController::class, 'inspect']);
             Route::post('/admin/students/{id}/qr/reissue', [StudentQRController::class, 'adminReissue']);
 
-            // System Announcements
+            // System Announcements & FCM Diagnostics
             Route::post('/admin/announcements', [AdminController::class, 'sendAnnouncement']);
+            Route::get('/admin/fcm-diagnostic', [NotificationController::class, 'diagnostic']);
 
             // Audit Logs & Admin Dashboard
             Route::get('/admin/logs', [AdminController::class, 'activityLogs']);

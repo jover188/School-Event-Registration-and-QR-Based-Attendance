@@ -110,6 +110,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    PushNotificationService().syncDeviceToken();
     if (_hasFixtureData) {
       _applyFixtureData();
     } else {

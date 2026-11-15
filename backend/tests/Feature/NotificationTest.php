@@ -215,4 +215,26 @@ class NotificationTest extends TestCase
             'fcm_token' => $fcmToken,
         ]);
     }
+
+    public function test_fcm_diagnostic_endpoint_accessible_to_admin(): void
+    {
+        $adminUser = User::where('role_id', 1)->first();
+
+        $loginRes = $this->postJson('/api/v1/auth/login', [
+            'login' => $adminUser->email,
+            'password' => 'Admin@12345',
+        ]);
+        $token = $loginRes->json('data.token');
+
+        $res = $this->requestAs($token, 'GET', '/api/v1/admin/fcm-diagnostic');
+        $res->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'firebase_credentials_resolved',
+                    'device_tokens_total',
+                    'recent_device_tokens',
+                ],
+            ]);
+    }
 }

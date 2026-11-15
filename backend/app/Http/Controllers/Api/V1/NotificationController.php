@@ -191,4 +191,51 @@ class NotificationController extends Controller
             'message' => 'Device token removed.',
         ]);
     }
+
+    /**
+     * Diagnostic report for Firebase credentials and device token status (Admin only)
+     */
+    public function diagnostic(): JsonResponse
+    {
+        $credentials = \App\Services\NotificationService::getFirebaseCredentials();
+        $secretFiles = @glob('/etc/secrets/*') ?: [];
+        $secretFileDetails = [];
+        foreach ($secretFiles as $file) {
+            $secretFileDetails[] = [
+                'path' => $file,
+                'readable' => is_readable($file),
+                'size' => @filesize($file),
+            ];
+        }
+
+        $deviceTokenCount = DeviceToken::count();
+        $recentTokens = DeviceToken::with('user:id,email')
+            ->latest()
+            ->take(10)
+            ->get()
+            ->map(function ($token) {
+                return [
+                    'id' => $token->id,
+                    'user_id' => $token->user_id,
+                    'email' => $token->user?->email,
+                    'platform' => $token->platform,
+                    'token_preview' => substr($token->fcm_token, 0, 15) . '...',
+                    'created_at' => $token->created_at?->toIso8601String(),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'firebase_credentials_resolved' => $credentials !== null,
+                'project_id' => $credentials['project_id'] ?? null,
+                'client_email' => $credentials['client_email'] ?? null,
+                'env_has_credentials_json' => !empty(env('FIREBASE_CREDENTIALS_JSON')),
+                'config_has_credentials_json' => !empty(config('services.firebase.credentials_json')),
+                'secret_files' => $secretFileDetails,
+                'device_tokens_total' => $deviceTokenCount,
+                'recent_device_tokens' => $recentTokens,
+            ],
+        ]);
+    }
 }
