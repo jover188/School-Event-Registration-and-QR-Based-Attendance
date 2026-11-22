@@ -7,7 +7,7 @@ import 'status_badge.dart';
 
 /// Reusable card for rendering an [EventModel] across student, organizer,
 /// management, and administrator lists.
-class EventCard extends StatelessWidget {
+class EventCard extends StatefulWidget {
   final EventModel event;
   final VoidCallback? onTap;
   final bool showEventStatusBadge;
@@ -22,17 +22,6 @@ class EventCard extends StatelessWidget {
     this.showCapacity = false,
     this.trailingAction,
   });
-
-  (String month, String day) _parseDateTile(String rawDate) {
-    final parsed = DateTime.tryParse(rawDate);
-    if (parsed != null) {
-      return (
-        DateFormat('MMM').format(parsed).toUpperCase(),
-        DateFormat('dd').format(parsed),
-      );
-    }
-    return ('EVT', '--');
-  }
 
   static String formatSingleTime(String raw) {
     final trimmed = raw.trim();
@@ -73,15 +62,34 @@ class EventCard extends StatelessWidget {
   }
 
   @override
+  State<EventCard> createState() => _EventCardState();
+}
+
+class _EventCardState extends State<EventCard> {
+  bool _isHovered = false;
+
+  (String month, String day) _parseDateTile(String rawDate) {
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed != null) {
+      return (
+        DateFormat('MMM').format(parsed).toUpperCase(),
+        DateFormat('dd').format(parsed),
+      );
+    }
+    return ('EVT', '--');
+  }
+
+  @override
   Widget build(BuildContext context) {
     final d = context.design;
+    final event = widget.event;
     final maxCap = event.maxParticipants;
     final registered = event.currentRegisteredCount;
     final progress = (maxCap != null && maxCap > 0)
         ? (registered / maxCap).clamp(0.0, 1.0)
         : null;
     final (monthLabel, dayLabel) = _parseDateTile(event.eventDate);
-    final cleanTimeText = formatTimeRange(event.startTime, event.endTime);
+    final cleanTimeText = EventCard.formatTimeRange(event.startTime, event.endTime);
     final isScaledText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
 
     final Widget? badgeWidget = event.isRegistered
@@ -94,7 +102,7 @@ class EventCard extends StatelessWidget {
                 status: 'waiting_list',
                 label: 'WAITING #${event.userWaitingPosition ?? 1}',
               )
-            : showEventStatusBadge
+            : widget.showEventStatusBadge
                 ? StatusBadge(status: event.status)
                 : null;
 
@@ -277,75 +285,106 @@ class EventCard extends StatelessWidget {
       ],
     );
 
-    final interactiveMainInfo = onTap != null
+    final interactiveMainInfo = widget.onTap != null
         ? AppPressable(
             semanticLabel: '${event.title}, ${event.venue}, $cleanTimeText',
-            onPressed: onTap,
-            child: mainInfoContent,
-          )
-        : mainInfoContent;
-
-    final hasFooter = showCapacity || trailingAction != null;
-
-    return Container(
-      padding: EdgeInsets.all(d.lg),
-      decoration: BoxDecoration(
-        color: d.card,
-        borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: d.authDark.withValues(alpha: 0.04),
-            offset: const Offset(0, 2),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          interactiveMainInfo,
-          if (hasFooter)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (progress != null && showCapacity) ...[
-                  SizedBox(height: d.md),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 5,
-                      backgroundColor: d.muted,
-                      color: progress >= 1.0 ? d.warning : d.primary,
-                    ),
-                  ),
-                  SizedBox(height: d.md),
-                ] else
-                  SizedBox(height: d.md),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: d.sm,
-                  runSpacing: d.sm,
-                  children: [
-                    if (showCapacity)
-                      Text(
-                        'Registered: $registered${maxCap != null ? ' / $maxCap' : ''}',
-                        style: d.supporting.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: d.foreground,
-                        ),
-                      ),
-                    if (trailingAction != null) trailingAction!,
-                  ],
-                ),
-              ],
+            onPressed: widget.onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: mainInfoContent,
             ),
-        ],
+          )
+        : ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: mainInfoContent,
+          );
+
+    final hasFooter = widget.showCapacity || widget.trailingAction != null;
+
+    final cardBorderColor = _isHovered
+        ? (d.isDark
+            ? d.foreground.withValues(alpha: 0.35)
+            : d.foreground.withValues(alpha: 0.22))
+        : d.border;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.all(d.lg),
+        decoration: BoxDecoration(
+          color: d.card,
+          borderRadius: BorderRadius.circular(d.radiusCard),
+          border: Border.all(color: cardBorderColor, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: d.authDark.withValues(alpha: _isHovered ? 0.08 : 0.04),
+              offset: Offset(0, _isHovered ? 4 : 2),
+              blurRadius: _isHovered ? 14 : 8,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            interactiveMainInfo,
+            if (hasFooter)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (progress != null && widget.showCapacity) ...[
+                    SizedBox(height: d.md),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 5,
+                        backgroundColor: d.muted,
+                        color: progress >= 1.0 ? d.warning : d.primary,
+                      ),
+                    ),
+                    SizedBox(height: d.md),
+                  ] else
+                    SizedBox(height: d.md),
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: d.sm,
+                    runSpacing: d.sm,
+                    children: [
+                      if (widget.showCapacity)
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 24),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Registered: $registered${maxCap != null ? ' / $maxCap' : ''}',
+                              style: d.supporting.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: d.foreground,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (widget.trailingAction != null)
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 36),
+                          child: widget.trailingAction!,
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }

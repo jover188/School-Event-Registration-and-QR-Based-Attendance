@@ -590,6 +590,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
     return AppPageScaffold(
       title: event?.title ?? 'Event Details',
+      maxWidth: 900,
       body: _isLoading && event == null
           ? Center(
               child: AppSpinner(
@@ -611,12 +612,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       builder: (context, constraints) {
                         final textScale =
                             MediaQuery.textScalerOf(context).scale(1);
-                        final useSidePane =
-                            constraints.maxWidth >= 960 && textScale < 1.5;
+                        final isWide =
+                            constraints.maxWidth >= 640 && textScale < 1.5;
 
                         final sidePane = _buildSidePane(context, event);
 
-                        if (useSidePane) {
+                        if (isWide && sidePane != null) {
                           return SingleChildScrollView(
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,10 +625,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 Expanded(
                                   child: _buildMainDetails(context, event),
                                 ),
-                                if (sidePane != null) ...[
-                                  SizedBox(width: d.lg),
-                                  SizedBox(width: 320, child: sidePane),
-                                ],
+                                SizedBox(width: d.lg),
+                                SizedBox(
+                                  width: 320,
+                                  child: sidePane,
+                                ),
                               ],
                             ),
                           );

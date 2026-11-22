@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:school_event_attendance/core/animations/app_animations.dart';
 import 'package:school_event_attendance/models/event_model.dart';
 import 'package:school_event_attendance/screens/organizer/qr_scanner_screen.dart';
 import '../support/app_test_host.dart';
@@ -179,6 +180,65 @@ void main() {
     await tester.pump();
 
     expect(find.text('Recording attendance…'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'renders AnimatedCheckmark with size 64 on successful scan result',
+      (tester) async {
+    final successResult = <String, dynamic>{
+      'status': 'present',
+      'mode': 'check_in',
+      'check_in_time': '2026-12-01T08:58:00',
+      'student': <String, dynamic>{
+        'full_name': 'John Doe',
+        'student_id_number': '20260001',
+        'course': 'BS Information Technology',
+        'year_level': '3rd Year',
+        'section': 'IT-3A',
+      },
+    };
+
+    await tester.pumpWidget(
+      AppTestHost(
+        child: QrScannerScreen(
+          event: scannerEvent('published'),
+          initialScanResult: successResult,
+          cameraSupportedOverride: false,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final checkmarkFinder = find.byType(AnimatedCheckmark);
+    expect(checkmarkFinder, findsOneWidget);
+    final checkmarkWidget = tester.widget<AnimatedCheckmark>(checkmarkFinder);
+    expect(checkmarkWidget.size, equals(64.0));
+    expect(find.text('John Doe'), findsOneWidget);
+    expect(find.textContaining('20260001'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'renders AnimatedScannerLine and active scanning indicator badge when camera is mounted and idle',
+      (tester) async {
+    await tester.pumpWidget(
+      AppTestHost(
+        child: QrScannerScreen(
+          event: scannerEvent('published'),
+          cameraSupportedOverride: true,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('scanner-reticle')), findsOneWidget);
+    expect(find.byType(AnimatedScannerLine), findsOneWidget);
+    expect(find.textContaining('Scanning Active'), findsOneWidget);
+    expect(
+      find.textContaining('Align permanent student QR code'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../../core/animations/app_animations.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
@@ -422,6 +423,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               ),
             );
 
+            final isCameraActive = _scannerController != null &&
+                !_isProcessing &&
+                _activeScanResult == null &&
+                _activeScanError == null;
+
             return Stack(
               fit: StackFit.expand,
               children: [
@@ -440,6 +446,63 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.white, width: 2.5),
                       borderRadius: BorderRadius.circular(d.radiusCard),
+                    ),
+                  ),
+                ),
+                if (isCameraActive)
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(d.radiusCard),
+                      child: AnimatedScannerLine(
+                        width: reticleSize,
+                        height: reticleSize,
+                        color: d.brandCyan,
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  bottom: 12,
+                  left: 12,
+                  right: 12,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isCameraActive ? d.success : d.mutedForeground,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Scanning Active • Align permanent student QR code',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: d.supporting.copyWith(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

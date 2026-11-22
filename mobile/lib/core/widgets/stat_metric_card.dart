@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'app_pressable.dart';
 
-/// Reusable KPI / metric summary card with accessible container semantics.
-class StatMetricCard extends StatelessWidget {
+/// Reusable KPI / metric summary card with accessible container semantics
+/// and desktop hover feedback.
+class StatMetricCard extends StatefulWidget {
   final String label;
   final String value;
   final IconData icon;
@@ -22,23 +23,40 @@ class StatMetricCard extends StatelessWidget {
   });
 
   @override
+  State<StatMetricCard> createState() => _StatMetricCardState();
+}
+
+class _StatMetricCardState extends State<StatMetricCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final d = context.design;
-    final semanticSummary = subtitle != null
-        ? '$label: $value, $subtitle'
-        : '$label: $value';
+    final semanticSummary = widget.subtitle != null
+        ? '${widget.label}: ${widget.value}, ${widget.subtitle}'
+        : '${widget.label}: ${widget.value}';
+    final isInteractive = widget.onTap != null;
 
-    final content = Container(
+    final cardBorderColor = _isHovered
+        ? (d.isDark
+            ? d.foreground.withValues(alpha: 0.35)
+            : d.foreground.withValues(alpha: 0.22))
+        : d.border;
+
+    final content = AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      constraints: const BoxConstraints(minHeight: 48),
       padding: EdgeInsets.all(d.md),
       decoration: BoxDecoration(
         color: d.card,
         borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: d.border, width: 1),
+        border: Border.all(color: cardBorderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: d.authDark.withValues(alpha: 0.04),
-            offset: const Offset(0, 2),
-            blurRadius: 8,
+            color: d.authDark.withValues(alpha: _isHovered ? 0.08 : 0.04),
+            offset: Offset(0, _isHovered ? 4 : 2),
+            blurRadius: _isHovered ? 14 : 8,
           ),
         ],
       ),
@@ -50,8 +68,8 @@ class StatMetricCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(
-                icon,
-                key: ValueKey('stat-icon-$label'),
+                widget.icon,
+                key: ValueKey('stat-icon-${widget.label}'),
                 size: 18,
                 weight: 300,
                 color: d.primary,
@@ -59,7 +77,7 @@ class StatMetricCard extends StatelessWidget {
               SizedBox(width: d.sm),
               Expanded(
                 child: Text(
-                  label,
+                  widget.label,
                   style: d.supporting.copyWith(
                     color: d.mutedForeground,
                     fontWeight: FontWeight.w600,
@@ -71,7 +89,7 @@ class StatMetricCard extends StatelessWidget {
           ),
           SizedBox(height: d.sm),
           Text(
-            value,
+            widget.value,
             style: d.sectionTitle.copyWith(
               fontSize: 22,
               fontWeight: FontWeight.w700,
@@ -79,10 +97,10 @@ class StatMetricCard extends StatelessWidget {
               letterSpacing: -0.3,
             ),
           ),
-          if (subtitle != null) ...[
+          if (widget.subtitle != null) ...[
             const SizedBox(height: 2),
             Text(
-              subtitle!,
+              widget.subtitle!,
               style: d.badge.copyWith(
                 color: d.mutedForeground,
                 fontWeight: FontWeight.w400,
@@ -94,18 +112,27 @@ class StatMetricCard extends StatelessWidget {
       ),
     );
 
-    if (onTap != null) {
+    final wrapped = MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: isInteractive
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      child: content,
+    );
+
+    if (widget.onTap != null) {
       return AppPressable(
         semanticLabel: semanticSummary,
-        onPressed: onTap,
-        child: content,
+        onPressed: widget.onTap,
+        child: wrapped,
       );
     }
 
     return Semantics(
       container: true,
       label: semanticSummary,
-      child: content,
+      child: wrapped,
     );
   }
 }

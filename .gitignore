@@ -39,6 +39,11 @@ build.bak/
 .DS_Store
 Thumbs.db
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
 # Agent Temporary Workspaces
 .superpowers/
 .worktrees/

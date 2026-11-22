@@ -586,6 +586,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     return AppPageScaffold(
       title: 'Attendance & Event Reports',
+      maxWidth: 1100,
       embedded: widget.embedded,
       body: FocusTraversalGroup(
         child: SingleChildScrollView(
@@ -732,7 +733,7 @@ class _ReportExportButtonsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final d = context.design;
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 880),
+      constraints: const BoxConstraints(maxWidth: 1100),
       child: Container(
         padding: EdgeInsets.all(d.md),
         decoration: BoxDecoration(
@@ -920,7 +921,7 @@ class _ReportPayloadViewer extends StatelessWidget {
     return Align(
       alignment: Alignment.topLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
+        constraints: const BoxConstraints(maxWidth: 1100),
         child: Container(
           padding: EdgeInsets.all(d.md),
           decoration: BoxDecoration(
@@ -937,7 +938,10 @@ class _ReportPayloadViewer extends StatelessWidget {
               ),
             ],
           ),
-          child: Text(payload.toString(), style: d.body, softWrap: true),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Text(payload.toString(), style: d.body, softWrap: true),
+          ),
         ),
       ),
     );

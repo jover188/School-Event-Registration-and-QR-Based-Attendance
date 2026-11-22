@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../../../core/animations/app_animations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_spinner.dart';
@@ -91,78 +92,85 @@ class ScanResultContent extends StatelessWidget {
         container: true,
         liveRegion: true,
         label: 'Scan rejected: $errorMessage',
-        child: Container(
-          padding: EdgeInsets.all(d.lg),
-          decoration: BoxDecoration(
-            color: d.card,
-            borderRadius: BorderRadius.circular(d.radiusCard),
-            border: Border.all(color: d.destructive.withValues(alpha: 0.3)),
-            boxShadow: [
-              BoxShadow(
-                color: d.authDark.withValues(alpha: 0.04),
-                offset: const Offset(0, 2),
-                blurRadius: 8,
+        child: EntranceFader(
+          duration: const Duration(milliseconds: 250),
+          offset: const Offset(0.0, 6.0),
+          child: Container(
+            padding: EdgeInsets.all(d.lg),
+            decoration: BoxDecoration(
+              color: d.card,
+              borderRadius: BorderRadius.circular(d.radiusCard),
+              border: Border.all(
+                color: d.destructive,
+                width: 1.5,
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(d.sm),
-                    decoration: BoxDecoration(
-                      color: d.dangerBackground,
-                      borderRadius: BorderRadius.circular(d.radiusControl),
-                    ),
-                    child: Icon(
-                      LucideIcons.alertCircle,
-                      color: d.destructive,
-                      size: 22,
-                    ),
-                  ),
-                  SizedBox(width: d.gap),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Scan Rejected', style: d.cardTitle),
-                        SizedBox(height: d.xs),
-                        const StatusBadge(
-                          status: 'rejected',
-                          label: 'NOT RECORDED',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: d.md),
-              Text(
-                errorMessage!,
-                style: d.body,
-              ),
-              SizedBox(height: d.lg),
-              AppButton(
-                key: const ValueKey<String>('scan-error-retry-button'),
-                label: 'Scan Next QR Code',
-                pill: true,
-                icon: LucideIcons.scanLine,
-                onPressed: onScanNext,
-              ),
-              if (onOpenAttendance != null) ...[
-                SizedBox(height: d.sm),
-                AppButton(
-                  label: 'View attendance',
-                  variant: AppButtonVariant.outline,
-                  pill: true,
-                  icon: LucideIcons.clipboardCheck,
-                  onPressed: onOpenAttendance,
+              boxShadow: [
+                BoxShadow(
+                  color: d.destructive.withValues(alpha: 0.12),
+                  offset: const Offset(0, 4),
+                  blurRadius: 12,
                 ),
               ],
-            ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(d.sm),
+                      decoration: BoxDecoration(
+                        color: d.dangerBackground,
+                        borderRadius: BorderRadius.circular(d.radiusControl),
+                      ),
+                      child: Icon(
+                        LucideIcons.alertCircle,
+                        color: d.destructive,
+                        size: 22,
+                      ),
+                    ),
+                    SizedBox(width: d.gap),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Scan Rejected', style: d.cardTitle),
+                          SizedBox(height: d.xs),
+                          const StatusBadge(
+                            status: 'rejected',
+                            label: 'NOT RECORDED',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: d.md),
+                Text(
+                  errorMessage!,
+                  style: d.body,
+                ),
+                SizedBox(height: d.lg),
+                AppButton(
+                  key: const ValueKey<String>('scan-error-retry-button'),
+                  label: 'Scan Next QR Code',
+                  pill: true,
+                  icon: LucideIcons.scanLine,
+                  onPressed: onScanNext,
+                ),
+                if (onOpenAttendance != null) ...[
+                  SizedBox(height: d.sm),
+                  AppButton(
+                    label: 'View attendance',
+                    variant: AppButtonVariant.outline,
+                    pill: true,
+                    icon: LucideIcons.clipboardCheck,
+                    onPressed: onOpenAttendance,
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       );
@@ -245,116 +253,127 @@ class ScanResultContent extends StatelessWidget {
       liveRegion: true,
       label:
           'Scan verified for $fullName, ID $studentIdNumber, status $statusUpper',
-      child: Container(
-        padding: EdgeInsets.all(d.lg),
-        decoration: BoxDecoration(
-          color: d.card,
-          borderRadius: BorderRadius.circular(d.radiusCard),
-          border: Border.all(
-            color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: d.authDark.withValues(alpha: 0.04),
-              offset: const Offset(0, 2),
-              blurRadius: 8,
+      child: EntranceFader(
+        duration: const Duration(milliseconds: 300),
+        offset: const Offset(0.0, 8.0),
+        child: Container(
+          padding: EdgeInsets.all(d.lg),
+          decoration: BoxDecoration(
+            color: d.card,
+            borderRadius: BorderRadius.circular(d.radiusCard),
+            border: Border.all(
+              color: d.isDark ? d.border : d.authDark.withValues(alpha: 0.08),
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: CircleAvatar(
-                radius: 40,
-                backgroundColor: d.selection,
-                backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                    ? CachedNetworkImageProvider(photoUrl)
-                    : null,
-                child: photoUrl == null || photoUrl.isEmpty
-                    ? Text(
-                        _resolveInitials(fullName),
-                        style: d.sectionTitle.copyWith(
-                          color: d.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    : null,
+            boxShadow: [
+              BoxShadow(
+                color: d.authDark.withValues(alpha: 0.04),
+                offset: const Offset(0, 2),
+                blurRadius: 8,
               ),
-            ),
-            SizedBox(height: d.md),
-            Text(
-              fullName,
-              style: d.sectionTitle,
-              textAlign: TextAlign.center,
-              softWrap: true,
-            ),
-            SizedBox(height: d.xs),
-            Text(
-              'Student ID: $studentIdNumber',
-              style: d.body.copyWith(fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-            ),
-            if (academicParts.isNotEmpty) ...[
-              SizedBox(height: d.xs),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const AnimatedCheckmark(size: 64),
+                    SizedBox(height: d.md),
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundColor: d.selection,
+                      backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                          ? CachedNetworkImageProvider(photoUrl)
+                          : null,
+                      child: photoUrl == null || photoUrl.isEmpty
+                          ? Text(
+                              _resolveInitials(fullName),
+                              style: d.sectionTitle.copyWith(
+                                color: d.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: d.md),
               Text(
-                academicParts,
-                style: d.supporting,
+                fullName,
+                style: d.sectionTitle,
                 textAlign: TextAlign.center,
                 softWrap: true,
               ),
-            ],
-            SizedBox(height: d.md),
-            Center(
-              child: StatusBadge(
-                status: rawStatus,
-                label: isCheckOut
-                    ? 'CHECK-OUT RECORDED ($statusUpper)'
-                    : 'CHECK-IN: $statusUpper',
+              SizedBox(height: d.xs),
+              Text(
+                'Student ID: $studentIdNumber',
+                style: d.body.copyWith(fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
               ),
-            ),
-            SizedBox(height: d.md),
-            Container(
-              padding: EdgeInsets.all(d.gap),
-              decoration: BoxDecoration(
-                color: d.isDark ? d.muted : const Color(0xFFFBFBFA),
-                borderRadius: BorderRadius.circular(d.radiusControl),
-                border: Border.all(
-                  color: d.isDark
-                      ? d.border
-                      : d.authDark.withValues(alpha: 0.08),
+              if (academicParts.isNotEmpty) ...[
+                SizedBox(height: d.xs),
+                Text(
+                  academicParts,
+                  style: d.supporting,
+                  textAlign: TextAlign.center,
+                  softWrap: true,
+                ),
+              ],
+              SizedBox(height: d.md),
+              Center(
+                child: StatusBadge(
+                  status: rawStatus,
+                  label: isCheckOut
+                      ? 'CHECK-OUT RECORDED ($statusUpper)'
+                      : 'CHECK-IN: $statusUpper',
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$timeLabel: ${primaryTimestamp.replaceAll('T', ' ').split('.').first}',
-                    style: d.supporting.copyWith(
-                      color: d.foreground,
-                      fontWeight: FontWeight.w600,
-                    ),
+              SizedBox(height: d.md),
+              Container(
+                padding: EdgeInsets.all(d.gap),
+                decoration: BoxDecoration(
+                  color: d.isDark ? d.muted : const Color(0xFFFBFBFA),
+                  borderRadius: BorderRadius.circular(d.radiusControl),
+                  border: Border.all(
+                    color: d.isDark
+                        ? d.border
+                        : d.authDark.withValues(alpha: 0.08),
                   ),
-                  if (isCheckOut && checkInTime.isNotEmpty) ...[
-                    SizedBox(height: d.xs),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      'Check-In Time: ${checkInTime.replaceAll('T', ' ').split('.').first}',
-                      style: d.supporting,
+                      '$timeLabel: ${primaryTimestamp.replaceAll('T', ' ').split('.').first}',
+                      style: d.supporting.copyWith(
+                        color: d.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    if (isCheckOut && checkInTime.isNotEmpty) ...[
+                      SizedBox(height: d.xs),
+                      Text(
+                        'Check-In Time: ${checkInTime.replaceAll('T', ' ').split('.').first}',
+                        style: d.supporting,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            SizedBox(height: d.lg),
-            AppButton(
-              key: const ValueKey<String>('scan-next-button'),
-              label: 'Scan Next QR Code',
-              pill: true,
-              icon: LucideIcons.scanLine,
-              onPressed: onScanNext,
-            ),
-          ],
+              SizedBox(height: d.lg),
+              AppButton(
+                key: const ValueKey<String>('scan-next-button'),
+                label: 'Scan Next QR Code',
+                pill: true,
+                icon: LucideIcons.scanLine,
+                onPressed: onScanNext,
+              ),
+            ],
+          ),
         ),
       ),
     );

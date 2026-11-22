@@ -4,6 +4,7 @@ import 'core/network/api_client.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/realtime_notification_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/app_splash_screen.dart';
 import 'core/widgets/app_toast.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -155,18 +156,8 @@ class _SchoolAttendanceAppState extends State<SchoolAttendanceApp> {
             localizationsDelegates: const [GlobalShadLocalizations.delegate],
             scrollBehavior: const ShadScrollBehavior(),
             builder: (context, child) => ShadAppBuilder(child: child),
-            home: FutureBuilder<Widget>(
-              future: _initialScreen,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Scaffold(
-                    body: Center(
-                      child: CircularProgressIndicator(color: AppTheme.primary),
-                    ),
-                  );
-                }
-                return snapshot.data ?? const LoginScreen();
-              },
+            home: AppSplashScreen(
+              initialScreenFuture: _initialScreen,
             ),
           ),
         );

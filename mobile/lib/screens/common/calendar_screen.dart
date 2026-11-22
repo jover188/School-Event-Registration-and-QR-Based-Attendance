@@ -274,78 +274,146 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final d = context.design;
     final isDark = d.isDark;
 
-    final scrollable = CustomScrollView(
-      key: const PageStorageKey<String>('calendar-scroll-view'),
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        SliverToBoxAdapter(
-          child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 900;
+
+        final Widget pageBody;
+        if (isWide) {
+          pageBody = Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // ── Branded App Header ──────────────────────────────────────────
               if (!widget.embedded) _buildAppHeader(context),
 
-              // ── Calendar Toolbar & View Selector ─────────────────────────────
-              _buildCalendarToolbar(context),
+              // ── Side-by-Side Responsive Content ──────────────────────────────
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left: Calendar controls and 7-column grid
+                    SizedBox(
+                      width: 440,
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.only(bottom: d.xl),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildCalendarToolbar(context),
+                            _buildCalendarGrid(context),
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                    ),
 
-              // ── 7-Column Calendar Grid ──────────────────────────────────────
-              _buildCalendarGrid(context),
+                    // Vertical separation divider
+                    VerticalDivider(
+                      width: 1,
+                      thickness: 1,
+                      color: isDark
+                          ? CalendarBwPalette.darkModeBorders
+                          : CalendarBwPalette.borders,
+                    ),
 
-              // Divider
-              Divider(
-                height: 1,
-                color: isDark
-                    ? CalendarBwPalette.darkModeBorders
-                    : CalendarBwPalette.borders,
+                    // Right: Event list for selected date
+                    Expanded(
+                      child: CustomScrollView(
+                        key: const PageStorageKey<String>('calendar-scroll-view'),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          ..._buildEventSlivers(context),
+                          SliverPadding(
+                            padding: EdgeInsets.only(bottom: d.xl + 48),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
+          );
+        } else {
+          pageBody = CustomScrollView(
+            key: const PageStorageKey<String>('calendar-scroll-view'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ── Branded App Header ──────────────────────────────────────────
+                    if (!widget.embedded) _buildAppHeader(context),
+
+                    // ── Calendar Toolbar & View Selector ─────────────────────────────
+                    _buildCalendarToolbar(context),
+
+                    // ── 7-Column Calendar Grid ──────────────────────────────────────
+                    _buildCalendarGrid(context),
+
+                    // Divider
+                    Divider(
+                      height: 1,
+                      color: isDark
+                          ? CalendarBwPalette.darkModeBorders
+                          : CalendarBwPalette.borders,
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Event list for selected date (or empty/loading/error state) ───────
+              ..._buildEventSlivers(context),
+
+              // ── Bottom Clearance Padding ─────────────────────────────────────────
+              // Prevents bottom navigation bar from covering the last event card
+              SliverPadding(
+                padding: EdgeInsets.only(bottom: d.xl + 48),
+              ),
+            ],
+          );
+        }
+
+        final scrollConfigured = ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            scrollbars: true,
+            dragDevices: {
+              PointerDeviceKind.touch,
+              PointerDeviceKind.mouse,
+              PointerDeviceKind.trackpad,
+              PointerDeviceKind.stylus,
+            },
           ),
-        ),
+          child: pageBody,
+        );
 
-        // ── Event list for selected date (or empty/loading/error state) ───────
-        ..._buildEventSlivers(context),
+        final content = Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: scrollConfigured,
+          ),
+        );
 
-        // ── Bottom Clearance Padding ─────────────────────────────────────────
-        // Prevents bottom navigation bar from covering the last event card
-        SliverPadding(
-          padding: EdgeInsets.only(bottom: d.xl + 48),
-        ),
-      ],
-    );
+        if (widget.embedded) {
+          return Container(
+            color: isDark
+                ? CalendarBwPalette.primaryBlack
+                : CalendarBwPalette.lightBackground,
+            child: content,
+          );
+        }
 
-    final scrollConfigured = ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(
-        scrollbars: true,
-        dragDevices: {
-          PointerDeviceKind.touch,
-          PointerDeviceKind.mouse,
-          PointerDeviceKind.trackpad,
-          PointerDeviceKind.stylus,
-        },
-      ),
-      child: scrollable,
-    );
-
-    final content = Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1080),
-        child: scrollConfigured,
-      ),
-    );
-
-    if (widget.embedded) {
-      return Container(
-        color: isDark ? CalendarBwPalette.primaryBlack : CalendarBwPalette.lightBackground,
-        child: content,
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: isDark ? CalendarBwPalette.primaryBlack : CalendarBwPalette.lightBackground,
-      body: SafeArea(
-        child: content,
-      ),
+        return Scaffold(
+          backgroundColor: isDark
+              ? CalendarBwPalette.primaryBlack
+              : CalendarBwPalette.lightBackground,
+          body: SafeArea(
+            child: content,
+          ),
+        );
+      },
     );
   }
 
@@ -901,8 +969,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 }
 
 /// Strictly black-and-white event card with monochrome category icon, status pill,
-/// location, time, and chevron navigation indicator.
-class _BwEventCard extends StatelessWidget {
+/// location, time, chevron navigation indicator, and desktop hover feedback.
+class _BwEventCard extends StatefulWidget {
   final EventModel event;
   final VoidCallback onTap;
 
@@ -986,17 +1054,29 @@ class _BwEventCard extends StatelessWidget {
   }
 
   @override
+  State<_BwEventCard> createState() => _BwEventCardState();
+}
+
+class _BwEventCardState extends State<_BwEventCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final d = context.design;
     final isDark = d.isDark;
+    final event = widget.event;
     final cardBg = isDark ? CalendarBwPalette.darkSurfaces : CalendarBwPalette.primaryWhite;
-    final cardBorder = isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.borders;
+    final cardBorder = _isHovered
+        ? (isDark
+            ? CalendarBwPalette.subtleDarkGray
+            : CalendarBwPalette.primaryBlack.withValues(alpha: 0.35))
+        : (isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.borders);
     final iconBg = isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.secondaryGray;
     final primaryColor = isDark ? CalendarBwPalette.primaryWhite : CalendarBwPalette.primaryBlack;
     final badgeBg = isDark ? CalendarBwPalette.darkModeBorders : CalendarBwPalette.secondaryGray;
 
-    final icon = _categoryIconForEvent(event);
-    final categoryLabel = _categoryLabelForEvent(event);
+    final icon = _BwEventCard._categoryIconForEvent(event);
+    final categoryLabel = _BwEventCard._categoryLabelForEvent(event);
     final statusText = event.status.replaceAll('_', ' ').toUpperCase();
 
     final maxCap = event.maxParticipants;
@@ -1011,109 +1091,137 @@ class _BwEventCard extends StatelessWidget {
             : event.startTime)
         : '';
 
-    return Container(
-      margin: EdgeInsets.only(bottom: d.gap),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(d.radiusCard),
-        border: Border.all(color: cardBorder, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: CalendarBwPalette.primaryBlack.withValues(alpha: 0.03),
-            offset: const Offset(0, 2),
-            blurRadius: 6,
-          ),
-        ],
-      ),
-      child: AppPressable(
-        onPressed: onTap,
-        semanticLabel: '${event.title}, $categoryLabel, ${event.venue}',
-        child: Padding(
-          padding: EdgeInsets.all(d.md),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Top-left icon aligned and centered with title + badges
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Icon(
-                          icon,
-                          size: 18,
-                          color: primaryColor,
-                        ),
-                        SizedBox(width: d.sm),
-                        Expanded(
-                          child: Text(
-                            event.title,
-                            style: d.cardTitle.copyWith(
-                              color: primaryColor,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        margin: EdgeInsets.only(bottom: d.gap),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(d.radiusCard),
+          border: Border.all(color: cardBorder, width: 1.0),
+          boxShadow: [
+            BoxShadow(
+              color: CalendarBwPalette.primaryBlack
+                  .withValues(alpha: _isHovered ? 0.08 : 0.03),
+              offset: Offset(0, _isHovered ? 4 : 2),
+              blurRadius: _isHovered ? 12 : 6,
+            ),
+          ],
+        ),
+        child: AppPressable(
+          onPressed: widget.onTap,
+          semanticLabel: '${event.title}, $categoryLabel, ${event.venue}',
+          child: Padding(
+            padding: EdgeInsets.all(d.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Top-left icon aligned and centered with title + badges
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Icon(
+                            icon,
+                            size: 18,
+                            color: primaryColor,
+                          ),
+                          SizedBox(width: d.sm),
+                          Expanded(
+                            child: Text(
+                              event.title,
+                              style: d.cardTitle.copyWith(
+                                color: primaryColor,
+                              ),
+                              softWrap: true,
                             ),
-                            softWrap: true,
                           ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: d.xs),
-                    // Category & Status row
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          categoryLabel,
-                          style: d.badge.copyWith(
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.6,
-                            color: CalendarBwPalette.mutedText,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 1.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: badgeBg,
-                            borderRadius: BorderRadius.circular(d.radiusControl),
-                            border: Border.all(color: cardBorder, width: 1),
-                          ),
-                          child: Text(
-                            statusText,
+                        ],
+                      ),
+                      SizedBox(height: d.xs),
+                      // Category & Status row
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            categoryLabel,
                             style: d.badge.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: primaryColor,
+                              letterSpacing: 0.6,
+                              color: CalendarBwPalette.mutedText,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    // Venue & Time
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (formattedTime.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: badgeBg,
+                              borderRadius: BorderRadius.circular(d.radiusControl),
+                              border: Border.all(color: cardBorder, width: 1),
+                            ),
+                            child: Text(
+                              statusText,
+                              style: d.badge.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: primaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Venue & Time
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (formattedTime.isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  LucideIcons.clock,
+                                  size: 14,
+                                  color: primaryColor,
+                                ),
+                                SizedBox(width: d.xs),
+                                Flexible(
+                                  child: Text(
+                                    formattedTime,
+                                    style: d.supporting.copyWith(
+                                      color: CalendarBwPalette.mutedText,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                LucideIcons.clock,
+                                LucideIcons.mapPin,
                                 size: 14,
                                 color: primaryColor,
                               ),
                               SizedBox(width: d.xs),
                               Flexible(
                                 child: Text(
-                                  formattedTime,
+                                  event.venue,
                                   style: d.supporting.copyWith(
                                     color: CalendarBwPalette.mutedText,
                                   ),
@@ -1123,60 +1231,40 @@ class _BwEventCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              LucideIcons.mapPin,
-                              size: 14,
-                              color: primaryColor,
-                            ),
-                            SizedBox(width: d.xs),
-                            Flexible(
-                              child: Text(
-                                event.venue,
-                                style: d.supporting.copyWith(
-                                  color: CalendarBwPalette.mutedText,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        ],
+                      ),
+                      if (progress != null) ...[
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(d.radiusControl),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 4,
+                            backgroundColor: iconBg,
+                            color: primaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Capacity: $registered / $maxCap',
+                          style: d.supporting.copyWith(
+                            fontWeight: FontWeight.w500,
+                            color: CalendarBwPalette.mutedText,
+                          ),
                         ),
                       ],
-                    ),
-                    if (progress != null) ...[
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(d.radiusControl),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 4,
-                          backgroundColor: iconBg,
-                          color: primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Capacity: $registered / $maxCap',
-                        style: d.supporting.copyWith(
-                          fontWeight: FontWeight.w500,
-                          color: CalendarBwPalette.mutedText,
-                        ),
-                      ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              SizedBox(width: d.sm),
-              // Chevron indicator matched to primary theme color
-              Icon(
-                LucideIcons.chevronRight,
-                size: 18,
-                color: primaryColor,
-              ),
-            ],
+                SizedBox(width: d.sm),
+                // Chevron indicator matched to primary theme color
+                Icon(
+                  LucideIcons.chevronRight,
+                  size: 18,
+                  color: primaryColor,
+                ),
+              ],
+            ),
           ),
         ),
       ),
