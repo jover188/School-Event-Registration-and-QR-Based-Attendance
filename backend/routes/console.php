@@ -42,32 +42,9 @@ Schedule::call(function () {
 //    has been reached today, and marks published/ongoing events as 'completed'
 //    once their end_time has passed.
 Schedule::call(function () {
-    $now = Carbon::now();
-
-    $toOngoing = Event::where('status', 'published')
-        ->whereDate('event_date', Carbon::today())
-        ->get()
-        ->filter(function ($event) use ($now) {
-            $startDt = Carbon::parse($event->event_date->format('Y-m-d') . ' ' . $event->start_time);
-            $endDt   = Carbon::parse($event->event_date->format('Y-m-d') . ' ' . $event->end_time);
-            return $now->greaterThanOrEqualTo($startDt) && $now->lessThan($endDt);
-        });
-
-    foreach ($toOngoing as $event) {
-        $event->update(['status' => 'ongoing']);
-        Log::info("[Scheduler] Event #{$event->id} '{$event->title}' transitioned to ongoing.");
-    }
-
-    $toClose = Event::whereIn('status', ['published', 'ongoing'])
-        ->get()
-        ->filter(function ($event) use ($now) {
-            $endDt = Carbon::parse($event->event_date->format('Y-m-d') . ' ' . $event->end_time);
-            return $now->greaterThan($endDt);
-        });
-
-    foreach ($toClose as $event) {
-        $event->update(['status' => 'completed']);
-        Log::info("[Scheduler] Event #{$event->id} '{$event->title}' auto-closed as completed.");
+    $closedCount = Event::syncExpiredEvents();
+    if ($closedCount > 0) {
+        Log::info("[Scheduler] auto-close-events: {$closedCount} expired event(s) auto-closed as completed.");
     }
 })->everyFiveMinutes()->name('auto-close-events')->withoutOverlapping();
 

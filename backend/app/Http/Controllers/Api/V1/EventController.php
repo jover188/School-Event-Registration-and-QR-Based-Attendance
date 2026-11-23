@@ -20,6 +20,8 @@ class EventController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        Event::syncExpiredEvents();
+
         $user = $request->user();
         $query = Event::with('organizer:id,email');
 
@@ -224,6 +226,7 @@ class EventController extends Controller
     {
         $user = $request->user();
         $event = Event::with(['organizer:id,email', 'approvals'])->findOrFail($id);
+        $event->checkAndTransitionStatus();
 
         if ($user->isStudent()) {
             $hasHistory = $user->student && $event->registrations()->where('student_id', $user->student->id)->exists();

@@ -394,7 +394,7 @@ class AppDesignTokens extends ThemeExtension<AppDesignTokens> {
         'approved' =>
           success,
         'ongoing' || 'walk_in' || 'walk-in' => information,
-        'completed' => primary,
+        'completed' || 'ended' => primary,
         'late' || 'pending_approval' || 'pending' => warning,
         'waiting_list' || 'waiting' => waiting,
         'excused' => excused,
@@ -417,7 +417,7 @@ class AppDesignTokens extends ThemeExtension<AppDesignTokens> {
         'approved' =>
           successBackground,
         'ongoing' || 'walk_in' || 'walk-in' => informationBackground,
-        'completed' => selection,
+        'completed' || 'ended' => selection,
         'late' || 'pending_approval' || 'pending' => warningBackground,
         'waiting_list' || 'waiting' => waitingBackground,
         'excused' => excusedBackground,

@@ -31,6 +31,7 @@ class AttendanceController extends Controller
         ]);
 
         $event = Event::findOrFail($eventId);
+        $event->checkAndTransitionStatus();
         $scannerUser = $request->user();
 
         if (!$scannerUser->isAdmin() && $event->organizer_id !== $scannerUser->id) {

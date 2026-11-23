@@ -127,6 +127,56 @@ class EventModel {
   bool get isRegistered => userRegistrationStatus == 'registered';
   bool get isWaitingList => userRegistrationStatus == 'waiting_list';
 
+  DateTime? get startDateTime {
+    if (eventDate.isEmpty || startTime.isEmpty) return null;
+    try {
+      final dateClean = eventDate.split('T').first.trim();
+      final timeClean = startTime.trim();
+      final timeParts = timeClean.split(':');
+      final hour = timeParts.isNotEmpty ? (int.tryParse(timeParts[0]) ?? 0) : 0;
+      final minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final second = timeParts.length > 2 ? (int.tryParse(timeParts[2].split('.').first) ?? 0) : 0;
+
+      final parsedDate = DateTime.tryParse(dateClean);
+      if (parsedDate != null) {
+        return DateTime(parsedDate.year, parsedDate.month, parsedDate.day, hour, minute, second);
+      }
+      return DateTime.tryParse('${dateClean}T$timeClean');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  DateTime? get endDateTime {
+    if (eventDate.isEmpty || endTime.isEmpty) return null;
+    try {
+      final dateClean = eventDate.split('T').first.trim();
+      final timeClean = endTime.trim();
+      final timeParts = timeClean.split(':');
+      final hour = timeParts.isNotEmpty ? (int.tryParse(timeParts[0]) ?? 0) : 0;
+      final minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final second = timeParts.length > 2 ? (int.tryParse(timeParts[2].split('.').first) ?? 0) : 0;
+
+      final parsedDate = DateTime.tryParse(dateClean);
+      if (parsedDate != null) {
+        return DateTime(parsedDate.year, parsedDate.month, parsedDate.day, hour, minute, second);
+      }
+      return DateTime.tryParse('${dateClean}T$timeClean');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool get isEnded {
+    final s = status.trim().toLowerCase();
+    if (s == 'completed' || s == 'ended') return true;
+    final end = endDateTime;
+    if (end != null) {
+      return DateTime.now().isAfter(end) || DateTime.now().isAtSameMomentAs(end);
+    }
+    return false;
+  }
+
   String get audienceSummary {
     if (targetAudienceType == 'course') {
       return targetCourses.isEmpty

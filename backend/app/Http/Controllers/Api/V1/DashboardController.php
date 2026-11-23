@@ -20,6 +20,7 @@ class DashboardController extends Controller
      */
     public function student(Request $request): JsonResponse
     {
+        Event::syncExpiredEvents();
         $user = $request->user();
         $student = $user->student;
 
@@ -73,6 +74,7 @@ class DashboardController extends Controller
      */
     public function organizer(Request $request): JsonResponse
     {
+        Event::syncExpiredEvents();
         $user = $request->user();
         $organizedQuery = Event::where('organizer_id', $user->id);
 
@@ -109,6 +111,7 @@ class DashboardController extends Controller
      */
     public function management(): JsonResponse
     {
+        Event::syncExpiredEvents();
         $totalEvents = Event::whereIn('status', ['published', 'ongoing', 'completed'])->count();
         $totalRegistrations = EventRegistration::where('status', 'registered')->count();
         $totalAttendances = Attendance::count();
@@ -154,6 +157,7 @@ class DashboardController extends Controller
      */
     public function admin(): JsonResponse
     {
+        Event::syncExpiredEvents();
         $pendingApprovals = Event::where('status', 'pending_approval')->count();
         $totalUsers = User::count();
         $totalStudents = Student::count();

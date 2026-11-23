@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_page_scaffold.dart';
 import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_spinner.dart';
+import '../../core/widgets/event_card.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/event_model.dart';
 import 'live_attendance_screen.dart';
@@ -44,9 +46,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   late bool _isProcessing;
   Map<String, dynamic>? _activeScanResult;
   String? _activeScanError;
+  bool _isLocallyExpired = false;
+  Timer? _expirationCheckTimer;
 
-  bool get _isEventScannable =>
-      widget.event.status == 'published' || widget.event.status == 'ongoing';
+  bool get _isEventScannable {
+    final statusNorm = widget.event.status.trim().toLowerCase();
+    final isStatusActive = statusNorm == 'published' || statusNorm == 'ongoing';
+    return isStatusActive && !widget.event.isEnded && !_isLocallyExpired;
+  }
 
   bool get _isCameraSupported =>
       widget.cameraSupportedOverride ??
@@ -67,8 +74,27 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     _activeScanResult = widget.initialScanResult;
     _activeScanError = widget.initialScanError;
 
+    _checkExpiration();
+    _expirationCheckTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _checkExpiration();
+    });
+
     if (_shouldMountCamera) {
       _scannerController = MobileScannerController();
+    }
+  }
+
+  void _checkExpiration() {
+    if (_isLocallyExpired) return;
+    if (widget.event.isEnded) {
+      if (mounted) {
+        setState(() {
+          _isLocallyExpired = true;
+          _activeScanError =
+              'This event has ended and is no longer accepting attendance scans.';
+        });
+        _scannerController?.stop();
+      }
     }
   }
 
@@ -87,10 +113,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     if (widget.initialScanError != oldWidget.initialScanError) {
       _activeScanError = widget.initialScanError;
     }
+    _checkExpiration();
   }
 
   @override
   void dispose() {
+    _expirationCheckTimer?.cancel();
     _scannerController?.dispose();
     super.dispose();
   }
@@ -114,7 +142,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 
   void _clearScanFeedback() {
-    if (_isProcessing) return;
+    if (_isProcessing || !_isEventScannable) return;
     setState(() {
       _activeScanResult = null;
       _activeScanError = null;
@@ -126,6 +154,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     if (_isProcessing ||
         _activeScanResult != null ||
         _activeScanError != null) {
+      return;
+    }
+
+    if (!_isEventScannable) {
+      _scannerController?.stop();
+      setState(() {
+        _isLocallyExpired = true;
+        _activeScanError =
+            'This event has ended and is no longer accepting attendance scans.';
+      });
       return;
     }
 
@@ -265,7 +303,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               ),
             ],
           ),
-          StatusBadge(status: widget.event.status),
+          StatusBadge(
+            status: (widget.event.isEnded || _isLocallyExpired)
+                ? 'completed'
+                : widget.event.status,
+            label: (widget.event.isEnded || _isLocallyExpired) ? 'ENDED' : null,
+          ),
         ],
       ),
     );
@@ -273,6 +316,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
   Widget _buildNonActiveEventNotice(BuildContext context) {
     final d = context.design;
+    final isEnded = widget.event.isEnded || _isLocallyExpired;
+
     return Container(
       padding: EdgeInsets.all(d.lg),
       decoration: BoxDecoration(
@@ -302,7 +347,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   borderRadius: BorderRadius.circular(d.radiusControl),
                 ),
                 child: Icon(
-                  LucideIcons.lock,
+                  isEnded ? LucideIcons.clock : LucideIcons.lock,
                   color: d.warning,
                   size: 22,
                 ),
@@ -313,11 +358,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Scanning Not Active for This Event State',
+                      isEnded
+                          ? 'Event Has Ended'
+                          : 'Scanning Not Active for This Event State',
                       style: d.cardTitle,
                     ),
                     SizedBox(height: d.xs),
-                    StatusBadge(status: widget.event.status),
+                    StatusBadge(
+                      status: isEnded ? 'completed' : widget.event.status,
+                      label: isEnded ? 'ENDED' : null,
+                    ),
                   ],
                 ),
               ),
@@ -325,7 +375,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           ),
           SizedBox(height: d.md),
           Text(
-            'QR attendance scanning is only available when an event is published or ongoing. This event is currently ${widget.event.status.replaceAll('_', ' ')}.',
+            isEnded
+                ? 'This event has reached its scheduled end date and time (${EventCard.formatTimeRange(widget.event.startTime, widget.event.endTime)}). New attendance scans are no longer accepted.'
+                : 'QR attendance scanning is only available when an event is published or ongoing. This event is currently ${widget.event.status.replaceAll('_', ' ')}.',
             style: d.body,
           ),
           SizedBox(height: d.lg),

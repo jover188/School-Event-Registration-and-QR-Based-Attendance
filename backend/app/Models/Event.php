@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -181,5 +182,100 @@ class Event extends Model
             })
             ->pluck('id')
             ->values();
+    }
+
+    /**
+     * Start datetime as Carbon instance in application timezone.
+     */
+    public function startDateTime(): ?Carbon
+    {
+        if (!$this->event_date || !$this->start_time) {
+            return null;
+        }
+        $dateStr = $this->event_date instanceof Carbon
+            ? $this->event_date->format('Y-m-d')
+            : substr((string) $this->event_date, 0, 10);
+        return Carbon::parse("{$dateStr} {$this->start_time}");
+    }
+
+    /**
+     * End datetime as Carbon instance in application timezone.
+     */
+    public function endDateTime(): ?Carbon
+    {
+        if (!$this->event_date || !$this->end_time) {
+            return null;
+        }
+        $dateStr = $this->event_date instanceof Carbon
+            ? $this->event_date->format('Y-m-d')
+            : substr((string) $this->event_date, 0, 10);
+        return Carbon::parse("{$dateStr} {$this->end_time}");
+    }
+
+    /**
+     * Check if this event has ended based on status or scheduled end date and time.
+     */
+    public function hasEnded(?Carbon $now = null): bool
+    {
+        if ($this->status === 'completed') {
+            return true;
+        }
+        $end = $this->endDateTime();
+        if (!$end) {
+            return false;
+        }
+        $now ??= Carbon::now();
+        return $now->greaterThanOrEqualTo($end);
+    }
+
+    /**
+     * Check if this event is currently ongoing.
+     */
+    public function isCurrentlyOngoing(?Carbon $now = null): bool
+    {
+        if ($this->status === 'completed' || $this->status === 'cancelled' || $this->status === 'draft') {
+            return false;
+        }
+        $start = $this->startDateTime();
+        $end = $this->endDateTime();
+        if (!$start || !$end) {
+            return false;
+        }
+        $now ??= Carbon::now();
+        return $now->greaterThanOrEqualTo($start) && $now->lessThan($end);
+    }
+
+    /**
+     * Check and transition this instance's status if past end time or reaching start time.
+     */
+    public function checkAndTransitionStatus(?Carbon $now = null): string
+    {
+        if (in_array($this->status, ['published', 'ongoing'], true) && $this->hasEnded($now)) {
+            $this->update(['status' => 'completed']);
+            $this->status = 'completed';
+        }
+        return $this->status;
+    }
+
+    /**
+     * Synchronize and transition expired events in the database to 'completed'.
+     * Can be called from scheduler, API controllers, or on-demand.
+     */
+    public static function syncExpiredEvents(?Carbon $now = null): int
+    {
+        $now ??= Carbon::now();
+        $today = $now->toDateString();
+        $currentTime = $now->toTimeString();
+
+        // Mark published/ongoing events that have reached or passed their end time as 'completed'
+        return self::whereIn('status', ['published', 'ongoing'])
+            ->where(function ($q) use ($today, $currentTime) {
+                $q->whereDate('event_date', '<', $today)
+                  ->orWhere(function ($sub) use ($today, $currentTime) {
+                      $sub->whereDate('event_date', '=', $today)
+                          ->where('end_time', '<=', $currentTime);
+                  });
+            })
+            ->update(['status' => 'completed']);
     }
 }

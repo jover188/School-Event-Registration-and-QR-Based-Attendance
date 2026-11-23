@@ -25,7 +25,7 @@ class StatusBadge extends StatelessWidget {
       'approved' =>
         LucideIcons.circleCheck,
       'ongoing' => LucideIcons.radio,
-      'completed' => LucideIcons.checkCheck,
+      'completed' || 'ended' => LucideIcons.checkCheck,
       'walk_in' || 'walk-in' => LucideIcons.footprints,
       'late' => LucideIcons.clock,
       'pending_approval' || 'pending' => LucideIcons.hourglass,

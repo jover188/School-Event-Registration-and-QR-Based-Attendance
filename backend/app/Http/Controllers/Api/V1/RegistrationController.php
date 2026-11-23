@@ -31,6 +31,7 @@ class RegistrationController extends Controller
         }
 
         $event = Event::findOrFail($eventId);
+        $event->checkAndTransitionStatus();
 
         if (!$event->isStudentEligible($student)) {
             return response()->json([
@@ -190,6 +191,7 @@ class RegistrationController extends Controller
         }
 
         $event = Event::findOrFail($eventId);
+        $event->checkAndTransitionStatus();
 
         // Disallow cancellation once event has started
         $eventStart = Carbon::parse("{$event->event_date->format('Y-m-d')} {$event->start_time}");
@@ -296,6 +298,7 @@ class RegistrationController extends Controller
     public function cancelByStaff(int $eventId, int $registrationId, Request $request): JsonResponse
     {
         $event = Event::findOrFail($eventId);
+        $event->checkAndTransitionStatus();
         $user = $request->user();
 
         if (!$user->isAdmin() && $event->organizer_id !== $user->id) {
@@ -407,6 +410,7 @@ class RegistrationController extends Controller
     public function index(int $eventId, Request $request): JsonResponse
     {
         $event = Event::findOrFail($eventId);
+        $event->checkAndTransitionStatus();
         $user = $request->user();
 
         if (!$user->isAdmin() && !$user->isManagement() && $event->organizer_id !== $user->id) {
